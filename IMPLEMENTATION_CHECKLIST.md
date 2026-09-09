@@ -66,7 +66,8 @@ Acceptance: a fresh checkout can run documented checks; missing secrets fail cle
 
 ### 03 — Create persistent databases and private storage
 
-- [ ] Provision development Supabase and prepare separate production configuration.
+- [x] Initialize local Supabase CLI configuration with development auth, redirects, 10 MB upload limit, and email-verification defaults.
+- [ ] Provision a runnable development Supabase database and prepare separate production configuration.
 - [x] Draft the initial migration for profiles, brokerage/IRA accounts, imports, immutable source rows, normalized ledger entries, lots/opening balances, instruments/aliases, price revisions, corporate actions/corrections, report snapshots, billing state, audit events and job outbox.
 - [ ] Apply and verify the migration in Supabase; enable row-level security and ownership constraints on every user-owned table. Global prices are shared data with restricted writes.
 - [x] Define a private brokerage-statement bucket and ownership policies in the initial migration.
@@ -253,5 +254,6 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 13 — Billing entitlement rules (partial) | One-time trial and replay-safe event reducers added; `npm run typecheck`, `npm test` (36 passing), and `npm run build` passed | Stripe products, signed HTTP webhooks, checkout, billing portal, and server enforcement require Stripe configuration |
 | 2026-09-09 | 14 — Raw-file retention (partial) | 30-day retention eligibility and auditable deletion-state rules added; `npm run typecheck`, `npm test` (38 passing), and `npm run build` passed | Storage deletion job, retries, and verification require private Supabase storage |
 | 2026-09-09 | 14 — User-deletion rules (partial) | User-data deletion lifecycle and complete cleanup-plan rules added; `npm run typecheck`, `npm test` (40 passing), and `npm run build` passed | Actual storage, billing, database, and export execution requires configured services |
+| 2026-09-09 | 03/04 — Local Supabase configuration (partial) | Supabase CLI configuration initialized with product-aligned local auth, redirects, and file-size settings | Docker is not installed, so local database start and schema lint cannot run; no hosted Supabase project is linked |
 
 For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.
