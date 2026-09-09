@@ -153,6 +153,7 @@ Acceptance: repeated seed jobs are idempotent; suspicious records are excluded f
 - [x] Implement the server-only provider HTTP adapter and normalized decimal-string responses.
 - [x] Add a free-development request budget object; configure an actual key and confirm the allowance before scheduling.
 - [x] Add a tested New York-time standard NYSE full-day holiday calendar and EOD eligibility guard; extraordinary closures and early closes remain explicit operational overrides.
+- [x] Add a tested EOD refresh coordinator that coalesces supplied symbols and rejects incomplete, duplicate, off-date, or unrequested provider results before persistence.
 - [ ] Schedule after-market-close updates using U.S. trading sessions, holidays and daylight saving time.
 - [ ] Fetch each unique currently held symbol once across users; use shared database values for every dashboard view.
 - [ ] Add retry/backoff, pagination where needed, idempotency, gap backfills and dead-letter visibility.
