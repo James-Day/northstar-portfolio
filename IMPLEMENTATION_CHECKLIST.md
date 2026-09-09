@@ -67,9 +67,10 @@ Acceptance: a fresh checkout can run documented checks; missing secrets fail cle
 ### 03 — Create persistent databases and private storage
 
 - [ ] Provision development Supabase and prepare separate production configuration.
-- [ ] Add migrations for profiles, brokerage/IRA accounts, imports, immutable source rows, normalized ledger entries, lots/opening balances, instruments/aliases, price revisions, corporate actions/corrections, report snapshots, billing state, audit events and job outbox.
-- [ ] Enable row-level security and ownership constraints on every user-owned table. Global prices are shared data with restricted writes.
-- [ ] Create private upload storage with signed access and account ownership validation.
+- [x] Draft the initial migration for profiles, brokerage/IRA accounts, imports, immutable source rows, normalized ledger entries, lots/opening balances, instruments/aliases, price revisions, corporate actions/corrections, report snapshots, billing state, audit events and job outbox.
+- [ ] Apply and verify the migration in Supabase; enable row-level security and ownership constraints on every user-owned table. Global prices are shared data with restricted writes.
+- [x] Define a private brokerage-statement bucket and ownership policies in the initial migration.
+- [ ] Verify signed upload access and account ownership validation against real storage.
 - [ ] Add transactional operations for import commit/undo and versioned report publication.
 
 Acceptance: data survives reload and a second session; user A cannot read or modify user B's accounts, imports or objects, even with guessed IDs.
@@ -228,5 +229,6 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | Repository audit and checklist created | Read routes, UI components, portfolio logic, package/config and Git status | No live services or runtime tests verified in this audit |
 | 2026-09-09 | 01 — Truthful and safe prototype | Commit `9890b19`; synthetic labels, temporary CSV preview, disabled fake sign-in, and accurate unavailable states; `npm run build`, `npx tsc --noEmit`, and local `/dashboard` HTTP 200 passed | Full lint remains blocked by pre-existing vendored UI lint errors; no authentication, storage, reporting, or price data exists |
 | 2026-09-09 | 02 — Backend/test foundation (partial) | Commit `9890b19`; exact-decimal/date/instrument contracts, server-only environment template, Hono API shell, Vitest/Playwright scripts, CI, README, dependency updates; `npm run typecheck`, `npm test` (2 passing), and `npm run build` passed | API shell is not mounted; Supabase, queues, database tests, and browser flows require service configuration and implementation |
+| 2026-09-09 | 03 — Persistence (schema foundation) | Initial Supabase migration and public-client factory added; `npm run typecheck`, `npm test` (2 passing), and `npm run build` passed | Migration and storage policies are unverified until a development Supabase project is configured |
 
 For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.

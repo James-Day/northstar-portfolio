@@ -14,6 +14,10 @@ The present UI is a Vinext/Sites application. The planned production system keep
 
 The module boundaries are identity/billing, accounts, ingestion, ledger, calculations, market data, and reporting. The source folders now establish the shared numeric, date, instrument-alias, configuration, and API-health contracts. The API is not mounted until user authentication and database ownership controls are implemented.
 
+## Supabase schema
+
+`supabase/migrations/20260909120000_initial_schema.sql` is the initial PostgreSQL schema. It stores immutable import rows, normalized ledger entries, FIFO lots, price revisions, report snapshots, billing state, audit data, and job-outbox events. It also enables row-level security for user-owned records and creates a private `brokerage-statements` storage bucket. Apply it only to a Supabase development project after its URL and anonymous key are configured; no database credentials belong in this repository.
+
 ## Marketstack during development
 
 Marketstack is not called by the application yet. When the daily-price job is implemented, use a development-only free key via `MARKETSTACK_API_KEY`; keep it server-only and use an explicit conservative request cap. Production configuration requires a commercial plan and rights review before any public release.
