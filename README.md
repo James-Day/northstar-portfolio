@@ -20,4 +20,4 @@ The module boundaries are identity/billing, accounts, ingestion, ledger, calcula
 
 ## Marketstack during development
 
-Marketstack is not called by the application yet. When the daily-price job is implemented, use a development-only free key via `MARKETSTACK_API_KEY`; keep it server-only and use an explicit conservative request cap. Production configuration requires a commercial plan and rights review before any public release.
+Marketstack is not called by the application yet. The server-only adapter accepts a `MARKETSTACK_API_KEY` and a request-budget implementation; it queries the EOD endpoint once per unique symbol and normalizes close prices as decimal strings. Connect it to the scheduled job only after the price database and job persistence exist. For development, use a conservative cap below the official free-plan 100 monthly requests. Production configuration requires a commercial plan and rights review before any public release.
