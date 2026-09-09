@@ -89,7 +89,7 @@ Acceptance: valid users can sign in and return later; invalid credentials fail; 
 
 - [ ] Create, name and select Robinhood individual brokerage, traditional IRA and Roth IRA accounts.
 - [ ] Associate every import with a confirmed account; do not claim account detection from a CSV that lacks that information.
-- [ ] Add opening cash, positions and lots with known/unknown basis and dates.
+- [x] Add opening-history contracts for cash, positions and lots with known/unknown basis and dates.
 - [ ] Record activity coverage separately from valuation freshness.
 
 Acceptance: multiple accounts remain separate, fractional positions are supported, and unknown basis remains explicitly unknown.
@@ -235,5 +235,6 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 08 — Accounting engine (partial) | Decimal FIFO core added with fractional-lot, fee, DRIP, and unknown-basis fixtures; `npm run typecheck`, `npm test` (7 passing), and `npm run build` passed | Engine is not yet driven from the database; internal transfers and validated corporate actions remain unimplemented |
 | 2026-09-09 | 06 — CSV parser (partial) | Strict CSV parser added with quoted-field/BOM, exact-code, amount/date, and unsupported-row fixtures; `npm run typecheck`, `npm test` (10 passing), and `npm run build` passed | Official redacted brokerage and IRA CSV fixtures are still required to validate headers and transaction-code coverage |
 | 2026-09-09 | 11 — Returns core (partial) | Decimal Modified Dietz and non-bridging chain logic added with contribution, incentive, gap, and invalid-denominator fixtures; `npm run typecheck`, `npm test` (14 passing), and `npm run build` passed | No database-backed daily valuations, U.S. trading calendar, report snapshots, or dashboard integration yet |
+| 2026-09-09 | 05 — Accounts/opening history (partial) | Supported account-type and incomplete-opening-history validation added; `npm run typecheck`, `npm test` (17 passing), and `npm run build` passed | Account creation, selection, and persistence require Supabase configuration and authenticated UI work |
 
 For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.
