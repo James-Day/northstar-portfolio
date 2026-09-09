@@ -153,8 +153,8 @@ Acceptance: two users holding the same symbol reuse one price fetch; weekends do
 ### 11 — Implement valuation and return history
 
 - [ ] Value daily actual quantities plus cash using stored unadjusted closes and verified corporate actions.
-- [ ] Compute gain as ending value minus beginning value minus external flows and excluded incentives.
-- [ ] Implement estimated daily Modified Dietz: `(end - start - flow) / (start + 0.5 * flow)`, then chain valid daily returns. Disclose the intraday-flow approximation.
+- [x] Compute gain as ending value minus beginning value minus external flows and excluded incentives.
+- [x] Implement estimated daily Modified Dietz: `(end - start - flow) / (start + 0.5 * flow)`, then chain valid daily returns. Disclose the intraday-flow approximation.
 - [ ] Exclude external contributions/withdrawals and incentives from investment return; offset linked internal transfers in consolidated views.
 - [ ] Mark missing-data/invalid-denominator intervals unavailable; never chain across a gap or annualize short periods.
 - [ ] Publish versioned report snapshots atomically with activity and price coverage.
@@ -234,5 +234,6 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 10 — Marketstack provider (partial) | Server-only EOD adapter and request-budget guard added; `npm run typecheck`, `npm test` (4 passing), and `npm run build` passed | No free key, price database, schedule, metrics, retry, or dashboard integration yet |
 | 2026-09-09 | 08 — Accounting engine (partial) | Decimal FIFO core added with fractional-lot, fee, DRIP, and unknown-basis fixtures; `npm run typecheck`, `npm test` (7 passing), and `npm run build` passed | Engine is not yet driven from the database; internal transfers and validated corporate actions remain unimplemented |
 | 2026-09-09 | 06 — CSV parser (partial) | Strict CSV parser added with quoted-field/BOM, exact-code, amount/date, and unsupported-row fixtures; `npm run typecheck`, `npm test` (10 passing), and `npm run build` passed | Official redacted brokerage and IRA CSV fixtures are still required to validate headers and transaction-code coverage |
+| 2026-09-09 | 11 — Returns core (partial) | Decimal Modified Dietz and non-bridging chain logic added with contribution, incentive, gap, and invalid-denominator fixtures; `npm run typecheck`, `npm test` (14 passing), and `npm run build` passed | No database-backed daily valuations, U.S. trading calendar, report snapshots, or dashboard integration yet |
 
 For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.
