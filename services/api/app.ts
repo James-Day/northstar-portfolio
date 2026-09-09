@@ -6,6 +6,8 @@ import {
 } from '@/services/auth/server-session';
 import { validateCreatePortfolioAccount, type AccountsRepository } from '@/services/accounts/accounts';
 import { SupabaseAccountsRepository } from '@/services/supabase/accounts-repository';
+import { stageRobinhoodImport } from '@/services/ingestion/staging';
+import { SupabaseImportsRepository, type ImportsRepository } from '@/services/supabase/imports-repository';
 
 export type ApiBindings = {
   APP_ENV?: 'development' | 'staging' | 'production';
@@ -16,6 +18,7 @@ export type ApiBindings = {
 export type ApiDependencies = {
   verifySession?: (request: Request, bindings: ApiBindings) => Promise<AuthenticatedUser | undefined>;
   accountsRepository?: AccountsRepository;
+  importsRepository?: ImportsRepository;
 };
 
 export function createApi(dependencies: ApiDependencies = {}) {
@@ -26,6 +29,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
       supabaseAnonKey: bindings.SUPABASE_ANON_KEY,
     }));
   const accountsRepository = dependencies.accountsRepository;
+  const importsRepository = dependencies.importsRepository;
 
   api.get('/health', (context) =>
     context.json({
@@ -64,6 +68,21 @@ export function createApi(dependencies: ApiDependencies = {}) {
     return context.json({ account }, 201);
   });
 
+  api.post('/v1/accounts/:accountId/import-preview', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    const accountId = context.req.param('accountId');
+    const accounts = accountsRepository ?? createAccountsRepository(context.env);
+    const account = await accounts.get(authenticated.user.id, authenticated.accessToken, accountId);
+    if (!account) return context.json({ error: 'not_found' }, 404);
+    const contentType = context.req.header('content-type')?.toLowerCase() ?? '';
+    if (!contentType.startsWith('text/csv')) return context.json({ error: 'unsupported_media_type' }, 415);
+    const staged = await stageRobinhoodImport(accountId, await context.req.text());
+    const imports = importsRepository ?? createImportsRepository(context.env);
+    const duplicateFile = await imports.hasFileHash(accountId, authenticated.accessToken, staged.fileSha256);
+    return context.json({ import: { ...staged, duplicateFile } });
+  });
+
   return api;
 }
 
@@ -89,6 +108,11 @@ async function requireSession(
 function createAccountsRepository(bindings: ApiBindings): AccountsRepository {
   if (!bindings.SUPABASE_URL || !bindings.SUPABASE_ANON_KEY) throw new SessionConfigurationError();
   return new SupabaseAccountsRepository({ supabaseUrl: bindings.SUPABASE_URL, supabaseAnonKey: bindings.SUPABASE_ANON_KEY });
+}
+
+function createImportsRepository(bindings: ApiBindings): ImportsRepository {
+  if (!bindings.SUPABASE_URL || !bindings.SUPABASE_ANON_KEY) throw new SessionConfigurationError();
+  return new SupabaseImportsRepository({ supabaseUrl: bindings.SUPABASE_URL, supabaseAnonKey: bindings.SUPABASE_ANON_KEY });
 }
 
 function readBearerToken(request: Request): string | undefined {

@@ -39,6 +39,17 @@ export class SupabaseAccountsRepository implements AccountsRepository {
     return rows.map((row) => mapAccount(row, userId));
   }
 
+  async get(userId: string, accessToken: string, accountId: string): Promise<PortfolioAccount | undefined> {
+    const url = new URL('/rest/v1/accounts', this.baseUrl);
+    url.searchParams.set('id', `eq.${accountId}`);
+    url.searchParams.set('select', 'id,user_id,brokerage,account_type,name,currency,activity_covered_through,created_at');
+    url.searchParams.set('limit', '1');
+    const response = await this.fetcher(url, { headers: this.headers(accessToken) });
+    if (!response.ok) throw new Error(`Supabase account query failed with HTTP ${response.status}.`);
+    const rows = z.array(accountRowSchema).parse(await response.json());
+    return rows[0] ? mapAccount(rows[0], userId) : undefined;
+  }
+
   async create(userId: string, accessToken: string, input: CreatePortfolioAccountInput): Promise<PortfolioAccount> {
     const url = new URL('/rest/v1/accounts', this.baseUrl);
     const response = await this.fetcher(url, {

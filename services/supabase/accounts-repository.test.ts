@@ -22,6 +22,14 @@ describe('Supabase accounts repository', () => {
     expect(JSON.parse(fetcher.mock.calls[0][1].body)).toMatchObject({ user_id: account.user_id, brokerage: 'robinhood', name: 'Taxable' });
   });
 
+  it('queries a selected account through the same caller-scoped RLS connection', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify([account])));
+    const repository = new SupabaseAccountsRepository({ supabaseUrl: 'https://project.supabase.co', supabaseAnonKey: 'anon-key', fetcher });
+
+    await expect(repository.get(account.user_id, 'user-token', account.id)).resolves.toMatchObject({ id: account.id });
+    expect(fetcher.mock.calls[0][0].searchParams.get('id')).toBe(`eq.${account.id}`);
+  });
+
   it('fails closed if a database response crosses ownership boundaries', async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify([{ ...account, user_id: '95a36e89-b5aa-4799-bf88-9d17a29a97e8' }])));
     const repository = new SupabaseAccountsRepository({ supabaseUrl: 'https://project.supabase.co', supabaseAnonKey: 'anon-key', fetcher });

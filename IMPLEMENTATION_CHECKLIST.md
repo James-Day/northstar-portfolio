@@ -108,6 +108,7 @@ Acceptance: multiple accounts remain separate, fractional positions are supporte
 - [ ] Normalize buys/sells, dividends, reinvestment buys, interest, fees, deposits/withdrawals, incentives and supported transfers.
 - [x] Preserve raw rows and parsing errors in the parser result; unsupported rows remain visible instead of disappearing.
 - [x] Default unfamiliar transaction codes to material during import review, so a reportable import cannot commit until their impact is resolved.
+- [x] Add a server-side preview contract that requires a confirmed owned account, records the original CSV SHA-256 and parser version, derives review/date-range metadata, and checks persisted identical-file hashes.
 - [ ] Persist file hash, parser version and review/commit blocking state with imports when the database workflow is connected.
 
 Acceptance: supported fixtures reconcile row-for-row; malformed values never silently become zero; unsupported assets/codes remain visible.

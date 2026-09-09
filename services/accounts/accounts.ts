@@ -16,6 +16,7 @@ export type CreatePortfolioAccountInput = Pick<PortfolioAccount, 'accountType' |
 
 export interface AccountsRepository {
   list(userId: string, accessToken: string): Promise<PortfolioAccount[]>;
+  get(userId: string, accessToken: string, accountId: string): Promise<PortfolioAccount | undefined>;
   create(userId: string, accessToken: string, input: CreatePortfolioAccountInput): Promise<PortfolioAccount>;
 }
 

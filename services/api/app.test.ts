@@ -48,7 +48,7 @@ describe('standalone API', () => {
     };
     const app = createApi({
       verifySession: async () => ({ id: 'user-123' }),
-      accountsRepository: { list, create: async () => { throw new Error('unused'); } },
+      accountsRepository: { list, get: async () => undefined, create: async () => { throw new Error('unused'); } },
     });
 
     const response = await app.request('http://api.test/v1/accounts', { headers: { authorization: 'Bearer session-token' } });
@@ -66,7 +66,7 @@ describe('standalone API', () => {
     };
     const app = createApi({
       verifySession: async () => ({ id: 'user-123' }),
-      accountsRepository: { list: async () => [], create },
+      accountsRepository: { list: async () => [], get: async () => undefined, create },
     });
 
     const response = await app.request('http://api.test/v1/accounts', {
@@ -77,5 +77,41 @@ describe('standalone API', () => {
 
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toMatchObject({ account: { id: 'account-123', accountType: 'roth_ira' } });
+  });
+
+  it('parses a CSV only after the verified user owns the selected account, then checks its hash', async () => {
+    const account = { id: 'account-123', userId: 'user-123', brokerage: 'robinhood' as const, accountType: 'individual' as const, name: 'Taxable', currency: 'USD' as const, activityCoveredThrough: null, createdAt: '2026-09-09T00:00:00.000Z' };
+    const hasFileHash = async (accountId: string, token: string, hash: string) => {
+      expect(accountId).toBe(account.id);
+      expect(token).toBe('session-token');
+      expect(hash).toMatch(/^[a-f0-9]{64}$/);
+      return false;
+    };
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123' }),
+      accountsRepository: { list: async () => [], get: async () => account, create: async () => account },
+      importsRepository: { hasFileHash },
+    });
+
+    const response = await app.request(`http://api.test/v1/accounts/${account.id}/import-preview`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer session-token', 'content-type': 'text/csv' },
+      body: 'Activity Date,Trans Code,Amount\n2026-01-02,Interest,$2',
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ import: { accountId: account.id, duplicateFile: false, review: { acceptedRowCount: 1 } } });
+  });
+
+  it('does not preview an import for an account that RLS did not return', async () => {
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123' }),
+      accountsRepository: { list: async () => [], get: async () => undefined, create: async () => { throw new Error('unused'); } },
+      importsRepository: { hasFileHash: async () => { throw new Error('must not query imports'); } },
+    });
+
+    const response = await app.request('http://api.test/v1/accounts/another-user-account/import-preview', { method: 'POST', headers: { authorization: 'Bearer session-token', 'content-type': 'text/csv' }, body: 'Activity Date,Trans Code,Amount\n2026-01-02,Interest,$2' });
+
+    expect(response.status).toBe(404);
   });
 });

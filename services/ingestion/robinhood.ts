@@ -6,6 +6,8 @@ import { isoDate, type IsoDate } from '@/lib/domain/types';
 const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_ROWS = 50_000;
 
+export const ROBINHOOD_ACTIVITY_PARSER_VERSION = 'robinhood-activity-v1';
+
 export type RobinhoodActivityType = 'buy' | 'sell' | 'dividend' | 'drip_buy' | 'interest' | 'fee' | 'deposit' | 'withdrawal' | 'ira_incentive' | 'transfer_in' | 'transfer_out';
 
 export type ParsedRobinhoodRow = {
