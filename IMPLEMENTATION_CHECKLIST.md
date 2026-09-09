@@ -124,7 +124,8 @@ Acceptance: repeated and overlapping files never double-count; legitimate identi
 - [x] Implement FIFO lots and analytical realized gains/losses; label them as not tax reporting.
 - [x] Apply net trade amounts/fees once and preserve unknown basis through sales.
 - [x] Record dividend income and a separate reinvestment purchase without double counting.
-- [ ] Link internal transfers for consolidated reporting; preserve share lots/basis where supported and flag unresolved transfers.
+- [x] Link reconciled internal transfers for consolidated reporting and flag unresolved transfers.
+- [ ] Preserve transferred share lots and basis through persisted cross-account transfers.
 - [x] Enforce validated corporate actions before applying quantity/basis changes; never automatically apply quarantined split rows.
 
 Acceptance: hand-calculated fixtures cover partial lot sales, fractional shares, fees, DRIP, transfers, incentives and splits; no hard-coded basis deductions remain.
@@ -243,5 +244,6 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 07 — Import deduplication (partial) | Commit `1d8e14d`; multiplicity-aware activity fingerprinting and overlap exclusion added; `npm run typecheck`, `npm test` (22 passing), and `npm run build` passed | Queue-backed staging, atomic commit/undo, persisted idempotency, and import history require the Supabase backend |
 | 2026-09-09 | 07 — Import workflow (partial) | Lifecycle and review-commit blocking rules added; `npm run typecheck`, `npm test` (25 passing), and `npm run build` passed | Lifecycle is not yet persisted or processed through queues |
 | 2026-09-09 | 08 — Corporate-action safeguards (partial) | Validated split and ticker-change lot handling added; `npm run typecheck`, `npm test` (28 passing), and `npm run build` passed | Corporate actions are not yet sourced, evidenced, or connected to stored price history |
+| 2026-09-09 | 08 — Internal-transfer linking (partial) | Reconciled-account transfer linking and unresolved-transfer rules added; `npm run typecheck`, `npm test` (30 passing), and `npm run build` passed | Transferred lots/basis require persisted cross-account transfer workflows |
 
 For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.
