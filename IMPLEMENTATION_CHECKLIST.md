@@ -190,7 +190,8 @@ Acceptance: test-mode full lifecycle passes, invalid signatures are rejected, an
 
 ### 14 — Complete privacy, operations and recovery
 
-- [ ] Purge raw upload objects after 30 days with retryable jobs and auditable deletion results.
+- [x] Implement and test 30-day raw-file eligibility and auditable one-time deletion state.
+- [ ] Run the retention job against private storage with retries and verify deletions in a configured environment.
 - [ ] Add safe CSV/report export, account deletion and complete user-data deletion workflows, including subscription cleanup.
 - [ ] Apply rate limits, upload validation, safe logging, secret management and least-privilege access.
 - [ ] Add queue, import, report and pricing monitoring with actionable alerts.
@@ -249,5 +250,6 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 08 — Internal-transfer linking (partial) | Reconciled-account transfer linking and unresolved-transfer rules added; `npm run typecheck`, `npm test` (30 passing), and `npm run build` passed | Transferred lots/basis require persisted cross-account transfer workflows |
 | 2026-09-09 | 04 — Authentication boundary (partial) | Supabase email/password, Google OAuth, reset, sign-out, and error-path interfaces added; `npm run typecheck`, `npm test` (33 passing), and `npm run build` passed | Live provider configuration, session handling, protected routes, and profile UI require a configured Supabase project |
 | 2026-09-09 | 13 — Billing entitlement rules (partial) | One-time trial and replay-safe event reducers added; `npm run typecheck`, `npm test` (36 passing), and `npm run build` passed | Stripe products, signed HTTP webhooks, checkout, billing portal, and server enforcement require Stripe configuration |
+| 2026-09-09 | 14 — Raw-file retention (partial) | 30-day retention eligibility and auditable deletion-state rules added; `npm run typecheck`, `npm test` (38 passing), and `npm run build` passed | Storage deletion job, retries, and verification require private Supabase storage |
 
 For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.
