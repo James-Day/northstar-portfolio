@@ -108,6 +108,7 @@ Acceptance: supported fixtures reconcile row-for-row; malformed values never sil
 
 ### 07 — Build durable review, commit, deduplication and undo
 
+- [x] Define and test durable import lifecycle transitions for staging, review, commit, discard, failure retry, and undo.
 - [ ] Queue parsing and persist staged results with progress/failure status.
 - [ ] Show source rows, interpreted transactions, account/date range, duplicates and actionable warnings.
 - [x] Implement multiplicity-aware overlap fingerprints including account, date, type, symbol, quantity, price, amount and description.
@@ -240,5 +241,6 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 05 — Accounts/opening history (partial) | Commit `24d6f07`; supported account-type and incomplete-opening-history validation added; `npm run typecheck`, `npm test` (17 passing), and `npm run build` passed | Account creation, selection, and persistence require Supabase configuration and authenticated UI work |
 | 2026-09-09 | 09 — Price quality (partial) | Commit `8257aa9`; candidate-close quarantine guard added with duplicate, invalid-close, extreme-move, and normal-history fixtures; `npm run typecheck`, `npm test` (19 passing), and `npm run build` passed | DoltHub ingestion, independent validation, aliases, corrections, and licensing resolution remain unimplemented |
 | 2026-09-09 | 07 — Import deduplication (partial) | Commit `1d8e14d`; multiplicity-aware activity fingerprinting and overlap exclusion added; `npm run typecheck`, `npm test` (22 passing), and `npm run build` passed | Queue-backed staging, atomic commit/undo, persisted idempotency, and import history require the Supabase backend |
+| 2026-09-09 | 07 — Import workflow (partial) | Lifecycle and review-commit blocking rules added; `npm run typecheck`, `npm test` (25 passing), and `npm run build` passed | Lifecycle is not yet persisted or processed through queues |
 
 For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.
