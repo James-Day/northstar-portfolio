@@ -110,7 +110,8 @@ Acceptance: supported fixtures reconcile row-for-row; malformed values never sil
 
 - [ ] Queue parsing and persist staged results with progress/failure status.
 - [ ] Show source rows, interpreted transactions, account/date range, duplicates and actionable warnings.
-- [ ] Implement identical-file idempotency and multiplicity-aware overlap fingerprints including account, date, type, symbol, quantity, price, amount and description.
+- [x] Implement multiplicity-aware overlap fingerprints including account, date, type, symbol, quantity, price, amount and description.
+- [ ] Connect fingerprints to persisted file hashes and committed imports for identical-file idempotency.
 - [ ] Commit accepted records atomically with concurrency protection and an outbox event for recomputation.
 - [ ] Add discard, import history and undo that preserves audit history and recomputes downstream state.
 
@@ -238,5 +239,6 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 11 — Returns core (partial) | Decimal Modified Dietz and non-bridging chain logic added with contribution, incentive, gap, and invalid-denominator fixtures; `npm run typecheck`, `npm test` (14 passing), and `npm run build` passed | No database-backed daily valuations, U.S. trading calendar, report snapshots, or dashboard integration yet |
 | 2026-09-09 | 05 — Accounts/opening history (partial) | Supported account-type and incomplete-opening-history validation added; `npm run typecheck`, `npm test` (17 passing), and `npm run build` passed | Account creation, selection, and persistence require Supabase configuration and authenticated UI work |
 | 2026-09-09 | 09 — Price quality (partial) | Candidate-close quarantine guard added with duplicate, invalid-close, extreme-move, and normal-history fixtures; `npm run typecheck`, `npm test` (19 passing), and `npm run build` passed | DoltHub ingestion, independent validation, aliases, corrections, and licensing resolution remain unimplemented |
+| 2026-09-09 | 07 — Import deduplication (partial) | Multiplicity-aware activity fingerprinting and overlap exclusion added; `npm run typecheck`, `npm test` (22 passing), and `npm run build` passed | Queue-backed staging, atomic commit/undo, persisted idempotency, and import history require the Supabase backend |
 
 For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.
