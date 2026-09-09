@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'Northstar — Portfolio clarity',
-  description: 'A private portfolio tracker for long-term investors.',
+  description: 'A portfolio-tracker prototype for long-term investors.',
 };
 
 export default function RootLayout({
