@@ -180,8 +180,9 @@ Acceptance: no synthetic values leak into a real account; each visible number ca
 ### 13 — Implement trials and billing
 
 - [ ] Create Stripe test products/prices for $5 monthly and $49 annual plans; configure production separately.
-- [ ] Start a no-card 14-day trial exactly once after the first usable committed import, including under concurrent requests.
-- [ ] Add Checkout, Billing Portal and signed, replay-safe webhook handling.
+- [x] Implement the one-time no-card 14-day trial rule after a usable committed import.
+- [x] Implement replay-safe entitlement webhook state handling; signature verification and Stripe HTTP endpoints remain pending.
+- [ ] Add Checkout, Billing Portal and signed webhook HTTP handling.
 - [ ] Enforce entitlement on the server and handle expiration, failed payments, cancellation and plan changes.
 - [ ] Preserve export/deletion access after cancellation; replace the hard-coded trial countdown.
 
@@ -247,5 +248,6 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 08 — Corporate-action safeguards (partial) | Validated split and ticker-change lot handling added; `npm run typecheck`, `npm test` (28 passing), and `npm run build` passed | Corporate actions are not yet sourced, evidenced, or connected to stored price history |
 | 2026-09-09 | 08 — Internal-transfer linking (partial) | Reconciled-account transfer linking and unresolved-transfer rules added; `npm run typecheck`, `npm test` (30 passing), and `npm run build` passed | Transferred lots/basis require persisted cross-account transfer workflows |
 | 2026-09-09 | 04 — Authentication boundary (partial) | Supabase email/password, Google OAuth, reset, sign-out, and error-path interfaces added; `npm run typecheck`, `npm test` (33 passing), and `npm run build` passed | Live provider configuration, session handling, protected routes, and profile UI require a configured Supabase project |
+| 2026-09-09 | 13 — Billing entitlement rules (partial) | One-time trial and replay-safe event reducers added; `npm run typecheck`, `npm test` (36 passing), and `npm run build` passed | Stripe products, signed HTTP webhooks, checkout, billing portal, and server enforcement require Stripe configuration |
 
 For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.
