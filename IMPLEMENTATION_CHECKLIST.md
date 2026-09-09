@@ -132,7 +132,8 @@ Acceptance: hand-calculated fixtures cover partial lot sales, fractional shares,
 - [ ] Implement bounded/resumable DoltHub close-price ingestion with stable instrument mapping and source revision/ingestion metadata.
 - [ ] Store unadjusted daily closes; keep dividend income sourced from brokerage activity.
 - [ ] Validate selected stocks, ETFs, ticker changes, delisted securities and split boundaries against independent records.
-- [ ] Detect invalid closes, missing trading dates, large jumps and alias discontinuities; quarantine suspicious data without altering holdings.
+- [x] Detect invalid closes, duplicate dates, and large jumps; quarantine suspicious records without altering holdings.
+- [ ] Add trading-calendar missing-date and ticker-alias discontinuity checks during database ingestion.
 - [ ] Add evidence-backed corrections and immutable price revisions; track report dependencies on revisions.
 - [ ] Record dataset attribution/share-alike obligations and resolve upstream provenance and commercial usage questions before public launch. A few successful spot checks do not settle licensing or whole-dataset quality.
 
@@ -236,5 +237,6 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 06 — CSV parser (partial) | Strict CSV parser added with quoted-field/BOM, exact-code, amount/date, and unsupported-row fixtures; `npm run typecheck`, `npm test` (10 passing), and `npm run build` passed | Official redacted brokerage and IRA CSV fixtures are still required to validate headers and transaction-code coverage |
 | 2026-09-09 | 11 — Returns core (partial) | Decimal Modified Dietz and non-bridging chain logic added with contribution, incentive, gap, and invalid-denominator fixtures; `npm run typecheck`, `npm test` (14 passing), and `npm run build` passed | No database-backed daily valuations, U.S. trading calendar, report snapshots, or dashboard integration yet |
 | 2026-09-09 | 05 — Accounts/opening history (partial) | Supported account-type and incomplete-opening-history validation added; `npm run typecheck`, `npm test` (17 passing), and `npm run build` passed | Account creation, selection, and persistence require Supabase configuration and authenticated UI work |
+| 2026-09-09 | 09 — Price quality (partial) | Candidate-close quarantine guard added with duplicate, invalid-close, extreme-move, and normal-history fixtures; `npm run typecheck`, `npm test` (19 passing), and `npm run build` passed | DoltHub ingestion, independent validation, aliases, corrections, and licensing resolution remain unimplemented |
 
 For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.
