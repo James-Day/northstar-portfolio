@@ -192,7 +192,8 @@ Acceptance: test-mode full lifecycle passes, invalid signatures are rejected, an
 
 - [x] Implement and test 30-day raw-file eligibility and auditable one-time deletion state.
 - [ ] Run the retention job against private storage with retries and verify deletions in a configured environment.
-- [ ] Add safe CSV/report export, account deletion and complete user-data deletion workflows, including subscription cleanup.
+- [x] Add a tested account/user-deletion lifecycle and cleanup plan covering raw files, accounts, profile, and subscription cleanup.
+- [ ] Execute deletion against live storage, billing, and database records; add safe CSV/report export.
 - [ ] Apply rate limits, upload validation, safe logging, secret management and least-privilege access.
 - [ ] Add queue, import, report and pricing monitoring with actionable alerts.
 - [ ] Configure backups; execute and document a restore drill with chosen recovery objectives.
@@ -251,5 +252,6 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 04 — Authentication boundary (partial) | Supabase email/password, Google OAuth, reset, sign-out, and error-path interfaces added; `npm run typecheck`, `npm test` (33 passing), and `npm run build` passed | Live provider configuration, session handling, protected routes, and profile UI require a configured Supabase project |
 | 2026-09-09 | 13 — Billing entitlement rules (partial) | One-time trial and replay-safe event reducers added; `npm run typecheck`, `npm test` (36 passing), and `npm run build` passed | Stripe products, signed HTTP webhooks, checkout, billing portal, and server enforcement require Stripe configuration |
 | 2026-09-09 | 14 — Raw-file retention (partial) | 30-day retention eligibility and auditable deletion-state rules added; `npm run typecheck`, `npm test` (38 passing), and `npm run build` passed | Storage deletion job, retries, and verification require private Supabase storage |
+| 2026-09-09 | 14 — User-deletion rules (partial) | User-data deletion lifecycle and complete cleanup-plan rules added; `npm run typecheck`, `npm test` (40 passing), and `npm run build` passed | Actual storage, billing, database, and export execution requires configured services |
 
 For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.
