@@ -90,6 +90,7 @@ Acceptance: valid users can sign in and return later; invalid credentials fail; 
 
 ### 05 — Implement accounts and opening history
 
+- [x] Add tested authenticated API contracts to list and create Robinhood individual brokerage, traditional IRA, and Roth IRA accounts through Supabase RLS.
 - [ ] Create, name and select Robinhood individual brokerage, traditional IRA and Roth IRA accounts.
 - [ ] Associate every import with a confirmed account; do not claim account detection from a CSV that lacks that information.
 - [x] Add opening-history contracts for cash, positions and lots with known/unknown basis and dates.

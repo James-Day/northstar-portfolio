@@ -39,4 +39,43 @@ describe('standalone API', () => {
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: 'unauthorized' });
   });
+
+  it('lists accounts only after verifying the caller and carries the same token into the RLS repository', async () => {
+    const list = async (userId: string, token: string) => {
+      expect(userId).toBe('user-123');
+      expect(token).toBe('session-token');
+      return [];
+    };
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123' }),
+      accountsRepository: { list, create: async () => { throw new Error('unused'); } },
+    });
+
+    const response = await app.request('http://api.test/v1/accounts', { headers: { authorization: 'Bearer session-token' } });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ accounts: [] });
+  });
+
+  it('creates only a supported Robinhood account for the verified user', async () => {
+    const create = async (userId: string, token: string, input: { accountType: 'individual' | 'traditional_ira' | 'roth_ira'; name: string }) => {
+      expect(userId).toBe('user-123');
+      expect(token).toBe('session-token');
+      expect(input).toEqual({ accountType: 'roth_ira', name: 'Future me' });
+      return { id: 'account-123', userId, brokerage: 'robinhood' as const, accountType: input.accountType, name: input.name, currency: 'USD' as const, activityCoveredThrough: null, createdAt: '2026-09-09T00:00:00.000Z' };
+    };
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123' }),
+      accountsRepository: { list: async () => [], create },
+    });
+
+    const response = await app.request('http://api.test/v1/accounts', {
+      method: 'POST',
+      headers: { authorization: 'Bearer session-token', 'content-type': 'application/json' },
+      body: JSON.stringify({ accountType: 'roth_ira', name: '  Future me  ' }),
+    });
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({ account: { id: 'account-123', accountType: 'roth_ira' } });
+  });
 });
