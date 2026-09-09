@@ -97,11 +97,12 @@ Acceptance: multiple accounts remain separate, fractional positions are supporte
 ### 06 — Replace the CSV parser with a validated importer
 
 - [ ] Obtain redacted official brokerage and IRA CSV fixtures; add sanitized fixtures with expected results.
-- [ ] Use a real CSV parser supporting quoted commas, escaped quotes, embedded newlines and BOMs.
-- [ ] Validate dates, signed amounts, parentheses, decimals, required headers and row counts; enforce 10 MB / 50,000 rows server-side.
+- [x] Use a real CSV parser supporting quoted commas, escaped quotes, embedded newlines and BOMs.
+- [x] Validate dates, signed amounts, parentheses, decimals, required headers and row counts; enforce 10 MB / 50,000 rows in the server-side parser.
 - [ ] Map verified Robinhood transaction codes rather than guessing from descriptions or using Process Date as the transaction type.
 - [ ] Normalize buys/sells, dividends, reinvestment buys, interest, fees, deposits/withdrawals, incentives and supported transfers.
-- [ ] Preserve raw rows, file hash, parser version and errors; unsupported/material rows must block affected reports or commit rather than disappear.
+- [x] Preserve raw rows and parsing errors in the parser result; unsupported rows remain visible instead of disappearing.
+- [ ] Persist file hash, parser version and review/commit blocking state with imports when the database workflow is connected.
 
 Acceptance: supported fixtures reconcile row-for-row; malformed values never silently become zero; unsupported assets/codes remain visible.
 
@@ -232,5 +233,6 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 03 — Persistence (schema foundation) | Initial Supabase migration and public-client factory added; `npm run typecheck`, `npm test` (2 passing), and `npm run build` passed | Migration and storage policies are unverified until a development Supabase project is configured |
 | 2026-09-09 | 10 — Marketstack provider (partial) | Server-only EOD adapter and request-budget guard added; `npm run typecheck`, `npm test` (4 passing), and `npm run build` passed | No free key, price database, schedule, metrics, retry, or dashboard integration yet |
 | 2026-09-09 | 08 — Accounting engine (partial) | Decimal FIFO core added with fractional-lot, fee, DRIP, and unknown-basis fixtures; `npm run typecheck`, `npm test` (7 passing), and `npm run build` passed | Engine is not yet driven from the database; internal transfers and validated corporate actions remain unimplemented |
+| 2026-09-09 | 06 — CSV parser (partial) | Strict CSV parser added with quoted-field/BOM, exact-code, amount/date, and unsupported-row fixtures; `npm run typecheck`, `npm test` (10 passing), and `npm run build` passed | Official redacted brokerage and IRA CSV fixtures are still required to validate headers and transaction-code coverage |
 
 For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.
