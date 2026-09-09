@@ -102,6 +102,34 @@ export function createApi(dependencies: ApiDependencies = {}) {
     return context.json({ import: { ...importRecord, review: staged.review, activityFrom: staged.activityFrom, activityThrough: staged.activityThrough } }, 201);
   });
 
+  api.get('/v1/accounts/:accountId/imports', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    const accountId = context.req.param('accountId');
+    const accounts = accountsRepository ?? createAccountsRepository(context.env);
+    if (!await accounts.get(authenticated.user.id, authenticated.accessToken, accountId)) return context.json({ error: 'not_found' }, 404);
+    const imports = importsRepository ?? createImportsRepository(context.env);
+    return context.json({ imports: await imports.list(accountId, authenticated.accessToken) });
+  });
+
+  api.get('/v1/imports/:importId', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    const imports = importsRepository ?? createImportsRepository(context.env);
+    const detail = await imports.get(context.req.param('importId'), authenticated.accessToken);
+    if (!detail) return context.json({ error: 'not_found' }, 404);
+    return context.json(detail);
+  });
+
+  api.post('/v1/imports/:importId/discard', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    const imports = importsRepository ?? createImportsRepository(context.env);
+    const importRecord = await imports.discard(context.req.param('importId'), authenticated.accessToken);
+    if (!importRecord) return context.json({ error: 'not_found_or_not_discardable' }, 404);
+    return context.json({ import: importRecord });
+  });
+
   return api;
 }
 

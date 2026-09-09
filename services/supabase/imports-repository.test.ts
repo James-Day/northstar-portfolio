@@ -3,6 +3,7 @@ import { SupabaseImportsRepository } from '@/services/supabase/imports-repositor
 import { stageRobinhoodImport, toPersistableImportStage } from '@/services/ingestion/staging';
 
 describe('Supabase imports repository', () => {
+  const summary = { id: 'import-id', account_id: 'account-id', status: 'ready_for_review', file_name: 'activity.csv', source_row_count: 1, usable_row_count: 1, warning_count: 0, activity_from: '2026-01-02', activity_through: '2026-01-02', created_at: '2026-09-09T12:00:00.000Z' };
   it('looks up only the selected account and file hash through the caller token', async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify([{ id: 'import-id' }])));
     const repository = new SupabaseImportsRepository({ supabaseUrl: 'https://project.supabase.co', supabaseAnonKey: 'anon-key', fetcher });
@@ -24,5 +25,27 @@ describe('Supabase imports repository', () => {
     expect(url.pathname).toBe('/rest/v1/rpc/stage_import');
     expect(init.headers).toMatchObject({ authorization: 'Bearer user-token' });
     expect(JSON.parse(init.body)).toMatchObject({ p_account_id: 'account-id', p_file_name: 'activity.csv', p_source_rows: [{ status: 'supported' }] });
+  });
+
+  it('lists a caller-owned account history and discards only a review-ready import', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify([summary])))
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ ...summary, status: 'discarded' }])));
+    const repository = new SupabaseImportsRepository({ supabaseUrl: 'https://project.supabase.co', supabaseAnonKey: 'anon-key', fetcher });
+
+    await expect(repository.list('account-id', 'user-token')).resolves.toMatchObject([{ id: 'import-id', fileName: 'activity.csv' }]);
+    await expect(repository.discard('import-id', 'user-token')).resolves.toMatchObject({ status: 'discarded' });
+    expect(fetcher.mock.calls[1][0].searchParams.get('status')).toBe('eq.ready_for_review');
+    expect(JSON.parse(fetcher.mock.calls[1][1].body)).toEqual({ status: 'discarded' });
+  });
+
+  it('gets a visible review detail only when both import and source-row RLS queries return data', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify([summary])))
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ id: 'row-id', row_number: 2, raw_row: { 'activity date': '2026-01-02' }, normalized_payload: { type: 'interest' }, parse_status: 'supported', message: null }])));
+    const repository = new SupabaseImportsRepository({ supabaseUrl: 'https://project.supabase.co', supabaseAnonKey: 'anon-key', fetcher });
+
+    await expect(repository.get('import-id', 'user-token')).resolves.toMatchObject({ import: { id: 'import-id' }, sourceRows: [{ rowNumber: 2, status: 'supported' }] });
+    expect(fetcher.mock.calls[1][0].pathname).toBe('/rest/v1/import_source_rows');
   });
 });
