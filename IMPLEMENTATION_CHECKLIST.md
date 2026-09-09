@@ -81,6 +81,7 @@ Acceptance: data survives reload and a second session; user A cannot read or mod
 - [x] Implement a tested Supabase email/password signup, sign-in, sign-out, and provider-error boundary.
 - [x] Implement a tested Google OAuth initiation boundary with configured callbacks.
 - [x] Implement a tested password-reset initiation boundary and expired-session error handling.
+- [x] Wire the sign-in screen and `/auth/callback` route to the Supabase client when public configuration is present; keep credential controls unavailable otherwise.
 - [ ] Configure Supabase email verification, Google OAuth redirect URLs, session renewal, and revoked-session behavior in a live project.
 - [x] Add Worker API bearer-session verification and a protected identity endpoint (`GET /v1/me`).
 - [ ] Protect application pages and remaining API endpoints on the server; keep the public demo separate.
