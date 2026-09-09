@@ -135,7 +135,8 @@ Acceptance: hand-calculated fixtures cover partial lot sales, fractional shares,
 
 ### 09 — Populate the historical-price database
 
-- [ ] Implement bounded/resumable DoltHub close-price ingestion with stable instrument mapping and source revision/ingestion metadata.
+- [x] Implement a bounded/resumable DoltHub close-price source reader that observes a stable source revision for each page.
+- [ ] Connect DoltHub pages to stable instrument mapping and persisted ingestion metadata.
 - [ ] Store unadjusted daily closes; keep dividend income sourced from brokerage activity.
 - [ ] Validate selected stocks, ETFs, ticker changes, delisted securities and split boundaries against independent records.
 - [x] Detect invalid closes, duplicate dates, and large jumps; quarantine suspicious records without altering holdings.
