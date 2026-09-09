@@ -54,7 +54,7 @@ Acceptance: entering arbitrary credentials cannot appear to authenticate; cancel
 ### 02 — Establish the production backend and test foundation
 
 - [x] Preserve the approved UI and document the existing Vinext/Sites deviation from the original stack.
-- [ ] Establish a standalone Cloudflare Hono API and Queue/scheduler deployment configuration, with Supabase over HTTP. Verify the frontend host supports the required external auth redirect/session flow before wiring it; move the frontend to standalone Cloudflare hosting if needed to preserve independent email/Google login.
+- [ ] Establish a standalone Cloudflare Hono API and Queue/scheduler deployment configuration, with Supabase over HTTP. A Worker health entrypoint now bundles cleanly; queues, schedules, auth session validation, and host redirect verification remain.
 - [ ] Create module boundaries for identity/billing, accounts, ingestion, ledger, calculations, market data and reporting.
 - [x] Add decimal arithmetic; use decimal strings at API boundaries and `NUMERIC(38,12)` in Postgres. Use numbers only for final chart/display conversion.
 - [x] Add date-only economic dates, stable instrument IDs, effective-dated ticker aliases and typed validation contracts.
@@ -254,6 +254,7 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 13 — Billing entitlement rules (partial) | One-time trial and replay-safe event reducers added; `npm run typecheck`, `npm test` (36 passing), and `npm run build` passed | Stripe products, signed HTTP webhooks, checkout, billing portal, and server enforcement require Stripe configuration |
 | 2026-09-09 | 14 — Raw-file retention (partial) | 30-day retention eligibility and auditable deletion-state rules added; `npm run typecheck`, `npm test` (38 passing), and `npm run build` passed | Storage deletion job, retries, and verification require private Supabase storage |
 | 2026-09-09 | 14 — User-deletion rules (partial) | User-data deletion lifecycle and complete cleanup-plan rules added; `npm run typecheck`, `npm test` (40 passing), and `npm run build` passed | Actual storage, billing, database, and export execution requires configured services |
-| 2026-09-09 | 03/04 — Local Supabase configuration (partial) | Supabase CLI configuration initialized with product-aligned local auth, redirects, and file-size settings | Docker is not installed, so local database start and schema lint cannot run; no hosted Supabase project is linked |
+| 2026-09-09 | 03/04 — Local Supabase configuration (partial) | Supabase CLI configuration initialized with product-aligned local auth, redirects, file-size settings, and a local public-client configuration | Docker Desktop 4.90.0 has a Windows runtime-socket failure that prevents stable local database startup; no hosted Supabase project is linked |
+| 2026-09-09 | 02 — Standalone API Worker foundation (partial) | Hono Worker entrypoint, deployment config, binding-safe health route, and dry-run bundle added; `npm run typecheck` and `npm test` (41 passing) passed | Queues, schedules, authenticated API routes, and deployed configuration remain pending |
 
 For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.

@@ -9,6 +9,7 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "wrangler dev --config dist/server/wrangler.json",
+    "dev:api": "wrangler dev --config wrangler.api.toml",
     "lint": "oxlint",
     "format": "oxfmt",
     "typecheck": "tsc --noEmit",

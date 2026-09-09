@@ -1,9 +1,23 @@
 import { Hono } from 'hono';
 
-/**
- * The standalone API shell. It is intentionally not mounted into the prototype
- * site until Supabase authentication and durable storage are configured.
- */
-export const api = new Hono();
+export type ApiBindings = {
+  APP_ENV?: 'development' | 'staging' | 'production';
+  SUPABASE_URL?: string;
+  SUPABASE_ANON_KEY?: string;
+};
 
-api.get('/health', (context) => context.json({ status: 'ok', service: 'northstar-api' }));
+export function createApi() {
+  const api = new Hono<{ Bindings: ApiBindings }>();
+
+  api.get('/health', (context) =>
+    context.json({
+      status: 'ok',
+      service: 'northstar-api',
+      environment: context.env.APP_ENV ?? 'development',
+    }),
+  );
+
+  return api;
+}
+
+export const api = createApi();

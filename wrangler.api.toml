@@ -1,0 +1,10 @@
+name = "northstar-portfolio-api"
+main = "workers/api.ts"
+compatibility_date = "2026-09-09"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+APP_ENV = "development"
+
+# Configure SUPABASE_URL and SUPABASE_ANON_KEY as Worker secrets for deployed
+# environments. Never put production secrets in this file or in browser code.
