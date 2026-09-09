@@ -107,6 +107,7 @@ Acceptance: multiple accounts remain separate, fractional positions are supporte
 - [ ] Map verified Robinhood transaction codes rather than guessing from descriptions or using Process Date as the transaction type.
 - [ ] Normalize buys/sells, dividends, reinvestment buys, interest, fees, deposits/withdrawals, incentives and supported transfers.
 - [x] Preserve raw rows and parsing errors in the parser result; unsupported rows remain visible instead of disappearing.
+- [x] Default unfamiliar transaction codes to material during import review, so a reportable import cannot commit until their impact is resolved.
 - [ ] Persist file hash, parser version and review/commit blocking state with imports when the database workflow is connected.
 
 Acceptance: supported fixtures reconcile row-for-row; malformed values never silently become zero; unsupported assets/codes remain visible.

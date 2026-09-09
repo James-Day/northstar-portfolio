@@ -11,7 +11,7 @@ export type RobinhoodActivityType = 'buy' | 'sell' | 'dividend' | 'drip_buy' | '
 export type ParsedRobinhoodRow = {
   rowNumber: number;
   raw: Record<string, string>;
-  status: 'supported' | 'unsupported';
+  status: 'supported' | 'unsupported' | 'invalid';
   message?: string;
   activity?: {
     effectiveDate: IsoDate;
@@ -97,26 +97,35 @@ export function parseRobinhoodActivityCsv(csv: string): ParsedRobinhoodRow[] {
     const code = raw['trans code'].trim().toUpperCase();
     const type = transactionCodes[code];
     if (!type) return { rowNumber, raw, status: 'unsupported', message: `Unsupported Robinhood transaction code: ${raw['trans code'] || '(blank)'}.` };
-    const symbol = raw.instrument?.trim().toUpperCase() || null;
-    const quantity = parseDecimal(raw.quantity ?? raw['quantity transacted'] ?? '', 'quantity', true);
-    const price = parseDecimal(raw.price ?? raw['price per share'] ?? '', 'price', true);
-    const amount = parseDecimal(raw.amount, 'amount');
-    if (['buy', 'sell', 'drip_buy'].includes(type) && (!symbol || !quantity || new Decimal(quantity).lte(0))) {
-      throw new Error(`Row ${rowNumber} requires an instrument and positive quantity for ${type}.`);
+    try {
+      const symbol = raw.instrument?.trim().toUpperCase() || null;
+      const quantity = parseDecimal(raw.quantity ?? raw['quantity transacted'] ?? '', 'quantity', true);
+      const price = parseDecimal(raw.price ?? raw['price per share'] ?? '', 'price', true);
+      const amount = parseDecimal(raw.amount, 'amount');
+      if (['buy', 'sell', 'drip_buy'].includes(type) && (!symbol || !quantity || new Decimal(quantity).lte(0))) {
+        throw new Error(`Row ${rowNumber} requires an instrument and positive quantity for ${type}.`);
+      }
+      return {
+        rowNumber,
+        raw,
+        status: 'supported',
+        activity: {
+          effectiveDate: parseDate(raw['activity date']),
+          type,
+          symbol,
+          quantity,
+          price,
+          amount: directedAmount(type, amount!),
+          description: raw.description?.trim() || raw['trans code'].trim(),
+        },
+      };
+    } catch (error) {
+      return {
+        rowNumber,
+        raw,
+        status: 'invalid',
+        message: error instanceof Error ? error.message : `Row ${rowNumber} is invalid.`,
+      };
     }
-    return {
-      rowNumber,
-      raw,
-      status: 'supported',
-      activity: {
-        effectiveDate: parseDate(raw['activity date']),
-        type,
-        symbol,
-        quantity,
-        price,
-        amount: directedAmount(type, amount!),
-        description: raw.description?.trim() || raw['trans code'].trim(),
-      },
-    };
   });
 }

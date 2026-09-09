@@ -13,6 +13,14 @@ describe('import workflow', () => {
     expect(() => assertImportCanCommit(review)).toThrow('material unsupported');
   });
 
+  it('fails closed for an unsupported row until its materiality is explicitly resolved', () => {
+    const unknown = buildImportReview([{ status: 'supported' }, { status: 'unsupported' }]);
+    expect(() => assertImportCanCommit(unknown)).toThrow('material unsupported');
+
+    const nonMaterial = buildImportReview([{ status: 'supported' }, { status: 'unsupported', materiallyAffectsReports: false }]);
+    expect(() => assertImportCanCommit(nonMaterial)).not.toThrow();
+  });
+
   it('accepts a clean reviewed import', () => {
     expect(() => assertImportCanCommit(buildImportReview([{ status: 'supported' }, { status: 'duplicate' }]))).not.toThrow();
   });

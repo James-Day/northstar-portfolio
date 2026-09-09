@@ -42,6 +42,9 @@ export function buildImportReview(rows: Array<{ status: 'supported' | 'unsupport
     unsupportedRowCount: count('unsupported'),
     invalidRowCount: count('invalid'),
     duplicateRowCount: count('duplicate'),
-    materialUnsupportedRowCount: rows.filter((row) => row.status === 'unsupported' && row.materiallyAffectsReports).length,
+    // An unfamiliar brokerage event has unknown economic impact. Treat it as
+    // material until an importer rule or explicit reviewer resolution proves
+    // that it cannot affect positions, cash, income, or return calculations.
+    materialUnsupportedRowCount: rows.filter((row) => row.status === 'unsupported' && row.materiallyAffectsReports !== false).length,
   };
 }

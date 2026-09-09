@@ -13,7 +13,9 @@ describe('parseRobinhoodActivityCsv', () => {
     expect(row).toMatchObject({ status: 'unsupported', rowNumber: 2, message: expect.stringContaining('Corporate Mystery') });
   });
 
-  it('rejects malformed values rather than converting them to zero', () => {
-    expect(() => parseRobinhoodActivityCsv('Activity Date,Trans Code,Amount\n2026-01-02,Interest,not-money')).toThrow('Invalid amount');
+  it('preserves malformed rows as invalid rather than converting them to zero or dropping them', () => {
+    const [row] = parseRobinhoodActivityCsv('Activity Date,Trans Code,Amount\n2026-01-02,Interest,not-money');
+    expect(row).toMatchObject({ status: 'invalid', rowNumber: 2, message: 'Invalid amount: not-money' });
+    expect(row.raw).toMatchObject({ amount: 'not-money' });
   });
 });
