@@ -77,9 +77,10 @@ Acceptance: data survives reload and a second session; user A cannot read or mod
 
 ### 04 — Implement real authentication
 
-- [ ] Implement Supabase email/password signup, email verification, sign-in and sign-out.
-- [ ] Configure Google OAuth, callbacks and permitted redirect URLs.
-- [ ] Implement password reset, session renewal and expired/revoked-session handling.
+- [x] Implement a tested Supabase email/password signup, sign-in, sign-out, and provider-error boundary.
+- [x] Implement a tested Google OAuth initiation boundary with configured callbacks.
+- [x] Implement a tested password-reset initiation boundary and expired-session error handling.
+- [ ] Configure Supabase email verification, Google OAuth redirect URLs, session renewal, and revoked-session behavior in a live project.
 - [ ] Protect application pages and API endpoints on the server; keep the public demo separate.
 - [ ] Replace James/JC placeholders with authenticated profile data.
 
@@ -245,5 +246,6 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 07 — Import workflow (partial) | Lifecycle and review-commit blocking rules added; `npm run typecheck`, `npm test` (25 passing), and `npm run build` passed | Lifecycle is not yet persisted or processed through queues |
 | 2026-09-09 | 08 — Corporate-action safeguards (partial) | Validated split and ticker-change lot handling added; `npm run typecheck`, `npm test` (28 passing), and `npm run build` passed | Corporate actions are not yet sourced, evidenced, or connected to stored price history |
 | 2026-09-09 | 08 — Internal-transfer linking (partial) | Reconciled-account transfer linking and unresolved-transfer rules added; `npm run typecheck`, `npm test` (30 passing), and `npm run build` passed | Transferred lots/basis require persisted cross-account transfer workflows |
+| 2026-09-09 | 04 — Authentication boundary (partial) | Supabase email/password, Google OAuth, reset, sign-out, and error-path interfaces added; `npm run typecheck`, `npm test` (33 passing), and `npm run build` passed | Live provider configuration, session handling, protected routes, and profile UI require a configured Supabase project |
 
 For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.
