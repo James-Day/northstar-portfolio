@@ -117,10 +117,10 @@ Acceptance: repeated and overlapping files never double-count; legitimate identi
 
 ### 08 — Implement the accounting engine
 
-- [ ] Derive cash and positions from ledger entries using decimal arithmetic.
-- [ ] Implement FIFO lots and analytical realized gains/losses; label them as not tax reporting.
-- [ ] Apply net trade amounts/fees once and preserve unknown basis through sales and transfers.
-- [ ] Record dividend income and a separate reinvestment purchase without double counting.
+- [x] Add a pure decimal ledger core that derives cash and open lots from normalized events.
+- [x] Implement FIFO lots and analytical realized gains/losses; label them as not tax reporting.
+- [x] Apply net trade amounts/fees once and preserve unknown basis through sales.
+- [x] Record dividend income and a separate reinvestment purchase without double counting.
 - [ ] Link internal transfers for consolidated reporting; preserve share lots/basis where supported and flag unresolved transfers.
 - [ ] Validate corporate actions before applying quantity/basis changes; never automatically apply DoltHub split rows.
 
@@ -231,5 +231,6 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 02 — Backend/test foundation (partial) | Commit `9890b19`; exact-decimal/date/instrument contracts, server-only environment template, Hono API shell, Vitest/Playwright scripts, CI, README, dependency updates; `npm run typecheck`, `npm test` (2 passing), and `npm run build` passed | API shell is not mounted; Supabase, queues, database tests, and browser flows require service configuration and implementation |
 | 2026-09-09 | 03 — Persistence (schema foundation) | Initial Supabase migration and public-client factory added; `npm run typecheck`, `npm test` (2 passing), and `npm run build` passed | Migration and storage policies are unverified until a development Supabase project is configured |
 | 2026-09-09 | 10 — Marketstack provider (partial) | Server-only EOD adapter and request-budget guard added; `npm run typecheck`, `npm test` (4 passing), and `npm run build` passed | No free key, price database, schedule, metrics, retry, or dashboard integration yet |
+| 2026-09-09 | 08 — Accounting engine (partial) | Decimal FIFO core added with fractional-lot, fee, DRIP, and unknown-basis fixtures; `npm run typecheck`, `npm test` (7 passing), and `npm run build` passed | Engine is not yet driven from the database; internal transfers and validated corporate actions remain unimplemented |
 
 For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.
