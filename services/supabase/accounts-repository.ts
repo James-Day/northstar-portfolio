@@ -26,7 +26,7 @@ export class SupabaseAccountsRepository implements AccountsRepository {
   constructor(private readonly options: SupabaseAccountsRepositoryOptions) {
     this.baseUrl = new URL(options.supabaseUrl);
     if (!options.supabaseAnonKey.trim()) throw new Error('SUPABASE_ANON_KEY is required for account queries.');
-    this.fetcher = options.fetcher ?? fetch;
+    this.fetcher = options.fetcher ?? ((input, init) => fetch(input, init));
   }
 
   async list(userId: string, accessToken: string): Promise<PortfolioAccount[]> {

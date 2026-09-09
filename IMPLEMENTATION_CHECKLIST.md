@@ -14,8 +14,8 @@ The application is a privately deployed visual prototype. It is not ready for re
 | Landing page and pricing | Visual implementation exists | `/`; $5/month and $49/year copy; no checkout |
 | Dashboard | Visual implementation exists | `/dashboard`; static holdings, chart, user identity, trial and freshness labels |
 | Sign-in | UI only | `/sign-in`; real Supabase flows remain unconnected to the screen |
-| User database / authentication | Foundation exists | Supabase schema, browser client, auth service boundaries, and Worker bearer-session verification exist; no hosted project or protected app pages yet |
-| CSV import | Prototype only | Browser file reader and basic parser; no durable storage or atomic commit |
+| User database / authentication | Local development implementation verified | Local Supabase schema, email/password users, Worker bearer-session verification, and RLS-backed account/import APIs were exercised; no hosted project or protected app pages yet |
+| CSV import | Durable review staging implemented locally | Immutable review imports/source rows stage atomically in local Supabase; no file-object upload, commit, or dashboard reporting yet |
 | Financial calculations | Placeholder | Floating-point arithmetic, hard-coded realized basis deduction, no FIFO or Modified Dietz |
 | Price database / historical seed | Not implemented | `demoHoldings` and `demoPrices` in `lib/portfolio.ts` supply displayed prices |
 | Marketstack | Development provider foundation | Server-only EOD adapter and free-plan budget guard exist; no configured key, database persistence, or scheduled refresh |
@@ -67,9 +67,9 @@ Acceptance: a fresh checkout can run documented checks; missing secrets fail cle
 ### 03 — Create persistent databases and private storage
 
 - [x] Initialize local Supabase CLI configuration with development auth, redirects, 10 MB upload limit, and email-verification defaults.
-- [ ] Provision a runnable development Supabase database and prepare separate production configuration.
+- [x] Provision and reset a runnable local Supabase database; production configuration remains separate and unconfigured.
 - [x] Draft the initial migration for profiles, brokerage/IRA accounts, imports, immutable source rows, normalized ledger entries, lots/opening balances, instruments/aliases, price revisions, corporate actions/corrections, report snapshots, billing state, audit events and job outbox.
-- [ ] Apply and verify the migration in Supabase; enable row-level security and ownership constraints on every user-owned table. Global prices are shared data with restricted writes.
+- [x] Apply and verify the migration locally; row-level security and ownership constraints cover every user-owned table. Global prices are shared data with restricted writes.
 - [x] Define a private brokerage-statement bucket and ownership policies in the initial migration.
 - [ ] Verify signed upload access and account ownership validation against real storage.
 - [ ] Add transactional operations for import commit/undo and versioned report publication.
@@ -109,14 +109,14 @@ Acceptance: multiple accounts remain separate, fractional positions are supporte
 - [x] Preserve raw rows and parsing errors in the parser result; unsupported rows remain visible instead of disappearing.
 - [x] Default unfamiliar transaction codes to material during import review, so a reportable import cannot commit until their impact is resolved.
 - [x] Add a server-side preview contract that requires a confirmed owned account, records the original CSV SHA-256 and parser version, derives review/date-range metadata, and checks persisted identical-file hashes.
-- [ ] Persist file hash, parser version and review/commit blocking state with imports when the database workflow is connected.
+- [x] Persist the file hash, parser version, source rows, and review metadata with local staged imports. Commit-blocking state still requires the durable commit workflow.
 
 Acceptance: supported fixtures reconcile row-for-row; malformed values never silently become zero; unsupported assets/codes remain visible.
 
 ### 07 — Build durable review, commit, deduplication and undo
 
 - [x] Define and test durable import lifecycle transitions for staging, review, commit, discard, failure retry, and undo.
-- [x] Add an RLS-scoped atomic staging RPC and authenticated API route that persist an import plus immutable source rows together; deployment verification remains pending local Supabase recovery.
+- [x] Add and locally verify an RLS-scoped atomic staging RPC and authenticated API route that persist an import plus immutable source rows together.
 - [x] Add authenticated API contracts to list staged import history, retrieve preserved review rows, and discard a review-ready import without deleting audit history.
 - [ ] Queue parsing and persist staged results with progress/failure status.
 - [ ] Show source rows, interpreted transactions, account/date range, duplicates and actionable warnings.
@@ -268,5 +268,6 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 03/04 — Local Supabase configuration (partial) | Supabase CLI configuration initialized with product-aligned local auth, redirects, file-size settings, and a local public-client configuration | Docker Desktop 4.90.0 has a Windows runtime-socket failure that prevents stable local database startup; no hosted Supabase project is linked |
 | 2026-09-09 | 04 — Worker session verification (partial) | Commit `02c4f26`; `GET /v1/me` verifies Supabase bearer tokens server-side and returns only a validated user; `npm run typecheck`, `npm test` (48 passing), `npm run build`, and Worker dry-run passed | Hosted Supabase configuration, frontend route protection, and persistence authorization are still incomplete |
 | 2026-09-09 | 02 — Standalone API Worker foundation (partial) | Hono Worker entrypoint, deployment config, binding-safe health route, and dry-run bundle added; `npm run typecheck` and `npm test` (41 passing) passed | Queues, schedules, authenticated API routes, and deployed configuration remain pending |
+| 2026-09-09 | 02/03/04/07 — Local database and authenticated import staging | Docker Desktop 4.90.0 repaired; local Supabase reset applied all three migrations and `db lint` passed. A real local user created an account, previewed and staged a CSV, listed its staged import, and a second authenticated user was denied access. Worker compatibility date and Worker-safe `fetch` adapters were corrected. `npm run typecheck`, `npm test` (88 passing), `npm run build`, and Worker dry-run passed | No hosted Supabase project, private file-object upload, durable commit/undo, or protected app UI yet |
 
 For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.

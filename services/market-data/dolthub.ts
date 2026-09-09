@@ -50,7 +50,7 @@ export class DoltHubHistoricalSource {
   private readonly branch: string;
 
   constructor(options: DoltHubHistoricalSourceOptions = {}) {
-    this.fetcher = options.fetcher ?? fetch;
+    this.fetcher = options.fetcher ?? ((input, init) => fetch(input, init));
     this.baseUrl = options.baseUrl ?? API_BASE_URL;
     this.branch = options.branch ?? 'master';
     if (!/^[A-Za-z][A-Za-z0-9_-]{2,31}$/.test(this.branch)) throw new Error('Invalid DoltHub branch name.');

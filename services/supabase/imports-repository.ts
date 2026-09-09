@@ -48,7 +48,7 @@ export class SupabaseImportsRepository implements ImportsRepository {
   constructor(private readonly options: SupabaseImportsRepositoryOptions) {
     this.baseUrl = new URL(options.supabaseUrl);
     if (!options.supabaseAnonKey.trim()) throw new Error('SUPABASE_ANON_KEY is required for import queries.');
-    this.fetcher = options.fetcher ?? fetch;
+    this.fetcher = options.fetcher ?? ((input, init) => fetch(input, init));
   }
 
   async hasFileHash(accountId: string, accessToken: string, fileSha256: string): Promise<boolean> {

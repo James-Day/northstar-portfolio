@@ -26,7 +26,7 @@ function bearerToken(request: Request): string | undefined {
 export async function verifySupabaseSession(
   request: Request,
   config: SupabaseSessionConfig,
-  requestFetch: SessionFetch = fetch,
+  requestFetch: SessionFetch = (input, init) => fetch(input, init),
 ): Promise<AuthenticatedUser | undefined> {
   const token = bearerToken(request);
   if (!token) return undefined;

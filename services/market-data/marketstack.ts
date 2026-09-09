@@ -43,7 +43,7 @@ export class MarketstackProvider implements DailyPriceProvider {
 
   constructor(private readonly options: MarketstackOptions) {
     if (!options.apiKey.trim()) throw new Error('MARKETSTACK_API_KEY is required for Marketstack requests.');
-    this.fetcher = options.fetcher ?? fetch;
+    this.fetcher = options.fetcher ?? ((input, init) => fetch(input, init));
     this.baseUrl = options.baseUrl ?? 'https://api.marketstack.com/v2/eod';
   }
 
