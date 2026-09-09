@@ -116,6 +116,7 @@ Acceptance: supported fixtures reconcile row-for-row; malformed values never sil
 ### 07 — Build durable review, commit, deduplication and undo
 
 - [x] Define and test durable import lifecycle transitions for staging, review, commit, discard, failure retry, and undo.
+- [x] Add an RLS-scoped atomic staging RPC and authenticated API route that persist an import plus immutable source rows together; deployment verification remains pending local Supabase recovery.
 - [ ] Queue parsing and persist staged results with progress/failure status.
 - [ ] Show source rows, interpreted transactions, account/date range, duplicates and actionable warnings.
 - [x] Implement multiplicity-aware overlap fingerprints including account, date, type, symbol, quantity, price, amount and description.

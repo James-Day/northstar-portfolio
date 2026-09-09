@@ -17,6 +17,18 @@ export type StagedRobinhoodImport = {
   duplicateFile: boolean;
 };
 
+export type PersistableImportStage = {
+  accountId: string;
+  fileName: string;
+  fileSha256: string;
+  parserVersion: string;
+  rows: ParsedRobinhoodRow[];
+  activityFrom: IsoDate | null;
+  activityThrough: IsoDate | null;
+  usableRowCount: number;
+  warningCount: number;
+};
+
 /**
  * Creates the immutable data needed to stage a Robinhood statement. The hash
  * covers the original bytes, while overlap fingerprinting later protects
@@ -46,6 +58,21 @@ export async function stageRobinhoodImport(accountId: string, csv: string, exist
 export function assertStagedImportCanCommit(staged: StagedRobinhoodImport) {
   if (staged.duplicateFile) throw new Error('This exact statement was already imported for the selected account.');
   assertImportCanCommit(staged.review);
+}
+
+export function toPersistableImportStage(staged: StagedRobinhoodImport, fileName: string): PersistableImportStage {
+  if (!/^[^/\\\p{Cc}]{1,255}\.csv$/u.test(fileName)) throw new Error('Statement file name must be a CSV name without path characters.');
+  return {
+    accountId: staged.accountId,
+    fileName,
+    fileSha256: staged.fileSha256,
+    parserVersion: staged.parserVersion,
+    rows: staged.rows,
+    activityFrom: staged.activityFrom,
+    activityThrough: staged.activityThrough,
+    usableRowCount: staged.review.acceptedRowCount,
+    warningCount: staged.review.unsupportedRowCount + staged.review.invalidRowCount + staged.review.duplicateRowCount,
+  };
 }
 
 export async function sha256Hex(value: string): Promise<string> {

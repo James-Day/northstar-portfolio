@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertStagedImportCanCommit, sha256Hex, stageRobinhoodImport } from '@/services/ingestion/staging';
+import { assertStagedImportCanCommit, sha256Hex, stageRobinhoodImport, toPersistableImportStage } from '@/services/ingestion/staging';
 
 describe('Robinhood import staging', () => {
   const csv = 'Activity Date,Trans Code,Instrument,Quantity,Price,Amount\n2026-01-04,Buy,VTI,1,$100,$100\n2026-01-02,Cash Dividend,VTI,,,$2\n2026-01-03,Unknown Event,,,,$3';
@@ -28,5 +28,11 @@ describe('Robinhood import staging', () => {
     const duplicate = await stageRobinhoodImport('account-123', csv, [staged.fileSha256.toUpperCase()]);
     expect(duplicate.duplicateFile).toBe(true);
     expect(() => assertStagedImportCanCommit(duplicate)).toThrow('already imported');
+  });
+
+  it('builds a storage-safe staging payload with review counts separate from raw rows', async () => {
+    const staged = await stageRobinhoodImport('account-123', csv);
+    expect(toPersistableImportStage(staged, 'activity.csv')).toMatchObject({ fileName: 'activity.csv', usableRowCount: 2, warningCount: 1 });
+    expect(() => toPersistableImportStage(staged, '../activity.csv')).toThrow('without path characters');
   });
 });

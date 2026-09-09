@@ -6,7 +6,7 @@ import {
 } from '@/services/auth/server-session';
 import { validateCreatePortfolioAccount, type AccountsRepository } from '@/services/accounts/accounts';
 import { SupabaseAccountsRepository } from '@/services/supabase/accounts-repository';
-import { stageRobinhoodImport } from '@/services/ingestion/staging';
+import { stageRobinhoodImport, toPersistableImportStage } from '@/services/ingestion/staging';
 import { SupabaseImportsRepository, type ImportsRepository } from '@/services/supabase/imports-repository';
 
 export type ApiBindings = {
@@ -81,6 +81,25 @@ export function createApi(dependencies: ApiDependencies = {}) {
     const imports = importsRepository ?? createImportsRepository(context.env);
     const duplicateFile = await imports.hasFileHash(accountId, authenticated.accessToken, staged.fileSha256);
     return context.json({ import: { ...staged, duplicateFile } });
+  });
+
+  api.post('/v1/accounts/:accountId/imports', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    const accountId = context.req.param('accountId');
+    const accounts = accountsRepository ?? createAccountsRepository(context.env);
+    const account = await accounts.get(authenticated.user.id, authenticated.accessToken, accountId);
+    if (!account) return context.json({ error: 'not_found' }, 404);
+    const contentType = context.req.header('content-type')?.toLowerCase() ?? '';
+    if (!contentType.startsWith('text/csv')) return context.json({ error: 'unsupported_media_type' }, 415);
+    const fileName = context.req.header('x-file-name') ?? '';
+    const staged = await stageRobinhoodImport(accountId, await context.req.text());
+    const imports = importsRepository ?? createImportsRepository(context.env);
+    if (await imports.hasFileHash(accountId, authenticated.accessToken, staged.fileSha256)) {
+      return context.json({ error: 'duplicate_file' }, 409);
+    }
+    const importRecord = await imports.stage(authenticated.accessToken, toPersistableImportStage(staged, fileName));
+    return context.json({ import: { ...importRecord, review: staged.review, activityFrom: staged.activityFrom, activityThrough: staged.activityThrough } }, 201);
   });
 
   return api;

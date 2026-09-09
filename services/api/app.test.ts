@@ -90,7 +90,7 @@ describe('standalone API', () => {
     const app = createApi({
       verifySession: async () => ({ id: 'user-123' }),
       accountsRepository: { list: async () => [], get: async () => account, create: async () => account },
-      importsRepository: { hasFileHash },
+      importsRepository: { hasFileHash, stage: async () => { throw new Error('unused'); } },
     });
 
     const response = await app.request(`http://api.test/v1/accounts/${account.id}/import-preview`, {
@@ -107,11 +107,47 @@ describe('standalone API', () => {
     const app = createApi({
       verifySession: async () => ({ id: 'user-123' }),
       accountsRepository: { list: async () => [], get: async () => undefined, create: async () => { throw new Error('unused'); } },
-      importsRepository: { hasFileHash: async () => { throw new Error('must not query imports'); } },
+      importsRepository: { hasFileHash: async () => { throw new Error('must not query imports'); }, stage: async () => { throw new Error('must not stage imports'); } },
     });
 
     const response = await app.request('http://api.test/v1/accounts/another-user-account/import-preview', { method: 'POST', headers: { authorization: 'Bearer session-token', 'content-type': 'text/csv' }, body: 'Activity Date,Trans Code,Amount\n2026-01-02,Interest,$2' });
 
     expect(response.status).toBe(404);
+  });
+
+  it('stages owned CSV rows through the atomic repository after duplicate-file preflight', async () => {
+    const account = { id: 'account-123', userId: 'user-123', brokerage: 'robinhood' as const, accountType: 'individual' as const, name: 'Taxable', currency: 'USD' as const, activityCoveredThrough: null, createdAt: '2026-09-09T00:00:00.000Z' };
+    const stage = async (token: string, input: { fileName: string; accountId: string }) => {
+      expect(token).toBe('session-token');
+      expect(input).toMatchObject({ fileName: 'activity.csv', accountId: account.id });
+      return { id: 'import-123', status: 'ready_for_review' as const };
+    };
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123' }),
+      accountsRepository: { list: async () => [], get: async () => account, create: async () => account },
+      importsRepository: { hasFileHash: async () => false, stage },
+    });
+
+    const response = await app.request(`http://api.test/v1/accounts/${account.id}/imports`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer session-token', 'content-type': 'text/csv', 'x-file-name': 'activity.csv' },
+      body: 'Activity Date,Trans Code,Amount\n2026-01-02,Interest,$2',
+    });
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({ import: { id: 'import-123', status: 'ready_for_review', review: { acceptedRowCount: 1 } } });
+  });
+
+  it('rejects an identical file before it reaches the staging RPC', async () => {
+    const account = { id: 'account-123', userId: 'user-123', brokerage: 'robinhood' as const, accountType: 'individual' as const, name: 'Taxable', currency: 'USD' as const, activityCoveredThrough: null, createdAt: '2026-09-09T00:00:00.000Z' };
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123' }),
+      accountsRepository: { list: async () => [], get: async () => account, create: async () => account },
+      importsRepository: { hasFileHash: async () => true, stage: async () => { throw new Error('must not stage duplicate'); } },
+    });
+
+    const response = await app.request(`http://api.test/v1/accounts/${account.id}/imports`, { method: 'POST', headers: { authorization: 'Bearer session-token', 'content-type': 'text/csv', 'x-file-name': 'activity.csv' }, body: 'Activity Date,Trans Code,Amount\n2026-01-02,Interest,$2' });
+
+    expect(response.status).toBe(409);
   });
 });
