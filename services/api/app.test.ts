@@ -17,4 +17,26 @@ describe('standalone API', () => {
       environment: 'production',
     });
   });
+
+  it('protects private routes with a server-verified session', async () => {
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123', email: 'person@example.com' }),
+    });
+
+    const response = await app.request('http://api.test/v1/me');
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      user: { id: 'user-123', email: 'person@example.com' },
+    });
+  });
+
+  it('returns 401 when a private route has no valid session', async () => {
+    const app = createApi({ verifySession: async () => undefined });
+
+    const response = await app.request('http://api.test/v1/me');
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'unauthorized' });
+  });
 });

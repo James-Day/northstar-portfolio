@@ -13,15 +13,15 @@ The application is a privately deployed visual prototype. It is not ready for re
 | React, TypeScript, Tailwind, components | Foundation exists | Uses Vinext on Vite and the Sites Worker scaffold; not the planned standalone React/Hono architecture |
 | Landing page and pricing | Visual implementation exists | `/`; $5/month and $49/year copy; no checkout |
 | Dashboard | Visual implementation exists | `/dashboard`; static holdings, chart, user identity, trial and freshness labels |
-| Sign-in | UI only | `/sign-in`; any nonempty password redirects; Google button also just redirects |
-| User database / authentication | Not implemented | No Supabase client, migrations, session validation or ownership enforcement |
+| Sign-in | UI only | `/sign-in`; real Supabase flows remain unconnected to the screen |
+| User database / authentication | Foundation exists | Supabase schema, browser client, auth service boundaries, and Worker bearer-session verification exist; no hosted project or protected app pages yet |
 | CSV import | Prototype only | Browser file reader and basic parser; no durable storage or atomic commit |
 | Financial calculations | Placeholder | Floating-point arithmetic, hard-coded realized basis deduction, no FIFO or Modified Dietz |
 | Price database / historical seed | Not implemented | `demoHoldings` and `demoPrices` in `lib/portfolio.ts` supply displayed prices |
-| Marketstack | Interface stub only | Provider throws for nonempty requests; no HTTP request or scheduled refresh |
+| Marketstack | Development provider foundation | Server-only EOD adapter and free-plan budget guard exist; no configured key, database persistence, or scheduled refresh |
 | Billing / trial | Not implemented | No Stripe integration; trial label is hard-coded |
 | Security / deletion / exports | Not implemented | No raw-file retention job, account deletion or export workflow |
-| Automated tests / CI | Not implemented | No Vitest, Playwright, database tests or CI workflow |
+| Automated tests / CI | Foundation exists | Vitest unit tests and CI configuration exist; database and browser-flow coverage remain pending |
 | Hosting | Private prototype deployed | Last confirmed deployment: version 3, commit `49d0287388a7c438758c05fe3616aa62e44664d8`; not rechecked remotely in this audit |
 | Branding | Partial local change | Compass mark exists and is used on local landing page; branding changes are uncommitted and not confirmed deployed; name remains Northstar |
 
@@ -82,7 +82,8 @@ Acceptance: data survives reload and a second session; user A cannot read or mod
 - [x] Implement a tested Google OAuth initiation boundary with configured callbacks.
 - [x] Implement a tested password-reset initiation boundary and expired-session error handling.
 - [ ] Configure Supabase email verification, Google OAuth redirect URLs, session renewal, and revoked-session behavior in a live project.
-- [ ] Protect application pages and API endpoints on the server; keep the public demo separate.
+- [x] Add Worker API bearer-session verification and a protected identity endpoint (`GET /v1/me`).
+- [ ] Protect application pages and remaining API endpoints on the server; keep the public demo separate.
 - [ ] Replace James/JC placeholders with authenticated profile data.
 
 Acceptance: valid users can sign in and return later; invalid credentials fail; unauthenticated and revoked sessions cannot access private data. Supabase manages password hashes; never store plaintext passwords in app tables.
@@ -255,6 +256,7 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 14 — Raw-file retention (partial) | 30-day retention eligibility and auditable deletion-state rules added; `npm run typecheck`, `npm test` (38 passing), and `npm run build` passed | Storage deletion job, retries, and verification require private Supabase storage |
 | 2026-09-09 | 14 — User-deletion rules (partial) | User-data deletion lifecycle and complete cleanup-plan rules added; `npm run typecheck`, `npm test` (40 passing), and `npm run build` passed | Actual storage, billing, database, and export execution requires configured services |
 | 2026-09-09 | 03/04 — Local Supabase configuration (partial) | Supabase CLI configuration initialized with product-aligned local auth, redirects, file-size settings, and a local public-client configuration | Docker Desktop 4.90.0 has a Windows runtime-socket failure that prevents stable local database startup; no hosted Supabase project is linked |
+| 2026-09-09 | 04 — Worker session verification (partial) | Pending commit; `GET /v1/me` verifies Supabase bearer tokens server-side and returns only a validated user; `npm run typecheck`, `npm test` (48 passing), `npm run build`, and Worker dry-run passed | Hosted Supabase configuration, frontend route protection, and persistence authorization are still incomplete |
 | 2026-09-09 | 02 — Standalone API Worker foundation (partial) | Hono Worker entrypoint, deployment config, binding-safe health route, and dry-run bundle added; `npm run typecheck` and `npm test` (41 passing) passed | Queues, schedules, authenticated API routes, and deployed configuration remain pending |
 
 For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.
