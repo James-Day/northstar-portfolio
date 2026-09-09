@@ -1,0 +1,30 @@
+import { describe, expect, it } from 'vitest';
+import { parseRobinhoodActivityCsv } from '@/services/ingestion/robinhood';
+import { normalizeRobinhoodRowsForLedger } from '@/services/ingestion/ledger-normalization';
+
+describe('Robinhood ledger normalization', () => {
+  it('expands a DRIP into dividend income and a separate cash-neutral buy', () => {
+    const rows = parseRobinhoodActivityCsv('Activity Date,Trans Code,Instrument,Quantity,Price,Amount,Description\n2026-01-02,Dividend Reinvestment,VTI,0.01,$200,($2),Reinvested dividend');
+    const entries = normalizeRobinhoodRowsForLedger(rows, new Map([['VTI', 'instrument-vti']]));
+
+    expect(entries).toEqual([
+      expect.objectContaining({ entryType: 'dividend', instrumentId: 'instrument-vti', quantity: null, cashAmount: '2', description: 'Reinvested dividend (reinvested dividend income)' }),
+      expect.objectContaining({ entryType: 'drip_buy', instrumentId: 'instrument-vti', quantity: '0.01', cashAmount: '-2' }),
+    ]);
+  });
+
+  it('preserves signs for cash activity and marks only deposits and withdrawals as external flows', () => {
+    const rows = parseRobinhoodActivityCsv('Activity Date,Trans Code,Amount\n2026-01-02,ACH Deposit,$100\n2026-01-03,IRA Incentive,$10\n2026-01-04,ACH Withdrawal,$5\n2026-01-05,Fee,$1');
+    expect(normalizeRobinhoodRowsForLedger(rows, new Map())).toEqual([
+      expect.objectContaining({ entryType: 'deposit', cashAmount: '100', externalFlow: true }),
+      expect.objectContaining({ entryType: 'ira_incentive', cashAmount: '10', externalFlow: false }),
+      expect.objectContaining({ entryType: 'withdrawal', cashAmount: '-5', externalFlow: true }),
+      expect.objectContaining({ entryType: 'fee', cashAmount: '-1', externalFlow: false }),
+    ]);
+  });
+
+  it('fails closed when a reportable ticker has not been resolved to a stable instrument ID', () => {
+    const rows = parseRobinhoodActivityCsv('Activity Date,Trans Code,Instrument,Quantity,Amount\n2026-01-02,Buy,VTI,1,($100)');
+    expect(() => normalizeRobinhoodRowsForLedger(rows, new Map())).toThrow('no resolved instrument for VTI');
+  });
+});

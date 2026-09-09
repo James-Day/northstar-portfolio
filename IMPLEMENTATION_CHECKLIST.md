@@ -129,6 +129,7 @@ Acceptance: repeated and overlapping files never double-count; legitimate identi
 
 ### 08 — Implement the accounting engine
 
+- [x] Normalize reviewed Robinhood rows into ledger-entry drafts; model DRIP as dividend income plus a separate reinvestment buy, preserve signed cash flows, and require a resolved stable instrument ID.
 - [x] Add a pure decimal ledger core that derives cash and open lots from normalized events.
 - [x] Implement FIFO lots and analytical realized gains/losses; label them as not tax reporting.
 - [x] Apply net trade amounts/fees once and preserve unknown basis through sales.
