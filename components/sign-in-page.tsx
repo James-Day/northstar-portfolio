@@ -56,7 +56,7 @@ export function SignInPage({ supabaseConfig }: { supabaseConfig?: PublicSupabase
     setMessage(undefined);
     setIsSubmitting(true);
     try {
-      await auth.sendPasswordReset(email, `${window.location.origin}/auth/callback`);
+      await auth.sendPasswordReset(email, `${window.location.origin}/auth/recovery`);
       setMessage('If that email has an account, a password-reset link is on its way.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Password reset could not start.');

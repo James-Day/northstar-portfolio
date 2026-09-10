@@ -7,6 +7,7 @@ function authPort(): SupabaseAuthPort {
     signInWithPassword: vi.fn().mockResolvedValue({ error: null }),
     signInWithOAuth: vi.fn().mockResolvedValue({ error: null }),
     resetPasswordForEmail: vi.fn().mockResolvedValue({ error: null }),
+    updateUser: vi.fn().mockResolvedValue({ error: null }),
     signOut: vi.fn().mockResolvedValue({ error: null }),
   };
 }
@@ -31,5 +32,19 @@ describe('Supabase authentication service', () => {
     const port = authPort();
     vi.mocked(port.signOut).mockResolvedValue({ error: { message: 'Session expired.' } });
     await expect(createSupabaseAuthService(port).signOut()).rejects.toThrow('Session expired.');
+    expect(port.signOut).toHaveBeenCalledWith({ scope: 'global' });
+  });
+
+  it('validates and submits a password from a recovery session', async () => {
+    const port = authPort();
+    await createSupabaseAuthService(port).updatePassword('a-new-long-password');
+    expect(port.updateUser).toHaveBeenCalledWith({ password: 'a-new-long-password' });
+    await expect(createSupabaseAuthService(port).updatePassword('short')).rejects.toThrow();
+  });
+
+  it('uses the dedicated recovery route for reset links', async () => {
+    const port = authPort();
+    await createSupabaseAuthService(port).sendPasswordReset(' user@example.com ', 'https://app.example.com/auth/recovery');
+    expect(port.resetPasswordForEmail).toHaveBeenCalledWith('user@example.com', { redirectTo: 'https://app.example.com/auth/recovery' });
   });
 });

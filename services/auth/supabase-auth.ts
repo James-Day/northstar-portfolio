@@ -12,7 +12,8 @@ export type SupabaseAuthPort = {
   signInWithPassword(input: { email: string; password: string }): Promise<AuthResponse>;
   signInWithOAuth(input: { provider: 'google'; options: { redirectTo: string } }): Promise<AuthResponse>;
   resetPasswordForEmail(email: string, options: { redirectTo: string }): Promise<AuthResponse>;
-  signOut(): Promise<AuthResponse>;
+  updateUser(input: { password: string }): Promise<AuthResponse>;
+  signOut(options?: { scope?: 'global' | 'local' | 'others' }): Promise<AuthResponse>;
 };
 
 function assertSuccess(response: AuthResponse) {
@@ -36,8 +37,14 @@ export function createSupabaseAuthService(auth: SupabaseAuthPort) {
       const validatedEmail = z.string().trim().email().parse(email);
       assertSuccess(await auth.resetPasswordForEmail(validatedEmail, { redirectTo }));
     },
+    async updatePassword(password: string) {
+      const validatedPassword = credentialsSchema.shape.password.parse(password);
+      assertSuccess(await auth.updateUser({ password: validatedPassword }));
+    },
     async signOut() {
-      assertSuccess(await auth.signOut());
+      // Revoke the refresh-token family at the provider. The local client also
+      // removes its persisted session after this call succeeds.
+      assertSuccess(await auth.signOut({ scope: 'global' }));
     },
   };
 }

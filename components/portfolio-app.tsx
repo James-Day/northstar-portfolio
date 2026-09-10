@@ -50,6 +50,7 @@ import { filterReportHistory, reportPeriodDescription, reportPeriodOptions, type
 import { SettingsPanel } from "@/components/settings-panel";
 import type { OpeningHistory } from "@/services/accounts/opening-history";
 import { buildAllocationRows } from "@/lib/report-details";
+import { clearPrivateWorkspaceState } from "@/lib/auth/private-workspace";
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
 type PublicApiConfig = { baseUrl: string };
@@ -199,27 +200,82 @@ export function PortfolioApp({
   const [activityRequestVersion, setActivityRequestVersion] = useState(0);
   const [activityFilter, setActivityFilter] = useState("");
   const [billingStatus, setBillingStatus] = useState<LiveBillingStatus>();
+  const authGeneration = useRef(0);
+
+  function clearAccountWorkspaceState() {
+    setOpeningHistory(undefined);
+    setLivePreview(undefined);
+    setStagedCsv(undefined);
+    setStagedImportId(undefined);
+    setLiveRows([]);
+    setImportHistory([]);
+    setFreshnessReport(undefined);
+    setReportSnapshot(undefined);
+    setActivityPage(undefined);
+    setActivityOffset(0);
+    setFreshnessError(undefined);
+    setReportError(undefined);
+    setActivityError(undefined);
+  }
+
+  function clearSessionWorkspaceState() {
+    clearPrivateWorkspaceState({
+      setEmail: () => setEmail(undefined),
+      setUserId: () => setUserId(undefined),
+      setAccounts: () => setAccounts([]),
+      setSelectedAccountId: () => setSelectedAccountId(undefined),
+      setOpeningHistory: () => setOpeningHistory(undefined),
+      setLivePreview: () => setLivePreview(undefined),
+      setStagedCsv: () => setStagedCsv(undefined),
+      setStagedImportId: () => setStagedImportId(undefined),
+      setLiveRows: () => setLiveRows([]),
+      setImportHistory: () => setImportHistory([]),
+      setFreshnessReport: () => setFreshnessReport(undefined),
+      setReportSnapshot: () => setReportSnapshot(undefined),
+      setActivityPage: () => setActivityPage(undefined),
+      setBillingStatus: () => setBillingStatus(undefined),
+    });
+    setAccountsError(undefined);
+    setFreshnessError(undefined);
+    setReportError(undefined);
+    setActivityError(undefined);
+    setStageMessage(undefined);
+    setActive("Overview");
+    setMenuOpen(false);
+    setReviewOpen(false);
+    if (fileRef.current) fileRef.current.value = "";
+  }
 
   useEffect(() => {
     if (!client) return;
     let active = true;
+    const generation = authGeneration.current;
     void client.auth.getUser().then(({ data }) => {
-      if (active) {
+      if (active && generation === authGeneration.current) {
         setEmail(data.user?.email);
         setUserId(data.user?.id);
       }
     });
-    const { data: listener } = client.auth.onAuthStateChange(
-      (_event, session) => {
-        setEmail(session?.user.email);
-        setUserId(session?.user.id);
-      },
-    );
+    const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
+      authGeneration.current += 1;
+      const nextUserId = session?.user.id;
+      if (!nextUserId || (userId && nextUserId !== userId)) clearSessionWorkspaceState();
+      setEmail(session?.user.email);
+      setUserId(nextUserId);
+    });
     return () => {
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, [client]);
+  }, [client, userId]);
+
+  // Account switching must never leave the previous account's report or import
+  // rows visible while the new account requests are in flight.
+  useEffect(() => {
+    if (selectedAccountId) clearAccountWorkspaceState();
+    // The fetch effects below repopulate account-scoped state after this reset.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccountId]);
 
   useEffect(() => {
     if (!client || !userId || !apiConfig) { setBillingStatus(undefined); return; }
@@ -416,7 +472,8 @@ export function PortfolioApp({
   }
 
   async function signOut() {
-    await client?.auth.signOut();
+    await client?.auth.signOut({ scope: "global" });
+    clearSessionWorkspaceState();
     window.location.assign("/");
   }
 
