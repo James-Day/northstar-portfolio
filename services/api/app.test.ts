@@ -19,6 +19,15 @@ describe('standalone API', () => {
     });
   });
 
+  it('allows the configured app origin to stage authenticated browser requests without opening the API to other origins', async () => {
+    const app = createApi();
+    const allowed = await app.request('http://api.test/health', { headers: { origin: 'https://app.example.com' } }, { APP_ENV: 'production', APP_ORIGIN: 'https://app.example.com' });
+    const rejected = await app.request('http://api.test/health', { headers: { origin: 'https://other.example.com' } }, { APP_ENV: 'production', APP_ORIGIN: 'https://app.example.com' });
+
+    expect(allowed.headers.get('access-control-allow-origin')).toBe('https://app.example.com');
+    expect(rejected.headers.get('access-control-allow-origin')).toBeNull();
+  });
+
   it('protects private routes with a server-verified session', async () => {
     const app = createApi({
       verifySession: async () => ({ id: 'user-123', email: 'person@example.com' }),

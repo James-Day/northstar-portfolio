@@ -11,6 +11,7 @@ import { ImportOperationRejectedError, SupabaseImportsRepository, type ImportsRe
 
 export type ApiBindings = {
   APP_ENV?: 'development' | 'staging' | 'production';
+  APP_ORIGIN?: string;
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
 };
@@ -30,6 +31,20 @@ export function createApi(dependencies: ApiDependencies = {}) {
     }));
   const accountsRepository = dependencies.accountsRepository;
   const importsRepository = dependencies.importsRepository;
+
+  api.use('*', async (context, next) => {
+    const origin = context.req.header('origin');
+    const bindings = context.env ?? {};
+    const allowedOrigin = bindings.APP_ORIGIN?.trim() || (bindings.APP_ENV !== 'production' ? 'http://localhost:3000' : undefined);
+    if (origin && allowedOrigin && origin === allowedOrigin) {
+      context.header('access-control-allow-origin', origin);
+      context.header('vary', 'Origin');
+      context.header('access-control-allow-headers', 'authorization,content-type,x-file-name');
+      context.header('access-control-allow-methods', 'GET,POST,OPTIONS');
+    }
+    if (context.req.method === 'OPTIONS') return context.body(null, 204);
+    await next();
+  });
 
   api.get('/health', (context) =>
     context.json({

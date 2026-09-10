@@ -12,7 +12,9 @@ import { Activity, calculateSummary, demoActivities, demoHoldings, demoPrices, p
 import { createPublicSupabaseClient } from '@/services/supabase/client';
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
+type PublicApiConfig = { baseUrl: string };
 type LiveAccount = { id: string; name: string; account_type: 'individual' | 'traditional_ira' | 'roth_ira'; brokerage: 'robinhood'; created_at: string };
+type LiveImportPreview = { accountId: string; duplicateFile: boolean; review: { sourceRowCount: number; acceptedRowCount: number; unsupportedRowCount: number; invalidRowCount: number; duplicateRowCount: number; materialUnsupportedRowCount: number } };
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const precise = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
@@ -23,7 +25,7 @@ function Pill({ children, tone = 'slate' }: { children: React.ReactNode; tone?: 
   return <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${tones[tone]}`}>{children}</span>;
 }
 
-export function PortfolioApp({ supabaseConfig }: { supabaseConfig?: PublicSupabaseConfig }) {
+export function PortfolioApp({ supabaseConfig, apiConfig }: { supabaseConfig?: PublicSupabaseConfig; apiConfig?: PublicApiConfig }) {
   const [active, setActive] = useState('Overview');
   const [menuOpen, setMenuOpen] = useState(false);
   const [stagedActivities, setStagedActivities] = useState<Activity[] | null>(null);
@@ -37,6 +39,11 @@ export function PortfolioApp({ supabaseConfig }: { supabaseConfig?: PublicSupaba
   const [userId, setUserId] = useState<string>();
   const [accounts, setAccounts] = useState<LiveAccount[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(false);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>();
+  const [livePreview, setLivePreview] = useState<LiveImportPreview>();
+  const [stagedCsv, setStagedCsv] = useState<string>();
+  const [isStagingImport, setIsStagingImport] = useState(false);
+  const [stageMessage, setStageMessage] = useState<string>();
 
   useEffect(() => {
     if (!client) return;
@@ -72,11 +79,17 @@ export function PortfolioApp({ supabaseConfig }: { supabaseConfig?: PublicSupaba
     return () => { active = false; };
   }, [client, userId]);
 
+  useEffect(() => {
+    if (!selectedAccountId && accounts[0]) setSelectedAccountId(accounts[0].id);
+    if (selectedAccountId && !accounts.some((account) => account.id === selectedAccountId)) setSelectedAccountId(accounts[0]?.id);
+  }, [accounts, selectedAccountId]);
+
   async function createAccount(input: { name: string; accountType: LiveAccount['account_type'] }) {
     if (!client || !userId) throw new Error('Sign in before creating an account.');
     const { data, error } = await client.from('accounts').insert({ user_id: userId, brokerage: 'robinhood', account_type: input.accountType, name: input.name.trim(), currency: 'USD' }).select('id,name,account_type,brokerage,created_at').single();
     if (error) throw new Error(error.message);
     setAccounts((current) => [...current, data as LiveAccount]);
+    setSelectedAccountId((data as LiveAccount).id);
   }
 
   async function signOut() {
@@ -88,6 +101,9 @@ export function PortfolioApp({ supabaseConfig }: { supabaseConfig?: PublicSupaba
     setReviewOpen(false);
     setStagedActivities(null);
     setStagedFileName('');
+    setLivePreview(undefined);
+    setStagedCsv(undefined);
+    setStageMessage(undefined);
     if (fileRef.current) fileRef.current.value = '';
   }
 
@@ -99,20 +115,62 @@ export function PortfolioApp({ supabaseConfig }: { supabaseConfig?: PublicSupaba
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         if (typeof reader.result !== 'string') throw new Error('We could not read that CSV as text.');
+        if (client && userId && selectedAccountId && apiConfig) {
+          setIsStagingImport(true);
+          const { data } = await client.auth.getSession();
+          if (!data.session?.access_token) throw new Error('Your sign-in session has expired. Sign in again before importing.');
+          const response = await fetch(`${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/import-preview`, {
+            method: 'POST',
+            headers: { authorization: `Bearer ${data.session.access_token}`, 'content-type': 'text/csv', 'x-file-name': file.name },
+            body: reader.result,
+          });
+          const payload: unknown = await response.json();
+          if (!response.ok || !payload || typeof payload !== 'object' || !('import' in payload)) throw new Error('The server could not preview this CSV.');
+          const preview = (payload as { import: LiveImportPreview }).import;
+          setLivePreview(preview);
+          setStagedCsv(reader.result);
+          setStagedFileName(file.name);
+          setReviewOpen(true);
+          return;
+        }
         setStagedActivities(parseRobinhoodCsv(reader.result));
         setStagedFileName(file.name);
         setReviewOpen(true);
       } catch (error) {
         setUploadError(error instanceof Error ? error.message : 'We could not read that CSV.');
+      } finally {
+        setIsStagingImport(false);
       }
     };
     reader.readAsText(file);
   }
 
   const openFileChooser = () => fileRef.current?.click();
+
+  async function persistLiveImport() {
+    if (!client || !apiConfig || !selectedAccountId || !stagedCsv || !livePreview) return;
+    setStageMessage(undefined);
+    setIsStagingImport(true);
+    try {
+      const { data } = await client.auth.getSession();
+      if (!data.session?.access_token) throw new Error('Your sign-in session has expired. Sign in again before importing.');
+      const response = await fetch(`${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/imports`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${data.session.access_token}`, 'content-type': 'text/csv', 'x-file-name': stagedFileName },
+        body: stagedCsv,
+      });
+      const payload: unknown = await response.json();
+      if (!response.ok) throw new Error(payload && typeof payload === 'object' && 'error' in payload ? String(payload.error) : 'The server could not stage this CSV.');
+      setStageMessage('Saved for review. This import has not changed your portfolio yet.');
+    } catch (error) {
+      setStageMessage(error instanceof Error ? error.message : 'We could not stage this CSV.');
+    } finally {
+      setIsStagingImport(false);
+    }
+  }
 
   return <main className="min-h-screen bg-[#f5f7fb] text-[#13233a]">
     <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-[#f5f7fb]/90 backdrop-blur-xl">
@@ -133,11 +191,11 @@ export function PortfolioApp({ supabaseConfig }: { supabaseConfig?: PublicSupaba
         {active === 'Overview' && <Overview summary={summary} onUpload={openFileChooser} />}
         {active === 'Activity' && <ActivityPanel onUpload={openFileChooser} />}
         {active === 'Accounts' && <Accounts summary={summary} accounts={accounts} isLoading={accountsLoading} canCreate={Boolean(client && userId)} onCreate={createAccount} />}
-        {active === 'Documents' && <Documents onUpload={openFileChooser} uploadError={uploadError} />}
+        {active === 'Documents' && <Documents onUpload={openFileChooser} uploadError={uploadError} accounts={accounts} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} canStage={Boolean(client && userId && apiConfig && selectedAccountId)} isStaging={isStagingImport} />}
       </section>
     </div>
     <Input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" aria-label="Preview a Robinhood CSV" onChange={(event) => stageFile(event.target.files?.[0])} />
-    <ImportReview open={reviewOpen} fileName={stagedFileName} activities={stagedActivities ?? []} onDiscard={clearStaging} />
+    <ImportReview open={reviewOpen} fileName={stagedFileName} activities={stagedActivities ?? []} livePreview={livePreview} isStaging={isStagingImport} stageMessage={stageMessage} onStage={persistLiveImport} onDiscard={clearStaging} />
   </main>;
 }
 
@@ -185,11 +243,13 @@ function accountTypeLabel(accountType: LiveAccount['account_type']) {
   return { individual: 'Individual brokerage', traditional_ira: 'Traditional IRA', roth_ira: 'Roth IRA' }[accountType];
 }
 
-function Documents({ onUpload, uploadError }: { onUpload: () => void; uploadError: string }) { return <><div className="mb-8"><Pill tone="gold">Local preview only</Pill><h1 className="mt-3 text-3xl font-bold tracking-tight">CSV preview</h1></div><section className="grid min-h-80 place-items-center rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><div><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#eaf2ff] text-[#185da8]"><FileUp size={25}/></span><h2 className="mt-5 text-xl font-bold">Preview a Robinhood activity CSV</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">This early prototype reads a selected CSV in your browser only to show a temporary interpretation. It does not upload, store, or add the rows to a portfolio.</p><Button onClick={onUpload} className="mt-6 rounded-xl bg-[#185da8] text-white"><Upload size={16}/>Choose CSV</Button>{uploadError && <p role="alert" className="mx-auto mt-4 max-w-md rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{uploadError}</p>}<p className="mt-4 text-xs text-slate-400">CSV only · Up to 10 MB · Storage and secure import are not implemented yet</p></div></section></>; }
+function Documents({ onUpload, uploadError, accounts, selectedAccountId, onSelectAccount, canStage, isStaging }: { onUpload: () => void; uploadError: string; accounts: LiveAccount[]; selectedAccountId?: string; onSelectAccount: (accountId: string) => void; canStage: boolean; isStaging: boolean }) { const live = accounts.length > 0; return <><div className="mb-8"><Pill tone={live ? 'green' : 'gold'}>{live ? 'Secure staged import' : 'Local preview only'}</Pill><h1 className="mt-3 text-3xl font-bold tracking-tight">{live ? 'Import activity' : 'CSV preview'}</h1></div><section className="grid min-h-80 place-items-center rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><div><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#eaf2ff] text-[#185da8]"><FileUp size={25}/></span><h2 className="mt-5 text-xl font-bold">{live ? 'Review a Robinhood activity CSV' : 'Preview a Robinhood activity CSV'}</h2>{live ? <><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">The Worker validates this CSV and saves it for your review. Nothing affects your portfolio until you commit the reviewed import.</p><label className="mx-auto mt-5 block max-w-sm text-left text-sm font-semibold text-slate-700">Account<select value={selectedAccountId ?? ''} onChange={(event) => onSelectAccount(event.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="" disabled>Select an account</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {accountTypeLabel(account.account_type)}</option>)}</select></label></> : <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">This early prototype reads a selected CSV in your browser only to show a temporary interpretation. It does not upload, store, or add the rows to a portfolio.</p>}<Button disabled={isStaging || (live && !canStage)} onClick={onUpload} className="mt-6 rounded-xl bg-[#185da8] text-white"><Upload size={16}/>{isStaging ? 'Reading CSV…' : 'Choose CSV'}</Button>{uploadError && <p role="alert" className="mx-auto mt-4 max-w-md rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{uploadError}</p>}<p className="mt-4 text-xs text-slate-400">CSV only · Up to 10 MB · {live ? 'Server-side validation and review' : 'Temporary browser preview'}</p></div></section></>; }
 
-function ImportReview({ open, fileName, activities, onDiscard }: { open: boolean; fileName: string; activities: Activity[]; onDiscard: () => void }) {
+function ImportReview({ open, fileName, activities, livePreview, isStaging, stageMessage, onStage, onDiscard }: { open: boolean; fileName: string; activities: Activity[]; livePreview?: LiveImportPreview; isStaging: boolean; stageMessage?: string; onStage: () => Promise<void>; onDiscard: () => void }) {
   const warnings = activities.filter((activity) => activity.warning).length;
-  return <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onDiscard(); }}><DialogContent className="max-h-[90vh] max-w-2xl overflow-auto rounded-3xl bg-white p-6 shadow-2xl md:p-8"><DialogHeader><Pill tone="gold">Temporary browser preview</Pill><DialogTitle className="mt-3 text-2xl font-bold">Review parsed rows</DialogTitle><DialogDescription className="text-sm text-slate-500">{fileName || 'Selected CSV'} was not uploaded or saved. These rows cannot affect the demo portfolio.</DialogDescription></DialogHeader><div className="grid grid-cols-3 gap-3"><Metric label="Rows found" value={String(activities.length)}/><Metric label="Interpreted" value={String(activities.length - warnings)}/><Metric label="Needs review" value={String(warnings)}/></div>{warnings > 0 && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Some rows are not recognized. The full importer will preserve them for review instead of silently changing reports.</p>}<div className="max-h-52 overflow-auto rounded-xl border border-slate-200"><table className="w-full text-left text-sm"><thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Date</th><th className="p-3">Type</th><th className="p-3">Symbol</th></tr></thead><tbody>{activities.slice(0, 20).map((item) => <tr key={item.id} className="border-t border-slate-100"><td className="p-3">{item.date}</td><td className="p-3">{item.kind}</td><td className="p-3">{item.symbol ?? '—'}</td></tr>)}</tbody></table></div><DialogFooter className="mt-3 rounded-b-2xl"><Button onClick={onDiscard} className="rounded-xl bg-[#185da8] text-white">Discard preview <ChevronRight size={16}/></Button></DialogFooter></DialogContent></Dialog>;
+  const review = livePreview?.review;
+  const liveWarnings = review ? review.unsupportedRowCount + review.invalidRowCount + review.duplicateRowCount : 0;
+  return <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onDiscard(); }}><DialogContent className="max-h-[90vh] max-w-2xl overflow-auto rounded-3xl bg-white p-6 shadow-2xl md:p-8"><DialogHeader><Pill tone={livePreview ? 'green' : 'gold'}>{livePreview ? 'Server-side review' : 'Temporary browser preview'}</Pill><DialogTitle className="mt-3 text-2xl font-bold">Review parsed rows</DialogTitle><DialogDescription className="text-sm text-slate-500">{livePreview ? `${fileName || 'Selected CSV'} has been parsed securely but is not yet committed to your portfolio.` : `${fileName || 'Selected CSV'} was not uploaded or saved. These rows cannot affect the demo portfolio.`}</DialogDescription></DialogHeader><div className="grid grid-cols-3 gap-3"><Metric label="Rows found" value={String(review?.sourceRowCount ?? activities.length)}/><Metric label="Interpreted" value={String(review?.acceptedRowCount ?? activities.length - warnings)}/><Metric label="Needs review" value={String(review ? liveWarnings : warnings)}/></div>{livePreview?.duplicateFile && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">This exact file was already imported for this account.</p>}{(liveWarnings > 0 || warnings > 0) && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Some rows need review. They remain visible and cannot silently change reports.</p>}{!livePreview && <div className="max-h-52 overflow-auto rounded-xl border border-slate-200"><table className="w-full text-left text-sm"><thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Date</th><th className="p-3">Type</th><th className="p-3">Symbol</th></tr></thead><tbody>{activities.slice(0, 20).map((item) => <tr key={item.id} className="border-t border-slate-100"><td className="p-3">{item.date}</td><td className="p-3">{item.kind}</td><td className="p-3">{item.symbol ?? '—'}</td></tr>)}</tbody></table></div>}{stageMessage && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{stageMessage}</p>}<DialogFooter className="mt-3 rounded-b-2xl">{livePreview && !stageMessage && <Button disabled={isStaging || livePreview.duplicateFile} onClick={() => void onStage()} className="rounded-xl bg-[#185da8] text-white">{isStaging ? 'Saving…' : 'Save for review'} <ChevronRight size={16}/></Button>}<Button onClick={onDiscard} className="rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200">{stageMessage ? 'Done' : 'Discard preview'}</Button></DialogFooter></DialogContent></Dialog>;
 }
 
 function Metric({ label, value, small = false }: { label: string; value: string; small?: boolean }) { return <div><p className="text-xs font-semibold text-slate-500">{label}</p><p className={`mt-1 font-bold ${small ? 'text-base' : 'text-lg'}`}>{value}</p></div>; }

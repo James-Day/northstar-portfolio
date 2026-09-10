@@ -1,6 +1,6 @@
 import { PortfolioApp } from '@/components/portfolio-app';
-import { readPublicSupabaseConfig } from '@/lib/platform/config';
+import { readPublicApiConfig, readPublicSupabaseConfig } from '@/lib/platform/config';
 
 export default function DashboardPage() {
-  return <PortfolioApp supabaseConfig={readPublicSupabaseConfig(process.env)} />;
+  return <PortfolioApp supabaseConfig={readPublicSupabaseConfig(process.env)} apiConfig={readPublicApiConfig(process.env)} />;
 }

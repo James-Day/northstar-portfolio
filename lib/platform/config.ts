@@ -6,6 +6,7 @@ export type RuntimeConfig = {
 };
 
 export type PublicSupabaseConfig = { url: string; anonKey: string };
+export type PublicApiConfig = { baseUrl: string };
 
 function optional(env: Record<string, string | undefined>, key: string): string | undefined {
   const value = env[key]?.trim();
@@ -30,4 +31,10 @@ export function readPublicSupabaseConfig(env: Record<string, string | undefined>
   const url = optional(env, 'NEXT_PUBLIC_SUPABASE_URL') ?? optional(env, 'SUPABASE_URL');
   const anonKey = optional(env, 'NEXT_PUBLIC_SUPABASE_ANON_KEY') ?? optional(env, 'SUPABASE_ANON_KEY');
   return url && anonKey ? { url, anonKey } : undefined;
+}
+
+export function readPublicApiConfig(env: Record<string, string | undefined>): PublicApiConfig | undefined {
+  const configured = optional(env, 'NEXT_PUBLIC_API_URL');
+  if (configured) return { baseUrl: configured.replace(/\/$/, '') };
+  return optional(env, 'NODE_ENV') === 'production' ? undefined : { baseUrl: 'http://localhost:8787' };
 }

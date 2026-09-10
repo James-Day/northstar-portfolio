@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readPublicSupabaseConfig, readRuntimeConfig } from '@/lib/platform/config';
+import { readPublicApiConfig, readPublicSupabaseConfig, readRuntimeConfig } from '@/lib/platform/config';
 
 describe('runtime configuration', () => {
   it('uses browser-prefixed Supabase configuration when it is present', () => {
@@ -15,5 +15,10 @@ describe('runtime configuration', () => {
 
   it('does not produce an incomplete public configuration', () => {
     expect(readPublicSupabaseConfig({ SUPABASE_URL: 'https://project.supabase.co' })).toBeUndefined();
+  });
+
+  it('uses an explicit public API origin and never guesses localhost in production', () => {
+    expect(readPublicApiConfig({ NEXT_PUBLIC_API_URL: 'https://api.example.com/' })).toEqual({ baseUrl: 'https://api.example.com' });
+    expect(readPublicApiConfig({ NODE_ENV: 'production' })).toBeUndefined();
   });
 });
