@@ -90,6 +90,7 @@ type LiveImportSummary = {
   committedAt?: string | null;
 };
 type LiveFreshnessReport = { expectedDate: string; rows: Array<{ symbol: string; expectedDate: string; latestDate: string | null; status: 'current' | 'stale' | 'missing' }> };
+type LiveReportSnapshot = { asOfDate: string; payload: { totalValue: string | null; cash: string | null; timeWeightedReturn: string | null; activityCoveredThrough: string | null; pricesThrough: string | null } };
 
 const fmt = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -168,6 +169,7 @@ export function PortfolioApp({
   const [freshnessReport, setFreshnessReport] = useState<LiveFreshnessReport>();
   const [freshnessLoading, setFreshnessLoading] = useState(false);
   const [freshnessError, setFreshnessError] = useState<string>();
+  const [reportSnapshot, setReportSnapshot] = useState<LiveReportSnapshot>();
 
   useEffect(() => {
     if (!client) return;
@@ -267,6 +269,20 @@ export function PortfolioApp({
       if (!response.ok) throw new Error(payload && typeof payload === 'object' && 'error' in payload ? String(payload.error).replaceAll('_', ' ') : 'Freshness data is unavailable.');
       if (active && payload && typeof payload === 'object' && 'report' in payload) setFreshnessReport((payload as { report: LiveFreshnessReport }).report);
     }).catch((error) => { if (active) setFreshnessError(error instanceof Error ? error.message : 'Freshness data is unavailable.'); }).finally(() => { if (active) setFreshnessLoading(false); });
+    return () => { active = false; };
+  }, [apiConfig, client, selectedAccountId, userId]);
+
+  useEffect(() => {
+    if (!client || !apiConfig || !userId || !selectedAccountId) { setReportSnapshot(undefined); return; }
+    let active = true;
+    void client.auth.getSession().then(async ({ data }) => {
+      if (!data.session?.access_token) return;
+      const response = await fetch(`${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/report`, { headers: { authorization: `Bearer ${data.session.access_token}` } });
+      if (response.status === 404) { if (active) setReportSnapshot(undefined); return; }
+      const payload: unknown = await response.json();
+      if (!response.ok || !payload || typeof payload !== 'object' || !('snapshot' in payload)) throw new Error('The persisted report is unavailable.');
+      if (active) setReportSnapshot((payload as { snapshot: LiveReportSnapshot }).snapshot);
+    }).catch(() => { if (active) setReportSnapshot(undefined); });
     return () => { active = false; };
   }, [apiConfig, client, selectedAccountId, userId]);
 
@@ -638,7 +654,7 @@ export function PortfolioApp({
             <Menu size={18} />
           </button>
           {active === "Overview" && (
-            <Overview summary={summary} onUpload={openFileChooser} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} />
+            <Overview summary={summary} onUpload={openFileChooser} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} reportSnapshot={reportSnapshot} />
           )}
           {active === "Activity" && (
             <ActivityPanel onUpload={openFileChooser} />
@@ -701,23 +717,29 @@ function Overview({
   freshnessReport,
   freshnessLoading,
   freshnessError,
+  reportSnapshot,
 }: {
   summary: ReturnType<typeof calculateSummary>;
   onUpload: () => void;
   freshnessReport?: LiveFreshnessReport;
   freshnessLoading: boolean;
   freshnessError?: string;
+  reportSnapshot?: LiveReportSnapshot;
 }) {
+  const liveValue = reportSnapshot?.payload.totalValue;
+  const liveCash = reportSnapshot?.payload.cash;
+  const liveReturn = reportSnapshot?.payload.timeWeightedReturn;
+  const hasLiveReport = Boolean(reportSnapshot);
   return (
     <>
       <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <Pill tone="gold">Demo data</Pill>
+          <Pill tone={hasLiveReport ? "green" : "gold"}>{hasLiveReport ? "Your account" : "Demo data"}</Pill>
           <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
-            Portfolio example
+            {hasLiveReport ? "Portfolio overview" : "Portfolio example"}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            A fictional long-term portfolio used to preview the product.
+            {hasLiveReport ? `As of ${reportSnapshot?.asOfDate}. Values come from your persisted report snapshot.` : "A fictional long-term portfolio used to preview the product."}
           </p>
         </div>
         <Button
@@ -747,15 +769,14 @@ function Overview({
                 Example portfolio value
               </p>
               <h2 className="text-4xl font-semibold tracking-tight md:text-5xl">
-                {fmt.format(summary.value)}
+                {liveValue ? precise.format(Number(liveValue)) : fmt.format(summary.value)}
               </h2>
               <p className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-emerald-300">
                 <ArrowUpRight size={17} />
-                {precise.format(summary.gain)} (
-                {summary.returnPercent.toFixed(1)}%) in this example
+                {liveReturn ? `${(Number(liveReturn) * 100).toFixed(1)}% stored return` : `${precise.format(summary.gain)} (${summary.returnPercent.toFixed(1)}%) in this example`}
               </p>
             </div>
-            <Pill tone="gold">Synthetic</Pill>
+            <Pill tone={hasLiveReport ? "green" : "gold"}>{hasLiveReport ? "Persisted" : "Synthetic"}</Pill>
           </div>
           <div className="mt-8 h-44">
             <ResponsiveContainer width="100%" height="100%">
@@ -808,7 +829,7 @@ function Overview({
               label="Realized gains"
               value={precise.format(summary.realized)}
             />
-            <Metric label="Cash balance" value={precise.format(summary.cash)} />
+            <Metric label="Cash balance" value={liveCash ? precise.format(Number(liveCash)) : precise.format(summary.cash)} />
             <Metric label="Price source" value="Not connected" small />
           </div>
         </section>
