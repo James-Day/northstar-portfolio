@@ -1,4 +1,6 @@
-export type ActivityKind = 'buy' | 'sell' | 'dividend' | 'drip' | 'deposit' | 'withdrawal' | 'interest' | 'fee' | 'incentive' | 'transfer_in' | 'transfer_out' | 'unsupported';
+import { parseRobinhoodActivityCsv, type RobinhoodActivityType } from '@/services/ingestion/robinhood';
+
+export type ActivityKind = 'buy' | 'sell' | 'dividend' | 'drip' | 'deposit' | 'withdrawal' | 'interest' | 'fee' | 'incentive' | 'transfer_in' | 'transfer_out' | 'split' | 'unsupported';
 
 export type Activity = { id: string; date: string; kind: ActivityKind; symbol?: string; quantity?: number; price?: number; amount: number; description: string; source: 'demo' | 'robinhood'; warning?: string };
 export type Holding = { symbol: string; name: string; shares: number; costBasis: number; price: number; change: number };
@@ -23,23 +25,30 @@ export const demoHoldings: Holding[] = [
 
 export const demoPrices: PricePoint[] = [['Jan', 12000], ['Feb', 12462], ['Mar', 12138], ['Apr', 13274], ['May', 13826], ['Jun', 14088], ['Jul', 14892], ['Aug', 15342], ['Sep', 15780]].map(([date, value]) => ({ date: String(date), value: Number(value) }));
 
-const money = (value: string | undefined) => Number((value ?? '0').replace(/[$,]/g, '').replace(/[()]/g, '')) || 0;
-const quantity = (value: string | undefined) => Number((value ?? '0').replace(/,/g, '')) || undefined;
-
 export function parseRobinhoodCsv(csv: string): Activity[] {
-  const lines = csv.trim().split(/\r?\n/);
-  if (lines.length < 2) throw new Error('Your file needs a header and at least one activity row.');
-  const headers = lines[0].split(',').map((header) => header.trim().toLowerCase());
-  const index = (names: string[]) => names.map((name) => headers.indexOf(name)).find((value) => value >= 0) ?? -1;
-  const dateIndex = index(['activity date', 'date', 'trade date']); const typeIndex = index(['process date', 'trans code', 'type', 'activity type', 'description']); const symbolIndex = index(['instrument', 'symbol', 'ticker']); const quantityIndex = index(['quantity', 'quantity transacted', 'shares']); const priceIndex = index(['price', 'price per share']); const amountIndex = index(['amount', 'net amount']); const descriptionIndex = index(['description', 'activity description', 'trans code']);
-  if (dateIndex < 0 || amountIndex < 0) throw new Error('This does not look like a Robinhood activity CSV. We need a date and amount column.');
-  return lines.slice(1).filter(Boolean).map((line, row) => {
-    const cells = line.split(',').map((cell) => cell.trim().replace(/^"|"$/g, '')); const description = cells[descriptionIndex] || cells[typeIndex] || 'Imported activity'; const sourceType = `${cells[typeIndex] ?? ''} ${description}`.toLowerCase();
-    let kind: ActivityKind = 'unsupported';
-    if (/dividend.*reinvest|reinvest.*dividend/.test(sourceType)) kind = 'drip'; else if (/dividend/.test(sourceType)) kind = 'dividend'; else if (/buy/.test(sourceType)) kind = 'buy'; else if (/sell/.test(sourceType)) kind = 'sell'; else if (/deposit|contribution/.test(sourceType)) kind = 'deposit'; else if (/withdraw/.test(sourceType)) kind = 'withdrawal'; else if (/interest/.test(sourceType)) kind = 'interest'; else if (/fee/.test(sourceType)) kind = 'fee'; else if (/bonus|incentive/.test(sourceType)) kind = 'incentive'; else if (/transfer/.test(sourceType)) kind = sourceType.includes('out') ? 'transfer_out' : 'transfer_in';
-    const rawAmount = money(cells[amountIndex]); const normalizedAmount = /\(|debit|buy|fee|withdraw/.test(sourceType) ? -Math.abs(rawAmount) : rawAmount;
-    return { id: `row-${row + 2}`, date: cells[dateIndex], kind, symbol: cells[symbolIndex]?.toUpperCase(), quantity: quantity(cells[quantityIndex]), price: money(cells[priceIndex]) || undefined, amount: normalizedAmount, description, source: 'robinhood', warning: kind === 'unsupported' ? 'This activity needs review before it can affect your reports.' : undefined };
+  return parseRobinhoodActivityCsv(csv).map((row) => {
+    const activity = row.activity;
+    const raw = row.raw;
+    const kind = activity ? activityKind(activity.type) : 'unsupported';
+    return {
+      id: `row-${row.rowNumber}`,
+      date: activity?.effectiveDate ?? raw['activity date'] ?? '',
+      kind,
+      symbol: activity?.symbol ?? (raw.instrument?.trim().toUpperCase() || undefined),
+      quantity: activity?.quantity ? Number(activity.quantity) : undefined,
+      price: activity?.price ? Number(activity.price) : undefined,
+      amount: activity ? Number(activity.amount) : 0,
+      description: activity?.description ?? raw.description?.trim() ?? raw['trans code']?.trim() ?? 'Imported activity',
+      source: 'robinhood',
+      warning: row.status === 'supported' ? undefined : row.message ?? 'This activity needs review before it can affect your reports.',
+    };
   });
+}
+
+function activityKind(type: RobinhoodActivityType): ActivityKind {
+  if (type === 'drip_buy') return 'drip';
+  if (type === 'ira_incentive') return 'incentive';
+  return type;
 }
 
 export function calculateSummary(activities: Activity[], holdings: Holding[] = demoHoldings) {

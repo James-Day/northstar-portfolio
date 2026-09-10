@@ -94,7 +94,7 @@ function directedAmount(type: RobinhoodActivityType, amount: DecimalString): Dec
  * Transaction codes are matched exactly; unfamiliar codes remain unsupported.
  */
 export function parseRobinhoodActivityCsv(csv: string): ParsedRobinhoodRow[] {
-  if (Buffer.byteLength(csv, 'utf8') > MAX_BYTES) throw new Error('CSV exceeds the 10 MB import limit.');
+  if (new TextEncoder().encode(csv).byteLength > MAX_BYTES) throw new Error('CSV exceeds the 10 MB import limit.');
   const records = parse(csv, {
     bom: true,
     columns: (headers: string[]) => {
