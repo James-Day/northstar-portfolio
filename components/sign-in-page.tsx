@@ -65,7 +65,8 @@ export function SignInPage({ supabaseConfig }: { supabaseConfig?: PublicSupabase
     }
   }
 
-  return <main className="grid min-h-screen bg-[#f5f7fb] lg:grid-cols-[1.05fr_.95fr]">
+  return <main id="auth-content" className="grid min-h-screen bg-[#f5f7fb] lg:grid-cols-[1.05fr_.95fr]">
+    <a href="#auth-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-bold focus:text-[#185da8] focus:shadow-lg">Skip to content</a>
     <section className="relative hidden overflow-hidden bg-[#152b4a] p-12 text-white lg:block">
       <Link href="/" className="relative z-10 flex items-center gap-2.5 font-bold tracking-tight"><BrandMark inverse /><span>northstar</span></Link>
       <div className="relative z-10 mx-auto mt-36 max-w-md"><p className="text-sm font-bold text-sky-300">Portfolio clarity, in development</p><h1 className="mt-4 text-5xl font-bold tracking-[-0.05em]">Your whole portfolio, in focus.</h1><p className="mt-5 text-lg leading-8 text-slate-300">The live account experience is being built. You can explore a clearly labeled synthetic portfolio while we implement secure authentication and data storage.</p><div className="mt-10 space-y-4 text-sm font-semibold text-slate-200"><p className="flex items-center gap-3"><CheckCircle2 size={19} className="text-emerald-300"/>No brokerage connection in this prototype</p><p className="flex items-center gap-3"><CheckCircle2 size={19} className="text-emerald-300"/>CSV previews stay in this browser session</p></div></div>
