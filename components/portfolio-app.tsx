@@ -171,6 +171,8 @@ export function PortfolioApp({
   const [freshnessLoading, setFreshnessLoading] = useState(false);
   const [freshnessError, setFreshnessError] = useState<string>();
   const [reportSnapshot, setReportSnapshot] = useState<LiveReportSnapshot>();
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState<string>();
 
   useEffect(() => {
     if (!client) return;
@@ -276,6 +278,8 @@ export function PortfolioApp({
   useEffect(() => {
     if (!client || !apiConfig || !userId || !selectedAccountId) { setReportSnapshot(undefined); return; }
     let active = true;
+    setReportLoading(true);
+    setReportError(undefined);
     void client.auth.getSession().then(async ({ data }) => {
       if (!data.session?.access_token) return;
       const response = await fetch(`${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/report`, { headers: { authorization: `Bearer ${data.session.access_token}` } });
@@ -283,7 +287,7 @@ export function PortfolioApp({
       const payload: unknown = await response.json();
       if (!response.ok || !payload || typeof payload !== 'object' || !('snapshot' in payload)) throw new Error('The persisted report is unavailable.');
       if (active) setReportSnapshot((payload as { snapshot: LiveReportSnapshot }).snapshot);
-    }).catch(() => { if (active) setReportSnapshot(undefined); });
+    }).catch((error) => { if (active) { setReportSnapshot(undefined); setReportError(error instanceof Error ? error.message : 'The persisted report is unavailable.'); } }).finally(() => { if (active) setReportLoading(false); });
     return () => { active = false; };
   }, [apiConfig, client, selectedAccountId, userId]);
 
@@ -655,7 +659,7 @@ export function PortfolioApp({
             <Menu size={18} />
           </button>
           {active === "Overview" && (
-            <Overview summary={summary} onUpload={openFileChooser} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} reportSnapshot={reportSnapshot} />
+            <Overview summary={summary} onUpload={openFileChooser} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} reportSnapshot={reportSnapshot} reportLoading={reportLoading} reportError={reportError} />
           )}
           {active === "Activity" && (
             <ActivityPanel onUpload={openFileChooser} />
@@ -719,6 +723,8 @@ function Overview({
   freshnessLoading,
   freshnessError,
   reportSnapshot,
+  reportLoading,
+  reportError,
 }: {
   summary: ReturnType<typeof calculateSummary>;
   onUpload: () => void;
@@ -726,6 +732,8 @@ function Overview({
   freshnessLoading: boolean;
   freshnessError?: string;
   reportSnapshot?: LiveReportSnapshot;
+  reportLoading: boolean;
+  reportError?: string;
 }) {
   const liveValue = reportSnapshot?.payload.totalValue;
   const liveCash = reportSnapshot?.payload.cash;
@@ -767,6 +775,9 @@ function Overview({
           {freshnessError && <p className="mt-3 text-sm text-amber-800">{freshnessError}</p>}
         </section>
       )}
+      {reportLoading && <section className="mb-7 rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-500 shadow-sm">Loading your persisted report…</section>}
+      {reportError && <section role="alert" className="mb-7 rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">{reportError}</section>}
+      {!reportLoading && !reportError && hasLiveReport && reportSnapshot?.payload.totalValue === null && <section className="mb-7 rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">Your report has incomplete price coverage, so portfolio value is temporarily unavailable.</section>}
       <div className="mb-7 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,.85fr)]">
         <section className="overflow-hidden rounded-3xl bg-[#152b4a] p-6 text-white shadow-[0_18px_55px_rgba(21,43,74,.16)] md:p-8">
           <div className="flex items-start justify-between">
