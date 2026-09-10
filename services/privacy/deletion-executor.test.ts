@@ -39,4 +39,12 @@ describe('user deletion executor', () => {
     expect(f.effects.deletePrivateObject).not.toHaveBeenCalled();
     expect(f.repository.fail).toHaveBeenCalledWith('missing', expect.objectContaining({ error: 'Deletion raw-object item has no object path.' }));
   });
+
+  it('refuses a raw-object path outside the requesting user prefix', async () => {
+    const f = fixture([{ ...item('raw_object', 'outside'), targetPath: 'other-user/statement.csv' }]);
+    const result = await runUserDeletion({ repository: f.repository, effects: f.effects });
+    expect(result).toMatchObject({ claimed: 1, completed: 0, retrying: 1 });
+    expect(f.effects.deletePrivateObject).not.toHaveBeenCalled();
+    expect(f.repository.fail).toHaveBeenCalledWith('outside', expect.objectContaining({ error: 'Deletion raw-object item has an invalid user-owned path.' }));
+  });
 });

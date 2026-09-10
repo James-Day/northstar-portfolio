@@ -52,6 +52,7 @@ async function executeItem(item: DeletionPlanItem, effects: DeletionSideEffects)
   switch (item.targetType) {
     case 'raw_object':
       if (!item.targetPath) throw new Error('Deletion raw-object item has no object path.');
+      if (!isOwnedObjectPath(item.userId, item.targetPath)) throw new Error('Deletion raw-object item has an invalid user-owned path.');
       return effects.deletePrivateObject(item.targetPath);
     case 'account':
       if (!item.targetId) throw new Error('Deletion account item has no account ID.');
@@ -65,6 +66,11 @@ async function executeItem(item: DeletionPlanItem, effects: DeletionSideEffects)
     case 'auth_user':
       return effects.deleteAuthUser(item.userId);
   }
+}
+
+function isOwnedObjectPath(userId: string, path: string): boolean {
+  const normalizedUserId = userId.trim();
+  return Boolean(normalizedUserId) && path.startsWith(`${normalizedUserId}/`) && !path.includes('..') && !path.includes('\\') && !path.includes('\0');
 }
 
 export async function runUserDeletion(input: {
