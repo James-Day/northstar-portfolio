@@ -13,7 +13,7 @@ This file is the current implementation plan. Work through the numbered steps in
 - Keep commits large and coherent. Record meaningful milestone evidence rather than a log entry for every small UI change.
 - Never commit secrets. Configure credentials through local ignored environment files or the service's secret interface.
 
-**Current count: 102 tasks — 52 checked, 50 unchecked, across 13 ordered steps.**
+**Current count: 102 tasks — 53 checked, 49 unchecked, across 13 ordered steps.**
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -57,7 +57,7 @@ Owner: identity/accounts. Depends on step 01.
 - [x] **02.03** Authenticated account naming/creation for brokerage, traditional IRA and Roth IRA, listing, selection and load-error retry UI exist. Evidence: `components/portfolio-app.tsx`, `services/accounts/`.
 - [x] **02.04** Signed-in shell uses session identity and an account-workspace label; public synthetic demo is labeled separately. Evidence: `components/portfolio-app.tsx`.
 - [ ] **02.05** Separate private workspace routing from public demo; enforce server-side access where private pages are served and show an explicit session-loading state.
-- [ ] **02.06** Complete recovery password submission and verify signup verification, session renewal, logout/revocation and account switching; clear private cached UI data on session changes.
+- [x] **02.06** Complete recovery password submission and verify signup verification, session renewal, logout/revocation and account switching; clear private cached UI data on session changes. Evidence: dedicated recovery page, validated password update, global sign-out, identity-change cache clearing and account-switch cleanup in commit `b4d361a`.
 - [ ] **02.07** Configure/verify Google and email redirects in the target environment, including final origin and invalid callback handling.
 - [ ] **02.08** Gate: two real local users can create/select each supported account type; invalid/revoked sessions cannot read private account data in API or browser flows.
 
@@ -256,6 +256,7 @@ Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/sh
 | 2026-09-10 | 05.04/05.06 — Durable import queue and failure evidence | Commit `b77c092`; Cloudflare import jobs now claim and checkpoint processing through service-role RPCs, retry transient failures, persist poison/error evidence before acknowledgment, and expose safe replay primitives. Full validation: 79 test files / 274 tests and typecheck passed. | Live queue binding, Supabase migration execution and deployed import processing remain open. |
 | 2026-09-10 | 11.05 — Server-side entitlement enforcement | Commit `c7fe907`; billing access is evaluated at request time for report/freshness endpoints, trial expiry and failed/canceled states are denied, and authenticated billing status is shown in Settings. Focused API/billing tests and typecheck passed. | Live Stripe/Supabase entitlement updates, checkout lifecycle and hosted browser verification remain open. |
 | 2026-09-10 | 07.07 — Immutable deterministic price revisions | Commit `cb1a7d9`; same-version price/correction overwrites are rejected by database triggers, source precedence is deterministic, conflicts fail closed, and report snapshots retain selected price dependencies. Full validation: 79 test files / 282 tests and typecheck passed. | Live migration execution and production correction workflow remain open. |
+| 2026-09-10 | 02.06 — Auth recovery and session lifecycle | Commit `b4d361a`; password recovery has a dedicated route and validated update, logout revokes globally, account/identity changes clear all private state, and stale session reads are ignored. Full validation: 80 test files / 285 tests and typecheck passed. | Hosted Supabase redirects, email verification and real token revocation remain open. |
 | 2026-09-10 | 05.03 — Verified private statement object binding | Commit `1c8f694`; authenticated object-binding verifies account ownership, private Storage access, 10 MB/byte-size limits and SHA-256 before persisting import metadata through an RLS-backed RPC. Focused tests (38) and typecheck passed. | Live Supabase Storage/RLS execution and queued import processing remain open. |
 | 2026-09-10 | 09.05 — Report outbox-to-queue wiring (partial) | Commit `ff69ddb`; scheduled transactional outbox dispatch claims report events, publishes typed jobs to `REPORT_QUEUE`, uses `waitUntil` for cron work, and retries safely. Queue tests (9) and typecheck passed. | Durable report input loaders, all import/undo/price-correction triggers, live queue bindings and end-to-end snapshot execution remain open. |
 
