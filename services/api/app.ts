@@ -98,7 +98,7 @@ export type ApiDependencies = {
       accountId: string,
       accessToken: string,
     ): Promise<ReportSnapshot | undefined>;
-    getLatestConsolidated?(accessToken: string): Promise<ReportSnapshot | undefined>;
+    getLatestConsolidated?(userId: string, accessToken: string): Promise<ReportSnapshot | undefined>;
   };
   signedUploadRepository?: SignedUploadRepository;
   activityRepository?: {
@@ -535,7 +535,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
     const reader = reportSnapshotReader ?? createReportSnapshotReader(context.env);
     if (!reader?.getLatestConsolidated)
       return context.json({ error: 'reporting_unavailable' }, 503);
-    const snapshot = await reader.getLatestConsolidated(authenticated.accessToken);
+    const snapshot = await reader.getLatestConsolidated(authenticated.user.id, authenticated.accessToken);
     if (!snapshot) return context.json({ error: 'not_found' }, 404);
     return context.json({ snapshot });
   });
@@ -741,7 +741,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
     if (authenticated instanceof Response) return authenticated;
     const reader = reportSnapshotReader ?? createReportSnapshotReader(context.env);
     if (!reader?.getLatestConsolidated) return context.json({ error: 'reporting_unavailable' }, 503);
-    const snapshot = await reader.getLatestConsolidated(authenticated.accessToken);
+    const snapshot = await reader.getLatestConsolidated(authenticated.user.id, authenticated.accessToken);
     if (!snapshot) return context.json({ error: 'not_found' }, 404);
     const payload = snapshot.payload as {
       totalValue?: unknown; cash?: unknown; timeWeightedReturn?: unknown;

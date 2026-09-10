@@ -26,10 +26,11 @@ export class SupabaseReportSnapshotReader {
   }
 
   /** Reads the caller's latest consolidated snapshot; RLS still enforces ownership. */
-  async getLatestConsolidated(accessToken: string): Promise<ReportSnapshot | undefined> {
+  async getLatestConsolidated(userId: string, accessToken: string): Promise<ReportSnapshot | undefined> {
     const url = new URL('/rest/v1/report_snapshots', this.baseUrl);
     url.searchParams.set('select', 'id,user_id,account_id,report_type,as_of_date,import_state_revision,price_revision_id,payload,published_at');
     url.searchParams.set('account_id', 'is.null');
+    url.searchParams.set('user_id', `eq.${userId}`);
     url.searchParams.set('report_type', 'eq.consolidated_daily');
     url.searchParams.set('order', 'as_of_date.desc,published_at.desc,id.desc');
     url.searchParams.set('limit', '1');

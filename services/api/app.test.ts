@@ -36,7 +36,7 @@ describe('standalone API', () => {
     await expect(response.json()).resolves.toEqual({
       snapshot: { reportType: 'consolidated_daily', accountId: null },
     });
-    expect(reader.getLatestConsolidated).toHaveBeenCalledWith('session-token');
+    expect(reader.getLatestConsolidated).toHaveBeenCalledWith('user-123', 'session-token');
   });
 
   it('exports a consolidated snapshot without an entitlement lookup', async () => {
