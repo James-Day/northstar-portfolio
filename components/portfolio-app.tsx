@@ -661,7 +661,7 @@ export function PortfolioApp({
             <Menu size={18} />
           </button>
           {active === "Overview" && (
-            <Overview summary={summary} onUpload={openFileChooser} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} onRetryFreshness={() => setFreshnessRequestVersion((value) => value + 1)} reportSnapshot={reportSnapshot} reportLoading={reportLoading} reportError={reportError} onRetryReport={() => setReportRequestVersion((value) => value + 1)} accounts={accounts} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} />
+            <Overview summary={summary} onUpload={openFileChooser} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} onRetryFreshness={() => setFreshnessRequestVersion((value) => value + 1)} reportSnapshot={reportSnapshot} reportLoading={reportLoading} reportError={reportError} onRetryReport={() => setReportRequestVersion((value) => value + 1)} accounts={accounts} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} isLiveAccount={Boolean(client && userId && selectedAccountId)} />
           )}
           {active === "Activity" && (
             <ActivityPanel onUpload={openFileChooser} />
@@ -732,6 +732,7 @@ function Overview({
   accounts,
   selectedAccountId,
   onSelectAccount,
+  isLiveAccount,
 }: {
   summary: ReturnType<typeof calculateSummary>;
   onUpload: () => void;
@@ -746,6 +747,7 @@ function Overview({
   accounts: LiveAccount[];
   selectedAccountId?: string;
   onSelectAccount: (accountId: string) => void;
+  isLiveAccount: boolean;
 }) {
   const liveValue = reportSnapshot?.payload.totalValue;
   const liveCash = reportSnapshot?.payload.cash;
@@ -753,19 +755,20 @@ function Overview({
   const liveDividends = reportSnapshot?.payload.dividendIncome;
   const liveRealized = reportSnapshot?.payload.realizedGainLoss;
   const hasLiveReport = Boolean(reportSnapshot);
+  const showDemo = !isLiveAccount;
   const chartData = hasLiveReport
     ? (reportSnapshot?.payload.valueHistory ?? []).map((point) => ({ date: point.date, value: point.value === null ? null : Number(point.value) }))
-    : demoPrices;
+    : showDemo ? demoPrices : [];
   return (
     <>
       <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <Pill tone={hasLiveReport ? "green" : "gold"}>{hasLiveReport ? "Your account" : "Demo data"}</Pill>
+          <Pill tone={hasLiveReport ? "green" : "gold"}>{hasLiveReport ? "Your account" : showDemo ? "Demo data" : "Awaiting report"}</Pill>
           <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
-            {hasLiveReport ? "Portfolio overview" : "Portfolio example"}
+            {hasLiveReport || isLiveAccount ? "Portfolio overview" : "Portfolio example"}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            {hasLiveReport ? `As of ${reportSnapshot?.asOfDate}. Values come from your persisted report snapshot.` : "A fictional long-term portfolio used to preview the product."}
+            {hasLiveReport ? `As of ${reportSnapshot?.asOfDate}. Values come from your persisted report snapshot.` : showDemo ? "A fictional long-term portfolio used to preview the product." : "No persisted report is available for this account yet."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -795,11 +798,11 @@ function Overview({
                 Example portfolio value
               </p>
               <h2 className="text-4xl font-semibold tracking-tight md:text-5xl">
-                {liveValue ? precise.format(Number(liveValue)) : fmt.format(summary.value)}
+                {liveValue != null ? precise.format(Number(liveValue)) : showDemo ? fmt.format(summary.value) : "—"}
               </h2>
               <p className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-emerald-300">
                 <ArrowUpRight size={17} />
-                {liveReturn ? `${(Number(liveReturn) * 100).toFixed(1)}% stored return` : `${precise.format(summary.gain)} (${summary.returnPercent.toFixed(1)}%) in this example`}
+                {liveReturn != null ? `${(Number(liveReturn) * 100).toFixed(1)}% stored return` : showDemo ? `${precise.format(summary.gain)} (${summary.returnPercent.toFixed(1)}%) in this example` : "Return unavailable until a report is published"}
               </p>
             </div>
             <Pill tone={hasLiveReport ? "green" : "gold"}>{hasLiveReport ? "Persisted" : "Synthetic"}</Pill>
@@ -839,40 +842,40 @@ function Overview({
               </AreaChart>
             </ResponsiveContainer>
           </div>
-          {hasLiveReport && chartData.length === 0 && <p className="mt-2 text-xs text-slate-300">No persisted valuation history is available yet.</p>}
+          {isLiveAccount && chartData.length === 0 && <p className="mt-2 text-xs text-slate-300">No persisted valuation history is available yet.</p>}
         </section>
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm font-semibold text-slate-500">Example return</p>
+          <p className="text-sm font-semibold text-slate-500">{showDemo ? "Example return" : "Your return"}</p>
           <p className="mt-2 text-3xl font-bold tracking-tight text-emerald-600">
-            +{summary.returnPercent.toFixed(1)}%
+            {liveReturn != null ? `${(Number(liveReturn) * 100).toFixed(1)}%` : showDemo ? `+${summary.returnPercent.toFixed(1)}%` : "—"}
           </p>
           <div className="my-6 border-t border-slate-100" />
           <div className="grid grid-cols-2 gap-5">
             <Metric
               label="Dividends"
-              value={liveDividends == null ? precise.format(summary.dividends) : precise.format(Number(liveDividends))}
+              value={liveDividends == null ? (showDemo ? precise.format(summary.dividends) : "—") : precise.format(Number(liveDividends))}
             />
             <Metric
               label="Realized gains"
-              value={liveRealized == null ? precise.format(summary.realized) : precise.format(Number(liveRealized))}
+              value={liveRealized == null ? (showDemo ? precise.format(summary.realized) : "—") : precise.format(Number(liveRealized))}
             />
-            <Metric label="Cash balance" value={liveCash ? precise.format(Number(liveCash)) : precise.format(summary.cash)} />
+            <Metric label="Cash balance" value={liveCash != null ? precise.format(Number(liveCash)) : showDemo ? precise.format(summary.cash) : "—"} />
             <Metric label="Price source" value="Not connected" small />
           </div>
         </section>
       </div>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(300px,.75fr)]">
-          <Holdings liveHoldings={reportSnapshot?.payload.holdings} />
+          <Holdings liveHoldings={reportSnapshot?.payload.holdings} isLiveAccount={isLiveAccount} />
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-lg font-bold">Example income</h2>
+            <h2 className="text-lg font-bold">{showDemo ? "Example income" : "Dividend income"}</h2>
             <HandCoins size={20} className="text-[#185da8]" />
           </div>
           <p className="text-3xl font-bold tracking-tight">
-            {liveDividends == null ? precise.format(summary.dividends) : precise.format(Number(liveDividends))}
+            {liveDividends == null ? (showDemo ? precise.format(summary.dividends) : "—") : precise.format(Number(liveDividends))}
           </p>
           <p className="mt-1 text-sm text-slate-500">
-            {liveDividends == null ? "Synthetic dividends in this scenario" : "Income recorded from your imported activity"}
+            {liveDividends == null ? (showDemo ? "Synthetic dividends in this scenario" : "No persisted dividend report yet") : "Income recorded from your imported activity"}
           </p>
         </section>
       </div>
@@ -880,7 +883,8 @@ function Overview({
   );
 }
 
-function Holdings({ liveHoldings }: { liveHoldings?: LiveReportHolding[] }) {
+function Holdings({ liveHoldings, isLiveAccount }: { liveHoldings?: LiveReportHolding[]; isLiveAccount: boolean }) {
+  if (isLiveAccount && !liveHoldings) return <section className="rounded-3xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500 shadow-sm">Holdings will appear after a persisted report is published for this account.</section>;
   if (liveHoldings) return <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="mb-5"><h2 className="text-lg font-bold">Your holdings</h2><p className="mt-0.5 text-sm text-slate-500">Persisted quantities and stored closes as of the latest report.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[610px] text-left"><thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400"><tr><th className="pb-3">Instrument</th><th className="pb-3">Shares</th><th className="pb-3">Stored close</th><th className="pb-3 text-right">Stored value</th></tr></thead><tbody>{liveHoldings.map((holding) => <tr key={holding.instrumentId} className="border-b border-slate-50 last:border-0"><td className="py-4 text-sm font-bold"><span>{holding.displayName ?? holding.instrumentId}</span>{holding.displayName && <span className="mt-0.5 block text-xs font-normal text-slate-500">{holding.instrumentId}</span>}</td><td className="py-4 text-sm font-semibold">{holding.quantity}</td><td className="py-4 text-sm font-semibold">{holding.close === null ? 'Missing' : precise.format(Number(holding.close))}</td><td className="py-4 text-right text-sm font-bold">{holding.value === null ? 'Unavailable' : precise.format(Number(holding.value))}</td></tr>)}</tbody></table></div></section>;
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
