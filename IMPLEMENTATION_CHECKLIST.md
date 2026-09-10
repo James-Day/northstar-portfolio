@@ -13,7 +13,7 @@ This file is the current implementation plan. Work through the numbered steps in
 - Keep commits large and coherent. Record meaningful milestone evidence rather than a log entry for every small UI change.
 - Never commit secrets. Configure credentials through local ignored environment files or the service's secret interface.
 
-**Current count: 102 tasks — 53 checked, 49 unchecked, across 13 ordered steps.**
+**Current count: 102 tasks — 54 checked, 48 unchecked, across 13 ordered steps.**
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -149,7 +149,7 @@ Owner: reporting/calculations. Depends on steps 05–08.
 - [x] **09.04** Compose persisted effective ledger, opening history, calendar, validated actions and selected stored prices into report inputs; use corrected chronological replay from step 06. `composePersistedReportInputs` now performs this deterministic composition and derives the import revision.
 - [ ] **09.05** Wire report queue handler and import/undo/price-correction triggers through publication; reject stale workers and make retry/snapshot revision selection deterministic.
 - [x] **09.06** Generate consolidated views that cancel linked internal transfers while excluding external flows and incentives; preserve unknown basis and incomplete return periods. Evidence: `composeConsolidatedReportInputs` cancels only proven links, keeps unresolved transfers explicit, and preserves incomplete valuations/unknown basis in commit `01afe90`.
-- [ ] **09.07** Validate return/gain definitions and disclose daily flow timing approximation; do not bridge gaps, annualize short periods or imply tax calculations.
+- [x] **09.07** Validate return/gain definitions and disclose daily flow timing approximation; do not bridge gaps, annualize short periods or imply tax calculations. Evidence: typed methodology metadata, midpoint flow disclosure, non-contiguous period handling, and explicit analytical/not-tax-reporting labels in commit `6a3718c`.
 - [ ] **09.08** Gate: upload → commit → queue → stored report completes without manually supplying a snapshot; undo/correction regenerates matching results and previous revisions remain reproducible.
 
 ## 10 — Finish the usable portfolio experience
@@ -257,6 +257,7 @@ Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/sh
 | 2026-09-10 | 11.05 — Server-side entitlement enforcement | Commit `c7fe907`; billing access is evaluated at request time for report/freshness endpoints, trial expiry and failed/canceled states are denied, and authenticated billing status is shown in Settings. Focused API/billing tests and typecheck passed. | Live Stripe/Supabase entitlement updates, checkout lifecycle and hosted browser verification remain open. |
 | 2026-09-10 | 07.07 — Immutable deterministic price revisions | Commit `cb1a7d9`; same-version price/correction overwrites are rejected by database triggers, source precedence is deterministic, conflicts fail closed, and report snapshots retain selected price dependencies. Full validation: 79 test files / 282 tests and typecheck passed. | Live migration execution and production correction workflow remain open. |
 | 2026-09-10 | 02.06 — Auth recovery and session lifecycle | Commit `b4d361a`; password recovery has a dedicated route and validated update, logout revokes globally, account/identity changes clear all private state, and stale session reads are ignored. Full validation: 80 test files / 285 tests and typecheck passed. | Hosted Supabase redirects, email verification and real token revocation remain open. |
+| 2026-09-10 | 09.07 — Report methodology and gap disclosure | Commit `6a3718c`; snapshots and dashboard expose chained daily Modified Dietz methodology, midpoint flow timing, no annualization, unavailable non-contiguous periods, explicit gain definitions and not-tax-reporting disclosure. Full validation: 80 test files / 286 tests and typecheck passed. | Live report execution and hosted browser verification remain open. |
 | 2026-09-10 | 05.03 — Verified private statement object binding | Commit `1c8f694`; authenticated object-binding verifies account ownership, private Storage access, 10 MB/byte-size limits and SHA-256 before persisting import metadata through an RLS-backed RPC. Focused tests (38) and typecheck passed. | Live Supabase Storage/RLS execution and queued import processing remain open. |
 | 2026-09-10 | 09.05 — Report outbox-to-queue wiring (partial) | Commit `ff69ddb`; scheduled transactional outbox dispatch claims report events, publishes typed jobs to `REPORT_QUEUE`, uses `waitUntil` for cron work, and retries safely. Queue tests (9) and typecheck passed. | Durable report input loaders, all import/undo/price-correction triggers, live queue bindings and end-to-end snapshot execution remain open. |
 
