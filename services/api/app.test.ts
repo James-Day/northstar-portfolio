@@ -68,6 +68,21 @@ describe('standalone API', () => {
     await expect(response.json()).resolves.toMatchObject({ snapshot: { asOfDate: '2026-07-06', payload: { totalValue: '100' } } });
   });
 
+  it('serves paginated account activity with source-row detail after ownership verification', async () => {
+    const list = async (accountId: string, token: string, input?: { limit?: number; offset?: number }) => {
+      expect([accountId, token, input]).toEqual(['account-123', 'session-token', { limit: 10, offset: 20 }]);
+      return { items: [], limit: 10, offset: 20, hasMore: false };
+    };
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123' }),
+      accountsRepository: { list: async () => [], get: async () => ({ id: 'account-123' } as never), create: async () => { throw new Error('unused'); } },
+      activityRepository: { list },
+    });
+    const response = await app.request('http://api.test/v1/accounts/account-123/activity?limit=10&offset=20', { headers: { authorization: 'Bearer session-token' } });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ activity: { items: [], limit: 10, offset: 20, hasMore: false } });
+  });
+
   it('lists accounts only after verifying the caller and carries the same token into the RLS repository', async () => {
     const list = async (userId: string, token: string) => {
       expect(userId).toBe('user-123');

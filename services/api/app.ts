@@ -12,6 +12,7 @@ import type { PriceFreshnessReportRepository } from '@/services/reporting/price-
 import { SupabasePriceFreshnessReportRepository } from '@/services/supabase/price-freshness-report-repository';
 import { SupabaseReportSnapshotReader, type ReportSnapshot } from '@/services/supabase/report-snapshot-reader';
 import { SupabaseSignedUploadRepository, type SignedUploadRepository } from '@/services/supabase/signed-upload-repository';
+import { SupabaseActivityRepository, type ActivityPage } from '@/services/supabase/activity-repository';
 
 export type ApiBindings = {
   APP_ENV?: 'development' | 'staging' | 'production';
@@ -30,6 +31,7 @@ export type ApiDependencies = {
   priceFreshnessRepository?: PriceFreshnessReportRepository;
   reportSnapshotReader?: { getLatest(accountId: string, accessToken: string): Promise<ReportSnapshot | undefined> };
   signedUploadRepository?: SignedUploadRepository;
+  activityRepository?: { list(accountId: string, accessToken: string, input?: { limit?: number; offset?: number }): Promise<ActivityPage> };
 };
 
 export function createApi(dependencies: ApiDependencies = {}) {
@@ -44,6 +46,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
   const priceFreshnessRepository = dependencies.priceFreshnessRepository;
   const reportSnapshotReader = dependencies.reportSnapshotReader;
   const signedUploadRepository = dependencies.signedUploadRepository;
+  const activityRepository = dependencies.activityRepository;
 
   api.use('*', async (context, next) => {
     const origin = context.req.header('origin');
@@ -114,6 +117,24 @@ export function createApi(dependencies: ApiDependencies = {}) {
     const snapshot = await reader.getLatest(context.req.param('accountId'), authenticated.accessToken);
     if (!snapshot) return context.json({ error: 'not_found' }, 404);
     return context.json({ snapshot });
+  });
+
+  api.get('/v1/accounts/:accountId/activity', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    const accountId = context.req.param('accountId');
+    const accounts = accountsRepository ?? createAccountsRepository(context.env);
+    if (!await accounts.get(authenticated.user.id, authenticated.accessToken, accountId)) return context.json({ error: 'not_found' }, 404);
+    let limit: number | undefined;
+    let offset: number | undefined;
+    try {
+      limit = parseIntegerQuery(context.req.query('limit'));
+      offset = parseIntegerQuery(context.req.query('offset'));
+    } catch {
+      return context.json({ error: 'invalid_pagination' }, 400);
+    }
+    const repository = activityRepository ?? createActivityRepository(context.env);
+    return context.json({ activity: await repository.list(accountId, authenticated.accessToken, { limit, offset }) });
   });
 
   api.post('/v1/accounts/:accountId/import-preview', async (context) => {
@@ -268,6 +289,17 @@ function createSignedUploadRepository(bindings: ApiBindings): SignedUploadReposi
     supabaseAnonKey: bindings.SUPABASE_ANON_KEY,
     accounts: new SupabaseAccountsRepository({ supabaseUrl: bindings.SUPABASE_URL, supabaseAnonKey: bindings.SUPABASE_ANON_KEY }),
   });
+}
+
+function createActivityRepository(bindings: ApiBindings) {
+  if (!bindings.SUPABASE_URL || !bindings.SUPABASE_ANON_KEY) throw new SessionConfigurationError();
+  return new SupabaseActivityRepository({ supabaseUrl: bindings.SUPABASE_URL, anonKey: bindings.SUPABASE_ANON_KEY });
+}
+
+function parseIntegerQuery(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  if (!/^\d+$/.test(value)) throw new Error('Pagination values must be non-negative integers.');
+  return Number(value);
 }
 
 function readBearerToken(request: Request): string | undefined {
