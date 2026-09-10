@@ -5,8 +5,13 @@ import { SupabaseActiveSymbolsRepository } from '@/services/supabase/active-symb
 import { SupabaseDailyPricesRepository } from '@/services/supabase/daily-prices-repository';
 import { SupabaseMarketDataJobRunsRepository } from '@/services/supabase/market-data-job-runs-repository';
 import { createCloudflareQueueHandler } from '@/services/queues/cloudflare';
+import { handleScheduledOutboxDispatch } from '@/services/queues/scheduled-outbox';
+import { SupabaseOutboxRepository } from '@/services/supabase/outbox-repository';
+import type { QueueProducer } from '@/services/queues/scheduled-outbox';
 
-function scheduledDependencies(environment: ApiBindings) {
+type WorkerBindings = ApiBindings & { REPORT_QUEUE?: QueueProducer };
+
+function scheduledDependencies(environment: WorkerBindings) {
   if (!environment.SUPABASE_URL || !environment.SUPABASE_SERVICE_ROLE_KEY || !environment.MARKETSTACK_API_KEY) throw new Error('Scheduled pricing requires SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and MARKETSTACK_API_KEY secrets.');
   const cap = Number(environment.MARKETSTACK_MONTHLY_CAP ?? '100');
   const recorder = new SupabaseMarketDataJobRunsRepository({ supabaseUrl: environment.SUPABASE_URL, serviceRoleKey: environment.SUPABASE_SERVICE_ROLE_KEY });
@@ -20,10 +25,16 @@ function scheduledDependencies(environment: ApiBindings) {
 }
 
 export default {
-  fetch(request: Request, environment: ApiBindings, executionContext: ExecutionContext) {
+  fetch(request: Request, environment: WorkerBindings, executionContext: ExecutionContext) {
     return api.fetch(request, environment, executionContext);
   },
-  scheduled(event: ScheduledEvent, environment: ApiBindings, context: ExecutionContext) {
+  scheduled(event: ScheduledEvent, environment: WorkerBindings, context: ExecutionContext) {
+    if (environment.SUPABASE_URL && environment.SUPABASE_SERVICE_ROLE_KEY && environment.REPORT_QUEUE) {
+      handleScheduledOutboxDispatch(context, {
+        repository: new SupabaseOutboxRepository({ supabaseUrl: environment.SUPABASE_URL, serviceRoleKey: environment.SUPABASE_SERVICE_ROLE_KEY }),
+        reportQueue: environment.REPORT_QUEUE,
+      });
+    }
     handleScheduledRefresh(event, context, scheduledDependencies(environment));
   },
 };
