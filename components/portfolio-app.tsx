@@ -87,6 +87,26 @@ function SessionLoadingState() {
     </main>
   );
 }
+
+function SignedOutWorkspaceState() {
+  return (
+    <main className="grid min-h-screen place-items-center bg-[#f5f7fb] px-6 text-[#13233a]">
+      <section className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+        <BrandMark size={40} />
+        <h1 className="mt-6 text-2xl font-bold">Sign in to your workspace</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          Your connected accounts and portfolio reports are private. Sign in to continue.
+        </p>
+        <Link href="/sign-in" className="mt-7 inline-flex h-11 items-center justify-center rounded-xl bg-[#185da8] px-5 text-sm font-semibold text-white hover:bg-[#154f8e]">
+          Continue to sign in
+        </Link>
+        <Link href="/" className="mt-4 block text-sm font-semibold text-slate-500 hover:text-[#185da8]">
+          Return to Northstar
+        </Link>
+      </section>
+    </main>
+  );
+}
 type LiveAccount = {
   id: string;
   name: string;
@@ -1121,9 +1141,9 @@ export function PortfolioApp({
     }
   }
 
-  return authLoading ? (
-    <SessionLoadingState />
-  ) : (
+  if (authLoading) return <SessionLoadingState />;
+  if (client && !userId) return <SignedOutWorkspaceState />;
+  return (
     <main className="min-h-screen bg-[#f5f7fb] text-[#13233a]">
       <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-[#f5f7fb]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-4 md:px-8">

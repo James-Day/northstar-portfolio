@@ -58,7 +58,7 @@ export function LandingPage() {
             Account setup
           </Link>
           <Link
-            href="/dashboard"
+            href="/demo"
             className="inline-flex items-center gap-2 rounded-xl bg-[#185da8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#154f8e]"
           >
             Explore the demo <ArrowRight size={16} />
@@ -85,7 +85,7 @@ export function LandingPage() {
             behind them.
           </p>
           <div className="mt-9 flex justify-center">
-            <Link href="/dashboard" className={primary}>
+            <Link href="/demo" className={primary}>
               Explore the synthetic demo <ArrowRight size={17} />
             </Link>
           </div>
@@ -172,7 +172,7 @@ export function LandingPage() {
               </p>
             </div>
             <Link
-              href="/dashboard"
+              href="/demo"
               className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-white px-6 text-sm font-semibold text-[#152b4a] hover:bg-slate-100"
             >
               View demo <ArrowRight size={17} />
