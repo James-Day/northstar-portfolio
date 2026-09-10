@@ -65,6 +65,23 @@ export class SupabaseBillingRepository implements BillingPersistence {
     return mapCustomer(rows[0], userId);
   }
 
+  /**
+   * Looks up ownership using the service-only Stripe customer mapping. This
+   * is intentionally separate from the user-scoped entitlement read so a
+   * webhook cannot select a billing row through a caller supplied user id.
+   */
+  async findUserIdByStripeCustomerId(customerId: string): Promise<string | undefined> {
+    if (!this.options.serviceRoleKey?.trim()) throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for Stripe customer lookup.');
+    const url = new URL('/rest/v1/billing_customers', this.baseUrl);
+    url.searchParams.set('stripe_customer_id', `eq.${customerId}`);
+    url.searchParams.set('select', 'user_id');
+    url.searchParams.set('limit', '1');
+    const response = await this.fetcher(url, { headers: this.serviceHeaders() });
+    if (!response.ok) throw new Error(`Supabase Stripe customer lookup failed with HTTP ${response.status}.`);
+    const rows = z.array(z.object({ user_id: z.string().uuid() })).parse(await response.json());
+    return rows[0]?.user_id;
+  }
+
   private userHeaders(accessToken: string) {
     return { apikey: this.options.supabaseAnonKey, authorization: `Bearer ${accessToken}` };
   }

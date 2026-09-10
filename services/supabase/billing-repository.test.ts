@@ -35,4 +35,12 @@ describe('SupabaseBillingRepository', () => {
     expect(String(fetcher.mock.calls[0][0])).toContain('/rpc/apply_billing_webhook');
     expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toMatchObject({ p_user_id: customer.user_id, p_event_id: 'evt_1' });
   });
+
+  it('resolves Stripe customer ownership through the service role mapping', async () => {
+    const fetcher = mockFetcher([{ user_id: customer.user_id }]);
+    const repository = new SupabaseBillingRepository({ supabaseUrl: 'https://supabase.test', supabaseAnonKey: 'anon', serviceRoleKey: 'service', fetcher });
+    await expect(repository.findUserIdByStripeCustomerId('cus_123')).resolves.toBe(customer.user_id);
+    expect(String(fetcher.mock.calls[0][0])).toContain('stripe_customer_id=eq.cus_123');
+    expect(fetcher.mock.calls[0][1]).toMatchObject({ headers: { apikey: 'service', authorization: 'Bearer service' } });
+  });
 });
