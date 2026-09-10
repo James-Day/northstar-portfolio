@@ -18,6 +18,34 @@ export type ReportSnapshotPayload = {
   holdings: ValuationHistory['valuations'][number]['holdings'];
   unavailableDates: Array<{ date: IsoDate; reason: string }>;
   priceDependencies: PriceDependency[];
+  methodology: ReportMethodology;
+};
+
+/**
+ * User-facing definitions for the analytical figures in a report. Keep these
+ * beside the payload so exports, API consumers, and the dashboard share the
+ * same disclosures instead of each inventing its own wording.
+ */
+export type ReportMethodology = {
+  returnMethod: 'daily_modified_dietz_chained';
+  externalFlowTiming: 'midpoint_approximation';
+  annualized: false;
+  gapHandling: 'unavailable';
+  investmentGainDefinition: 'ending_value_minus_beginning_value_minus_external_flows_minus_excluded_incentives';
+  realizedGainLossDefinition: 'fifo_analytical_lot_matching';
+  taxReporting: false;
+  disclosure: string;
+};
+
+export const reportMethodology: ReportMethodology = {
+  returnMethod: 'daily_modified_dietz_chained',
+  externalFlowTiming: 'midpoint_approximation',
+  annualized: false,
+  gapHandling: 'unavailable',
+  investmentGainDefinition: 'ending_value_minus_beginning_value_minus_external_flows_minus_excluded_incentives',
+  realizedGainLossDefinition: 'fifo_analytical_lot_matching',
+  taxReporting: false,
+  disclosure: 'Returns use daily Modified Dietz intervals chained across contiguous valuations. Deposits and withdrawals are timed at the midpoint of their day as an approximation; gaps remain unavailable, returns are not annualized, and realized gains/losses are analytical FIFO estimates, not tax reporting.',
 };
 
 /** Builds a reproducible report payload from exact-decimal valuation output. */
@@ -36,7 +64,8 @@ export function buildReportSnapshotPayload(input: { history: ValuationHistory; a
     realizedSales: input.ledger?.sales ?? [],
     valueHistory: input.history.valuations.map((valuation) => ({ date: valuation.date, value: valuation.totalValue })),
     holdings: latest?.holdings ?? [],
-    unavailableDates: input.history.valuations.filter((valuation) => valuation.totalValue === null || valuation.return.return === null).map((valuation) => ({ date: valuation.date, reason: valuation.return.unavailableReason ?? 'missing_valuation' })),
+    unavailableDates: input.history.valuations.filter((valuation) => valuation.totalValue === null || valuation.return.return === null || !valuation.canChainFromPrevious).map((valuation) => ({ date: valuation.date, reason: !valuation.canChainFromPrevious ? 'non_contiguous_period' : valuation.return.unavailableReason ?? 'missing_valuation' })),
     priceDependencies: input.priceDependencies ?? [],
+    methodology: reportMethodology,
   };
 }
