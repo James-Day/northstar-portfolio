@@ -2,6 +2,7 @@ import Decimal from 'decimal.js';
 import { decimalString, type DecimalString } from '@/lib/domain/money';
 import type { DailyClose, IsoDate, InstrumentId } from '@/lib/domain/types';
 import { applyFifoLedger, type LedgerEvent } from '@/services/ledger/fifo';
+import { applyValidatedCorporateAction, type CorporateAction } from '@/services/ledger/corporate-actions';
 import { calculateModifiedDietz, chainTimeWeightedReturn, type ModifiedDietzResult } from '@/services/calculations/returns';
 
 export type ValuationDate = {
@@ -45,6 +46,7 @@ export function valueLedgerHistory(input: {
   dates: ValuationDate[];
   events: LedgerEvent[];
   closes: DailyClose[];
+  corporateActions?: Array<CorporateAction & { effectiveDate: IsoDate }>;
 }): ValuationHistory {
   assertStrictDates(input.dates);
   assertEventOrder(input.events);
@@ -52,8 +54,12 @@ export function valueLedgerHistory(input: {
   const valuations: DailyValuation[] = [];
   for (const valuationDate of input.dates) {
     const ledger = applyFifoLedger(input.events.filter((event) => event.date <= valuationDate.date));
+    let lots = ledger.openLots;
+    for (const action of [...(input.corporateActions ?? [])].sort((left, right) => left.effectiveDate.localeCompare(right.effectiveDate))) {
+      if (action.effectiveDate <= valuationDate.date) lots = applyValidatedCorporateAction(lots, action);
+    }
     const quantities = new Map<string, Decimal>();
-    for (const lot of ledger.openLots) {
+    for (const lot of lots) {
       quantities.set(lot.instrumentId, (quantities.get(lot.instrumentId) ?? new Decimal(0)).plus(lot.remainingQuantity));
     }
     const prices = closeIndex.get(valuationDate.date) ?? new Map<string, DecimalString>();

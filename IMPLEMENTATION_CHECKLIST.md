@@ -172,7 +172,7 @@ Acceptance: two users holding the same symbol reuse one price fetch; weekends do
 
 ### 11 — Implement valuation and return history
 
-- [ ] Value daily actual quantities plus cash using stored unadjusted closes and verified corporate actions.
+- [x] Value daily actual quantities plus cash using stored unadjusted closes and verified corporate actions.
 - [x] Compute gain as ending value minus beginning value minus external flows and excluded incentives.
 - [x] Implement estimated daily Modified Dietz: `(end - start - flow) / (start + 0.5 * flow)`, then chain valid daily returns. Disclose the intraday-flow approximation.
 - [ ] Exclude external contributions/withdrawals and incentives from investment return; offset linked internal transfers in consolidated views.
@@ -308,6 +308,7 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-10 | 09 — Evidence-backed correction persistence (partial) | Added a service-only Supabase writer for evidence-backed corrections with an idempotent instrument/date/version conflict key; repository coverage verifies persisted evidence and retry-safe upserts. | Report dependency wiring and independent evidence review remain. |
 | 2026-09-10 | 11/12 — Ledger report metrics in snapshots (partial) | Snapshot payloads now carry exact ledger net deposits, dividend income, and FIFO realized gain/loss, and authenticated dashboard cards render persisted dividend/realized values when present. | Snapshot generation still needs persisted-ledger orchestration; charts, allocation, and live detail views remain. |
 | 2026-09-10 | 11/12 — Persisted valuation chart data (partial) | Snapshot payloads now include daily valuation points, preserving nulls for unavailable dates; the authenticated dashboard chart uses persisted history and never falls back to synthetic demo points for a live account. | Snapshot generation from persisted inputs, allocation, and live detail views remain. |
+| 2026-09-10 | 11 — Corporate-action-aware valuation | Valuation now applies only validated, effective-dated splits and symbol changes to open lots before pricing, preserving basis and quarantining unvalidated actions through the existing guard. Fixtures verify split quantity/value behavior. | Persisted corporate-action loading, live report orchestration, and independent source validation remain. |
 | 2026-09-09 | 07 — Import workflow (partial) | Lifecycle and review-commit blocking rules added; `npm run typecheck`, `npm test` (25 passing), and `npm run build` passed | Lifecycle is not yet persisted or processed through queues |
 | 2026-09-09 | 08 — Corporate-action safeguards (partial) | Validated split and ticker-change lot handling added; `npm run typecheck`, `npm test` (28 passing), and `npm run build` passed | Corporate actions are not yet sourced, evidenced, or connected to stored price history |
 | 2026-09-09 | 08 — Internal-transfer linking (partial) | Reconciled-account transfer linking and unresolved-transfer rules added; `npm run typecheck`, `npm test` (30 passing), and `npm run build` passed | Transferred lots/basis require persisted cross-account transfer workflows |

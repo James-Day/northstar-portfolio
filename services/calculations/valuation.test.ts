@@ -66,4 +66,18 @@ describe('valueLedgerHistory', () => {
 
     expect(history.valuations[1]).toMatchObject({ totalValue: '160', externalFlows: '50', excludedIncentives: '10', return: { investmentGain: '0', return: '0' } });
   });
+
+  it('applies only validated splits at their effective valuation date', () => {
+    const history = valueLedgerHistory({
+      dates: [{ date: date('2026-01-02'), canChainFromPrevious: false }, { date: date('2026-01-03'), canChainFromPrevious: true }],
+      events: [
+        { id: 'deposit', date: date('2026-01-02'), type: 'deposit', amount: decimalString('100') },
+        { id: 'buy', date: date('2026-01-02'), type: 'buy', instrumentId: 'instrument-1', quantity: decimalString('1'), grossAmount: decimalString('100'), fee: decimalString('0') },
+      ],
+      closes: [close('2026-01-02', '100'), close('2026-01-03', '50')],
+      corporateActions: [{ instrumentId: 'instrument-1', type: 'split', status: 'validated', ratioNumerator: decimalString('2'), ratioDenominator: decimalString('1'), effectiveDate: date('2026-01-03') }],
+    });
+    expect(history.valuations[0].holdings).toMatchObject([{ quantity: '1', value: '100' }]);
+    expect(history.valuations[1].holdings).toMatchObject([{ quantity: '2', value: '100' }]);
+  });
 });
