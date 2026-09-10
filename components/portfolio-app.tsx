@@ -184,6 +184,7 @@ export function PortfolioApp({
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityError, setActivityError] = useState<string>();
   const [activityRequestVersion, setActivityRequestVersion] = useState(0);
+  const [activityFilter, setActivityFilter] = useState("");
 
   useEffect(() => {
     if (!client) return;
@@ -718,6 +719,8 @@ export function PortfolioApp({
               onRetry={() => setActivityRequestVersion((value) => value + 1)}
               onPrevious={() => setActivityOffset((value) => Math.max(0, value - 25))}
               onNext={() => setActivityOffset((value) => value + 25)}
+              filter={activityFilter}
+              onFilterChange={setActivityFilter}
             />
           )}
           {active === "Accounts" && (
@@ -999,6 +1002,8 @@ function ActivityPanel({
   onRetry,
   onPrevious,
   onNext,
+  filter,
+  onFilterChange,
 }: {
   onUpload: () => void;
   isLiveAccount: boolean;
@@ -1008,6 +1013,8 @@ function ActivityPanel({
   onRetry: () => void;
   onPrevious: () => void;
   onNext: () => void;
+  filter: string;
+  onFilterChange: (value: string) => void;
 }) {
   if (isLiveAccount) return (
     <>
@@ -1020,6 +1027,10 @@ function ActivityPanel({
         <Button onClick={onUpload} className="rounded-xl bg-[#185da8] text-white"><Plus size={16} />Import CSV</Button>
       </div>
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <label htmlFor="activity-filter" className="text-sm font-semibold text-slate-700">Filter activity</label>
+          <Input id="activity-filter" value={filter} onChange={(event) => onFilterChange(event.target.value)} placeholder="Type, symbol, or description" className="w-full sm:max-w-xs" />
+        </div>
         {loadError && (
           <div role="alert" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
             <span>{loadError}</span>
@@ -1030,7 +1041,7 @@ function ActivityPanel({
           <div className="grid min-h-64 place-items-center text-center">
             <div><Clock3 className="mx-auto animate-pulse text-[#185da8]" size={28} /><p className="mt-4 text-sm text-slate-500">Loading your activity…</p></div>
           </div>
-        ) : activityPage && activityPage.items.length > 0 ? (
+        ) : activityPage && activityPage.items.filter((item) => `${item.entryType} ${item.instrumentId ?? ""} ${item.description}`.toLowerCase().includes(filter.trim().toLowerCase())).length > 0 ? (
           <>
             <div className="mb-4 flex items-center justify-between gap-3">
               <p className="text-sm text-slate-500">Showing entries {activityPage.offset + 1}–{activityPage.offset + activityPage.items.length}{isLoading ? " · Updating…" : ""}</p>
@@ -1042,7 +1053,7 @@ function ActivityPanel({
                   <tr><th className="pb-3">Date</th><th className="pb-3">Activity</th><th className="pb-3">Instrument</th><th className="pb-3">Details</th><th className="pb-3">Source</th><th className="pb-3 text-right">Amount</th></tr>
                 </thead>
                 <tbody>
-                  {activityPage.items.map((item) => <LiveActivityRow key={item.id} item={item} />)}
+                  {activityPage.items.filter((item) => `${item.entryType} ${item.instrumentId ?? ""} ${item.description}`.toLowerCase().includes(filter.trim().toLowerCase())).map((item) => <LiveActivityRow key={item.id} item={item} />)}
                 </tbody>
               </table>
             </div>
@@ -1054,7 +1065,7 @@ function ActivityPanel({
           </>
         ) : loadError ? null : (
           <div className="grid min-h-64 place-items-center text-center">
-            <div><Clock3 className="mx-auto text-[#185da8]" size={28} /><h2 className="mt-5 text-xl font-bold">No imported activity yet</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">Import a Robinhood activity CSV to populate this account’s ledger.</p><Button onClick={onUpload} className="mt-5 rounded-xl bg-[#185da8] text-white"><Plus size={16} />Import CSV</Button></div>
+            <div><Clock3 className="mx-auto text-[#185da8]" size={28} /><h2 className="mt-5 text-xl font-bold">{filter.trim() ? "No matching activity" : "No imported activity yet"}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{filter.trim() ? "Try a different type, symbol, or description." : "Import a Robinhood activity CSV to populate this account’s ledger."}</p>{!filter.trim() && <Button onClick={onUpload} className="mt-5 rounded-xl bg-[#185da8] text-white"><Plus size={16} />Import CSV</Button>}</div>
           </div>
         )}
       </section>
