@@ -146,8 +146,8 @@ Acceptance: hand-calculated fixtures cover partial lot sales, fractional shares,
 ### 09 — Populate the historical-price database
 
 - [x] Implement a bounded/resumable DoltHub close-price source reader that observes a stable source revision for each page.
-- [ ] Connect DoltHub pages to stable instrument mapping and persisted ingestion metadata.
-- [ ] Store unadjusted daily closes; keep dividend income sourced from brokerage activity.
+- [x] Connect DoltHub pages to stable instrument mapping and persisted ingestion metadata.
+- [x] Store unadjusted daily closes; keep dividend income sourced from brokerage activity.
 - [ ] Validate selected stocks, ETFs, ticker changes, delisted securities and split boundaries against independent records.
 - [x] Detect invalid closes, duplicate dates, and large jumps; quarantine suspicious records without altering holdings.
 - [ ] Add trading-calendar missing-date and ticker-alias discontinuity checks during database ingestion.
@@ -303,6 +303,7 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-10 | 05 — Account activity coverage | Added a transactional Supabase trigger that derives each account’s activity coverage from its committed imports and recomputes it after commit or undo, keeping it independent from valuation price freshness. Local schema lint passed. | Live project migration and UI display remain. |
 | 2026-09-10 | 03/07 — Signed-upload API boundary (partial) | Added authenticated `POST /v1/accounts/:accountId/upload-url`, forwarding the verified user token through the account ownership check before issuing a private Storage URL. API coverage verifies the account-scoped request and response. | Browser upload completion, storage-object linkage, retention execution, and live-project verification remain. |
 | 2026-09-10 | 06 — Complete supported activity normalization | Added regression coverage for Robinhood buys, sells, cash dividends, interest, fees, IRA contributions/distributions, and internal transfers, including signed cash-flow and external-flow semantics. | Persisted import processing and live fixtures remain. |
+| 2026-09-10 | 09 — Resumable historical-page persistence | Added `ingestDoltHubHistory`, which walks bounded pages, preserves one source revision, resolves date-effective stable aliases, persists accepted unadjusted closes, and aggregates quarantined records. Revision changes fail closed. Coverage now checks both-page cursoring and revision mismatch handling. | Live DoltHub run, independent validation, trading-calendar checks, corrections, and licensing review remain. |
 | 2026-09-09 | 07 — Import workflow (partial) | Lifecycle and review-commit blocking rules added; `npm run typecheck`, `npm test` (25 passing), and `npm run build` passed | Lifecycle is not yet persisted or processed through queues |
 | 2026-09-09 | 08 — Corporate-action safeguards (partial) | Validated split and ticker-change lot handling added; `npm run typecheck`, `npm test` (28 passing), and `npm run build` passed | Corporate actions are not yet sourced, evidenced, or connected to stored price history |
 | 2026-09-09 | 08 — Internal-transfer linking (partial) | Reconciled-account transfer linking and unresolved-transfer rules added; `npm run typecheck`, `npm test` (30 passing), and `npm run build` passed | Transferred lots/basis require persisted cross-account transfer workflows |

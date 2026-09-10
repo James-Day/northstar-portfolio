@@ -18,6 +18,42 @@ export type HistoricalPriceIngestion = {
   quarantined: Array<{ record: DoltHubDailyClose; reason: string }>;
 };
 
+export type HistoricalPageSource = {
+  getDailyClosePage(input: { symbols: string[]; from: IsoDate; through: IsoDate; limit?: number; cursor?: { tradingDate: IsoDate; symbol: string } }): Promise<{ records: DoltHubDailyClose[]; sourceRevision: string; nextCursor: { tradingDate: IsoDate; symbol: string } | null }>;
+};
+
+export type HistoricalPagePersistence = {
+  persistDoltHubPage(input: { sourceRevision: string; records: HistoricalPriceUpsert[] }): Promise<{ revisionId: string; upserted: number }>;
+};
+
+/** Reads and persists every bounded page while keeping one immutable source revision. */
+export async function ingestDoltHubHistory(input: {
+  source: HistoricalPageSource;
+  persistence: HistoricalPagePersistence;
+  symbols: string[];
+  from: IsoDate;
+  through: IsoDate;
+  aliases: InstrumentAlias[];
+  limit?: number;
+}): Promise<{ sourceRevision: string; pages: number; upserted: number; quarantined: HistoricalPriceIngestion['quarantined'] }> {
+  let cursor: { tradingDate: IsoDate; symbol: string } | undefined;
+  let sourceRevision: string | undefined;
+  let pages = 0;
+  let upserted = 0;
+  const quarantined: HistoricalPriceIngestion['quarantined'] = [];
+  do {
+    const page = await input.source.getDailyClosePage({ symbols: input.symbols, from: input.from, through: input.through, limit: input.limit, cursor });
+    if (!sourceRevision) sourceRevision = page.sourceRevision;
+    if (sourceRevision !== page.sourceRevision) throw new Error('DoltHub source revision changed between historical pages; retry the ingestion.');
+    const prepared = prepareHistoricalPriceIngestion(page.records, input.aliases, sourceRevision);
+    quarantined.push(...prepared.quarantined);
+    upserted += (await input.persistence.persistDoltHubPage({ sourceRevision, records: prepared.accepted })).upserted;
+    pages += 1;
+    cursor = page.nextCursor ?? undefined;
+  } while (cursor);
+  return { sourceRevision: sourceRevision ?? '', pages, upserted, quarantined };
+}
+
 /**
  * Converts a stable DoltHub page into database-ready rows. Alias resolution is
  * date-aware and fail-closed: an unknown or ambiguous ticker is quarantined,
