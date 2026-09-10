@@ -90,7 +90,8 @@ type LiveImportSummary = {
   committedAt?: string | null;
 };
 type LiveFreshnessReport = { expectedDate: string; rows: Array<{ symbol: string; expectedDate: string; latestDate: string | null; status: 'current' | 'stale' | 'missing' }> };
-type LiveReportSnapshot = { asOfDate: string; payload: { totalValue: string | null; cash: string | null; timeWeightedReturn: string | null; activityCoveredThrough: string | null; pricesThrough: string | null } };
+type LiveReportHolding = { instrumentId: string; quantity: string; close: string | null; value: string | null };
+type LiveReportSnapshot = { asOfDate: string; payload: { totalValue: string | null; cash: string | null; timeWeightedReturn: string | null; activityCoveredThrough: string | null; pricesThrough: string | null; holdings: LiveReportHolding[] } };
 
 const fmt = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -835,7 +836,7 @@ function Overview({
         </section>
       </div>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(300px,.75fr)]">
-        <Holdings />
+          <Holdings liveHoldings={reportSnapshot?.payload.holdings} />
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-lg font-bold">Example income</h2>
@@ -853,7 +854,8 @@ function Overview({
   );
 }
 
-function Holdings() {
+function Holdings({ liveHoldings }: { liveHoldings?: LiveReportHolding[] }) {
+  if (liveHoldings) return <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="mb-5"><h2 className="text-lg font-bold">Your holdings</h2><p className="mt-0.5 text-sm text-slate-500">Persisted quantities and stored closes as of the latest report.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[610px] text-left"><thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400"><tr><th className="pb-3">Instrument</th><th className="pb-3">Shares</th><th className="pb-3">Stored close</th><th className="pb-3 text-right">Stored value</th></tr></thead><tbody>{liveHoldings.map((holding) => <tr key={holding.instrumentId} className="border-b border-slate-50 last:border-0"><td className="py-4 text-sm font-bold">{holding.instrumentId}</td><td className="py-4 text-sm font-semibold">{holding.quantity}</td><td className="py-4 text-sm font-semibold">{holding.close === null ? 'Missing' : precise.format(Number(holding.close))}</td><td className="py-4 text-right text-sm font-bold">{holding.value === null ? 'Unavailable' : precise.format(Number(holding.value))}</td></tr>)}</tbody></table></div></section>;
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
