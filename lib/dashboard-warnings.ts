@@ -39,10 +39,11 @@ type WarningInput = {
 export function getDashboardWarnings(input: WarningInput): DashboardWarning[] {
   if (!input.isLiveAccount) return [];
   const warnings: DashboardWarning[] = [];
-  const hasReport = input.report !== undefined;
+  const report = input.report;
+  const hasReport = report !== undefined;
   const hasStalePrices = input.freshness?.rows.some((row) => row.status === 'stale') ?? false;
   const hasMissingPrices = input.freshness?.rows.some((row) => row.status === 'missing') ?? false;
-  const reportIsStale = hasReport && input.freshness !== undefined && input.report.asOfDate < input.freshness.expectedDate;
+  const reportIsStale = report !== undefined && input.freshness !== undefined && report.asOfDate < input.freshness.expectedDate;
   const hasPartialHistory = Boolean(
     input.openingHistory?.incompleteReason ||
       input.openingHistory?.positions.some((position) => position.acquiredOn === null || position.totalCostBasis === null),
@@ -72,7 +73,7 @@ export function getDashboardWarnings(input: WarningInput): DashboardWarning[] {
       action: 'accounts',
     });
   }
-  if (input.report?.totalValue === null || hasMissingPrices) {
+  if (report?.totalValue === null || hasMissingPrices) {
     warnings.push({
       kind: 'unavailable_prices',
       title: 'Portfolio value is temporarily unavailable',
@@ -80,7 +81,7 @@ export function getDashboardWarnings(input: WarningInput): DashboardWarning[] {
       action: 'retry',
     });
   }
-  if (hasReport && input.report.holdings.length === 0) {
+  if (report !== undefined && report.holdings.length === 0) {
     warnings.push({
       kind: 'no_holdings',
       title: 'No current holdings yet',
