@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:security": "vitest run services/security/rls-schema.test.ts",
+    "preflight:launch": "node --experimental-strip-types scripts/launch-preflight.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium"
