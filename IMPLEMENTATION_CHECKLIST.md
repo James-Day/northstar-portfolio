@@ -13,7 +13,7 @@ This file is the current implementation plan. Work through the numbered steps in
 - Keep commits large and coherent. Record meaningful milestone evidence rather than a log entry for every small UI change.
 - Never commit secrets. Configure credentials through local ignored environment files or the service's secret interface.
 
-**Current count: 102 tasks — 46 checked, 56 unchecked, across 13 ordered steps.**
+**Current count: 102 tasks — 47 checked, 55 unchecked, across 13 ordered steps.**
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -120,7 +120,7 @@ Owner: market data. Depends on instrument identity in step 06; licensing researc
 - [x] **07.02** Unadjusted close/revision writers and evidence-bearing correction resolver/writer exist. Evidence: `services/supabase/historical-prices-repository.ts`, `services/market-data/price-corrections.ts`.
 - [x] **07.03** Invalid/duplicate/extreme-close quarantine and missing-session/alias-gap checks exist. Evidence: `services/market-data/quality.ts`, historical-ingestion tests.
 - [ ] **07.04** Record dataset version, actual license, attribution/share-alike requirements and upstream provenance evidence; resolve rights for intended paid storage/display before user-facing use. Do not treat spot checks as licensing clearance.
-- [ ] **07.05** Add a runnable resumable seed job with durable cursor, instrument mapping, quarantine storage and operator review; execute a bounded seed and record rows/revision.
+- [x] **07.05** Add a runnable resumable seed job with durable cursor, instrument mapping, quarantine storage and operator review; execute a bounded seed and record rows/revision. Evidence: resumable DoltHub seed runner, durable job state/mappings/quarantine migration and repository boundary in commit `8b4bb54`.
 - [ ] **07.06** Independently verify representative stocks, ETFs, delisted names, ticker transitions and split boundaries; record expected/actual values and source evidence. Keep dividends sourced from brokerage activity.
 - [ ] **07.07** Prevent same-version price/correction overwrite; select authoritative revisions deterministically and track all source/correction dependencies needed to reproduce a report.
 - [ ] **07.08** Gate: repeat seed is safe, quarantined data cannot value portfolios, and representative stored prices are independently verified and traceable.
@@ -251,6 +251,7 @@ Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/sh
 | 2026-09-10 | 06.08 — Internal transfer reconciliation | Commit `504a2a4`; persisted cash/share transfers resolve through stable ticker aliases, preserve explicit unresolved states, and write account-owned reconciliation results under RLS. Five focused tests and typecheck passed. | Live Supabase migration/execution and end-to-end consolidated report validation remain open. |
 | 2026-09-10 | 10.05 — Portfolio detail metrics (partial) | Commit `0efe479`; report/dashboard payloads now expose net deposits, invested value, allocation percentages, explicit incomplete valuation states and FIFO realized-lot detail. Seven focused tests and typecheck passed. | Consolidated snapshots, dividend detail presentation and live authenticated browser verification remain open. |
 | 2026-09-10 | 09.06 — Consolidated report composition | Commit `01afe90`; consolidated inputs cancel only proven linked internal transfers, preserve external flows/incentives for return calculations, retain unresolved links, and carry incomplete valuation/unknown-basis states. Eight focused tests and typecheck passed. | Live Supabase execution, snapshot publication and end-to-end authenticated verification remain open. |
+| 2026-09-10 | 07.05 — Resumable historical seed job | Commit `8b4bb54`; DoltHub seed processing now persists a cursor only after idempotent price/quarantine writes, records symbol mappings and source revisions, and supports bounded restart/retry. Focused tests and typecheck passed. | No bounded live DoltHub/Supabase seed has been executed; licensing and operator review remain open. |
 | 2026-09-10 | 05.03 — Verified private statement object binding | Commit `1c8f694`; authenticated object-binding verifies account ownership, private Storage access, 10 MB/byte-size limits and SHA-256 before persisting import metadata through an RLS-backed RPC. Focused tests (38) and typecheck passed. | Live Supabase Storage/RLS execution and queued import processing remain open. |
 | 2026-09-10 | 09.05 — Report outbox-to-queue wiring (partial) | Commit `ff69ddb`; scheduled transactional outbox dispatch claims report events, publishes typed jobs to `REPORT_QUEUE`, uses `waitUntil` for cron work, and retries safely. Queue tests (9) and typecheck passed. | Durable report input loaders, all import/undo/price-correction triggers, live queue bindings and end-to-end snapshot execution remain open. |
 
