@@ -63,6 +63,13 @@ export function runLaunchPreflight(options: LaunchPreflightOptions = {}): Launch
     checks.push(check(`env.${name}`, configured ? 'pass' : 'fail', configured ? `${name} is configured.` : `${name} is missing or still a placeholder.`));
   }
 
+  checks.push(env.STRIPE_WEBHOOK_SECRET?.startsWith('whsec_')
+    ? check('billing.webhook-format', 'pass', 'Stripe webhook secret uses the expected format.')
+    : check('billing.webhook-format', 'fail', 'STRIPE_WEBHOOK_SECRET must use a whsec_ secret.'));
+  checks.push(env.STRIPE_MONTHLY_PRICE_ID?.startsWith('price_') && env.STRIPE_ANNUAL_PRICE_ID?.startsWith('price_')
+    ? check('billing.price-format', 'pass', 'Stripe monthly and annual price IDs use the expected format.')
+    : check('billing.price-format', 'fail', 'Stripe monthly and annual price IDs must use price_ identifiers.'));
+
   const publicUrl = env.NEXT_PUBLIC_SUPABASE_URL;
   const serverUrl = env.SUPABASE_URL;
   checks.push(publicUrl && serverUrl && publicUrl === serverUrl

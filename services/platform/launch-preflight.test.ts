@@ -52,6 +52,12 @@ describe('launch preflight', () => {
     expect(result.checks.find((item) => item.id === 'env.marketstack-cap')?.status).toBe('fail');
   });
 
+  it('fails closed for malformed Stripe identifiers even when values are non-empty', () => {
+    const result = run({ ...baseEnv, STRIPE_WEBHOOK_SECRET: 'secret', STRIPE_MONTHLY_PRICE_ID: 'monthly' });
+    expect(result.checks.find((item) => item.id === 'billing.webhook-format')?.status).toBe('fail');
+    expect(result.checks.find((item) => item.id === 'billing.price-format')?.status).toBe('fail');
+  });
+
   it('requires a live Stripe key and commercial provider plan in production', () => {
     const result = run({ ...baseEnv, APP_ENV: 'production', STRIPE_SECRET_KEY: 'sk_test_example', MARKETSTACK_PLAN: 'free' });
     expect(result.checks.find((item) => item.id === 'billing.live-key')?.status).toBe('fail');
