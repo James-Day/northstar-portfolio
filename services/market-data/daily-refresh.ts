@@ -6,6 +6,14 @@ export type DailyRefreshResult =
   | { status: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' }
   | { status: 'ready_to_persist'; tradingDate: IsoDate; requestedSymbols: string[]; prices: DailyPrice[] };
 
+export type DailyPricePersistence = {
+  persist(input: { tradingDate: IsoDate; prices: DailyPrice[] }): Promise<{ upserted: number }>;
+};
+
+export type DailyRefreshJobResult =
+  | { status: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' }
+  | { status: 'persisted'; tradingDate: IsoDate; requestedSymbols: string[]; upserted: number };
+
 /**
  * Coordinates one shared EOD request for all active symbols. Persistence and
  * retry are separate infrastructure concerns, so a failed provider call is
@@ -25,6 +33,19 @@ export async function prepareDailyPriceRefresh(
   const prices = await provider.getDailyPrices(requestedSymbols, tradingDate);
   validateProviderResponse(prices, requestedSymbols, tradingDate);
   return { status: 'ready_to_persist', tradingDate, requestedSymbols, prices };
+}
+
+/** Runs one guarded refresh and persists only a complete, validated provider response. */
+export async function runDailyPriceRefresh(
+  now: Date,
+  activeSymbols: string[],
+  provider: DailyPriceProvider,
+  persistence: DailyPricePersistence,
+): Promise<DailyRefreshJobResult> {
+  const prepared = await prepareDailyPriceRefresh(now, activeSymbols, provider);
+  if (prepared.status === 'skipped') return prepared;
+  const persisted = await persistence.persist({ tradingDate: prepared.tradingDate, prices: prepared.prices });
+  return { status: 'persisted', tradingDate: prepared.tradingDate, requestedSymbols: prepared.requestedSymbols, upserted: persisted.upserted };
 }
 
 function normalizeSymbols(symbols: string[]): string[] {

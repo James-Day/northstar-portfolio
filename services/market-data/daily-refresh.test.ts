@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { decimalString } from '@/lib/domain/money';
 import { isoDate } from '@/lib/domain/types';
-import { prepareDailyPriceRefresh } from '@/services/market-data/daily-refresh';
+import { prepareDailyPriceRefresh, runDailyPriceRefresh } from '@/services/market-data/daily-refresh';
 import type { DailyPriceProvider } from '@/services/market-data/types';
 
 const price = (symbol: string) => ({ symbol, tradingDate: isoDate('2026-07-06'), close: decimalString('100'), provider: 'marketstack' as const, providerMetadata: {} });
@@ -28,5 +28,18 @@ describe('daily price refresh preparation', () => {
   it('rejects incomplete, duplicate, off-date, and unrequested provider results', async () => {
     const provider: DailyPriceProvider = { getDailyPrices: vi.fn().mockResolvedValue([price('AAPL')]) };
     await expect(prepareDailyPriceRefresh(new Date('2026-07-06T22:00:00.000Z'), ['AAPL', 'VTI'], provider)).rejects.toThrow('VTI');
+  });
+
+  it('persists one complete shared-symbol batch after the session guard', async () => {
+    const provider: DailyPriceProvider = { getDailyPrices: vi.fn().mockResolvedValue([price('AAPL')]) };
+    const persistence = { persist: vi.fn().mockResolvedValue({ upserted: 1 }) };
+    await expect(runDailyPriceRefresh(new Date('2026-07-06T22:00:00.000Z'), ['AAPL', ' aapl '], provider, persistence)).resolves.toEqual({ status: 'persisted', tradingDate: '2026-07-06', requestedSymbols: ['AAPL'], upserted: 1 });
+    expect(persistence.persist).toHaveBeenCalledWith({ tradingDate: '2026-07-06', prices: [price('AAPL')] });
+  });
+
+  it('does not persist when the date is not eligible', async () => {
+    const persistence = { persist: vi.fn() };
+    await expect(runDailyPriceRefresh(new Date('2026-07-04T22:00:00.000Z'), ['AAPL'], { getDailyPrices: vi.fn() }, persistence)).resolves.toEqual({ status: 'skipped', reason: 'before_close_or_non_trading_day' });
+    expect(persistence.persist).not.toHaveBeenCalled();
   });
 });
