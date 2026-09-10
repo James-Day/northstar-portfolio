@@ -12,18 +12,23 @@ export type OperationalStatus = {
 
 /** Turns durable worker counters into a secret-free operator status summary. */
 export function summarizeOperationalStatus(input: {
-  marketData?: { failedRuns?: number; quotaExhausted?: boolean; staleSymbols?: number; publicationPendingSymbols?: number };
+  marketData?: { failedRuns?: number; quotaExhausted?: boolean; staleSymbols?: number; publicationPendingSymbols?: number; lastSuccessfulAt?: Date | null; maxSuccessAgeMs?: number };
   queues?: { failedJobs?: number; pendingJobs?: number };
   retention?: { exhaustedItems?: number; pendingItems?: number };
   reports?: { failedPublishes?: number; staleJobs?: number };
+  now?: Date;
 }): OperationalStatus {
   const signals: OperationalSignal[] = [];
   const add = (component: OperationalSignal['component'], severity: OperationalSeverity, message: string) => signals.push({ component, severity, message });
   const market = input.marketData;
+  const now = input.now ?? new Date();
+  const maxSuccessAgeMs = market?.maxSuccessAgeMs ?? 36 * 60 * 60 * 1000;
+  if (!Number.isInteger(maxSuccessAgeMs) || maxSuccessAgeMs < 1) throw new Error('Market-data success freshness threshold must be a positive integer.');
   if (market?.quotaExhausted) add('market_data', 'critical', 'Market-data quota is exhausted; new provider calls are paused.');
   else if ((market?.failedRuns ?? 0) > 0) add('market_data', 'critical', 'A market-data refresh failed after retries; affected valuations remain unavailable.');
   else if ((market?.staleSymbols ?? 0) > 0) add('market_data', 'warning', `${market?.staleSymbols} market-data symbol(s) are stale.`);
   else if ((market?.publicationPendingSymbols ?? 0) > 0) add('market_data', 'warning', `${market?.publicationPendingSymbols} market-data symbol(s) are awaiting end-of-day publication.`);
+  else if (market?.lastSuccessfulAt && now.getTime() - market.lastSuccessfulAt.getTime() > maxSuccessAgeMs) add('market_data', 'warning', 'No successful market-data refresh has completed within the expected freshness window.');
   const queues = input.queues;
   if ((queues?.failedJobs ?? 0) > 0) add('queues', 'critical', `${queues?.failedJobs} queued job(s) require replay or investigation.`);
   else if ((queues?.pendingJobs ?? 0) > 100) add('queues', 'warning', 'The queue backlog exceeds the operating threshold.');
