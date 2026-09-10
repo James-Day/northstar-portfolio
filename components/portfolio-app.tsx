@@ -600,9 +600,7 @@ export function PortfolioApp({
           </Link>
           {email ? (
             <div className="flex items-center gap-3">
-              <Pill tone="gold">
-                Synthetic demo · your portfolio is separate
-              </Pill>
+              <Pill tone="green">Signed in · account workspace</Pill>
               <button
                 onClick={signOut}
                 className="text-sm font-bold text-[#185da8] hover:text-[#154f8e]"
@@ -632,7 +630,7 @@ export function PortfolioApp({
           <p className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
             Demo workspace
           </p>
-          <nav className="space-y-1">
+          <nav aria-label="Portfolio sections" className="space-y-1">
             {nav.map(([label, Icon]) => (
               <button
                 key={label}
@@ -640,6 +638,7 @@ export function PortfolioApp({
                   setActive(label);
                   setMenuOpen(false);
                 }}
+                aria-current={active === label ? "page" : undefined}
                 className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold ${active === label ? "bg-[#eaf2ff] text-[#1d4a7d]" : "text-slate-500 hover:bg-slate-50"}`}
               >
                 <Icon size={18} />
