@@ -13,7 +13,7 @@ export type LotInput = {
 export type LedgerEvent =
   | { id: string; date: IsoDate; type: 'buy' | 'drip_buy'; instrumentId: string; quantity: DecimalString; grossAmount: DecimalString; fee: DecimalString }
   | { id: string; date: IsoDate; type: 'sell'; instrumentId: string; quantity: DecimalString; grossAmount: DecimalString; fee: DecimalString }
-  | { id: string; date: IsoDate; type: 'dividend' | 'interest' | 'deposit' | 'withdrawal' | 'ira_incentive'; amount: DecimalString }
+  | { id: string; date: IsoDate; type: 'dividend' | 'interest' | 'deposit' | 'withdrawal' | 'ira_incentive' | 'transfer_in' | 'transfer_out' | 'opening_cash'; amount: DecimalString }
   | { id: string; date: IsoDate; type: 'fee'; amount: DecimalString };
 
 export type OpenLot = LotInput & { remainingQuantity: DecimalString };
@@ -129,6 +129,18 @@ export function applyFifoLedger(events: LedgerEvent[], openingLots: LotInput[] =
         break;
       case 'ira_incentive':
         requireNonNegative(event.amount, 'IRA incentive amount');
+        cash = cash.plus(event.amount);
+        break;
+      case 'transfer_in':
+        requireNonNegative(event.amount, 'Transfer-in amount');
+        cash = cash.plus(event.amount);
+        break;
+      case 'transfer_out':
+        requireNonNegative(event.amount, 'Transfer-out amount');
+        cash = cash.minus(event.amount);
+        break;
+      case 'opening_cash':
+        requireNonNegative(event.amount, 'Opening cash amount');
         cash = cash.plus(event.amount);
         break;
       case 'fee':
