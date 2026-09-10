@@ -1,7 +1,7 @@
-import { parse } from 'csv-parse/sync';
 import Decimal from 'decimal.js';
 import { decimalString, type DecimalString } from '@/lib/domain/money';
 import { isoDate, type IsoDate } from '@/lib/domain/types';
+import { parseCsvRecords } from '@/lib/csv';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_ROWS = 50_000;
@@ -95,21 +95,10 @@ function directedAmount(type: RobinhoodActivityType, amount: DecimalString): Dec
  */
 export function parseRobinhoodActivityCsv(csv: string): ParsedRobinhoodRow[] {
   if (new TextEncoder().encode(csv).byteLength > MAX_BYTES) throw new Error('CSV exceeds the 10 MB import limit.');
-  const records = parse(csv, {
-    bom: true,
-    columns: (headers: string[]) => {
-      const normalized = headers.map(normalizedHeader);
-      if (new Set(normalized).size !== normalized.length) throw new Error('CSV has duplicate column headers.');
-      return normalized;
-    },
-    skip_empty_lines: true,
-    trim: true,
-    relax_quotes: false,
-    // Robinhood appends an informational footer with one additional column.
-    // The mapped data columns are blank, so it is ignored below with other
-    // fully blank records. Transaction content is still validated per row.
-    relax_column_count: true,
-  }) as Record<string, string>[];
+  const parsedRecords = parseCsvRecords(csv);
+  const headers = parsedRecords[0]?.map(normalizedHeader) ?? [];
+  if (new Set(headers).size !== headers.length) throw new Error('CSV has duplicate column headers.');
+  const records = parsedRecords.slice(1).map((values) => Object.fromEntries(headers.map((header, index) => [header, (values[index] ?? '').trim()])));
   if (records.length === 0) throw new Error('CSV needs a header and at least one activity row.');
   if (records.length > MAX_ROWS) throw new Error('CSV exceeds the 50,000-row import limit.');
 
