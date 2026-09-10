@@ -45,6 +45,7 @@ import {
 } from "@/lib/portfolio";
 import { createPublicSupabaseClient } from "@/services/supabase/client";
 import type { AccountActivity, ActivityPage } from "@/services/supabase/activity-repository";
+import { filterReportHistory, reportPeriodDescription, reportPeriodOptions, type ReportPeriod } from "@/services/reporting/period-filter";
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
 type PublicApiConfig = { baseUrl: string };
@@ -179,6 +180,8 @@ export function PortfolioApp({
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string>();
   const [reportRequestVersion, setReportRequestVersion] = useState(0);
+  const [reportPeriod, setReportPeriod] = useState<ReportPeriod>("all");
+  const [reportScope, setReportScope] = useState<"account" | "consolidated">("account");
   const [activityPage, setActivityPage] = useState<LiveActivityPage>();
   const [activityOffset, setActivityOffset] = useState(0);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -707,7 +710,7 @@ export function PortfolioApp({
             <Menu size={18} />
           </button>
           {active === "Overview" && (
-            <Overview summary={summary} onUpload={openFileChooser} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} onRetryFreshness={() => setFreshnessRequestVersion((value) => value + 1)} reportSnapshot={reportSnapshot} reportLoading={reportLoading} reportError={reportError} onRetryReport={() => setReportRequestVersion((value) => value + 1)} accounts={accounts} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} isLiveAccount={Boolean(client && userId && selectedAccountId)} />
+            <Overview summary={summary} onUpload={openFileChooser} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} onRetryFreshness={() => setFreshnessRequestVersion((value) => value + 1)} reportSnapshot={reportSnapshot} reportLoading={reportLoading} reportError={reportError} onRetryReport={() => setReportRequestVersion((value) => value + 1)} accounts={accounts} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} reportPeriod={reportPeriod} onSelectReportPeriod={setReportPeriod} reportScope={reportScope} onSelectReportScope={setReportScope} isLiveAccount={Boolean(client && userId && selectedAccountId)} />
           )}
           {active === "Activity" && (
             <ActivityPanel
@@ -791,6 +794,10 @@ function Overview({
   accounts,
   selectedAccountId,
   onSelectAccount,
+  reportPeriod,
+  onSelectReportPeriod,
+  reportScope,
+  onSelectReportScope,
   isLiveAccount,
 }: {
   summary: ReturnType<typeof calculateSummary>;
@@ -806,6 +813,10 @@ function Overview({
   accounts: LiveAccount[];
   selectedAccountId?: string;
   onSelectAccount: (accountId: string) => void;
+  reportPeriod: ReportPeriod;
+  onSelectReportPeriod: (period: ReportPeriod) => void;
+  reportScope: "account" | "consolidated";
+  onSelectReportScope: (scope: "account" | "consolidated") => void;
   isLiveAccount: boolean;
 }) {
   const liveValue = reportSnapshot?.payload.totalValue;
@@ -816,7 +827,7 @@ function Overview({
   const hasLiveReport = Boolean(reportSnapshot);
   const showDemo = !isLiveAccount;
   const chartData = hasLiveReport
-    ? (reportSnapshot?.payload.valueHistory ?? []).map((point) => ({ date: point.date, value: point.value === null ? null : Number(point.value) }))
+    ? filterReportHistory(reportSnapshot?.payload.valueHistory ?? [], reportPeriod).map((point) => ({ date: point.date, value: point.value === null ? null : Number(point.value) }))
     : showDemo ? demoPrices : [];
   return (
     <>
@@ -832,6 +843,8 @@ function Overview({
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {accounts.length > 0 && <label className="text-xs font-semibold text-slate-500">Account<select aria-label="Select account for report" value={selectedAccountId ?? accounts[0].id} onChange={(event) => onSelectAccount(event.target.value)} className="ml-2 h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm outline-none focus:border-[#185da8] focus:ring-2 focus:ring-[#185da8]/20">{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>}
+          {isLiveAccount && <label className="text-xs font-semibold text-slate-500">Scope<select aria-label="Select report scope" value={reportScope} onChange={(event) => onSelectReportScope(event.target.value as "account" | "consolidated")} className="ml-2 h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm outline-none focus:border-[#185da8] focus:ring-2 focus:ring-[#185da8]/20"><option value="account">This account</option><option value="consolidated" disabled>All accounts (coming soon)</option></select></label>}
+          {hasLiveReport && <label className="text-xs font-semibold text-slate-500">Chart period<select aria-label="Select report chart period" value={reportPeriod} onChange={(event) => onSelectReportPeriod(event.target.value as ReportPeriod)} className="ml-2 h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm outline-none focus:border-[#185da8] focus:ring-2 focus:ring-[#185da8]/20">{reportPeriodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}
           <Button onClick={onUpload} className="h-11 rounded-xl bg-[#185da8] px-5 text-white hover:bg-[#154f8e]"><Upload size={17} />Preview a CSV</Button>
         </div>
       </div>
@@ -856,7 +869,7 @@ function Overview({
           <div className="flex items-start justify-between">
             <div>
               <p className="mb-3 text-sm font-semibold text-slate-300">
-                Example portfolio value
+                {showDemo ? "Example portfolio value" : `Portfolio value · ${reportPeriodDescription(reportPeriod)}`}
               </p>
               <h2 className="text-4xl font-semibold tracking-tight md:text-5xl">
                 {liveValue != null ? precise.format(Number(liveValue)) : showDemo ? fmt.format(summary.value) : "—"}
@@ -868,6 +881,7 @@ function Overview({
             </div>
             <Pill tone={hasLiveReport ? "green" : "gold"}>{hasLiveReport ? "Persisted" : "Synthetic"}</Pill>
           </div>
+          {hasLiveReport && <p className="mt-2 text-xs text-slate-300">The chart window changes with the selected period. Headline metrics use the latest stored report.</p>}
           <div className="mt-8 h-44">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData}>
