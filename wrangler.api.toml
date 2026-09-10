@@ -5,6 +5,12 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 APP_ENV = "development"
+MARKETSTACK_MONTHLY_CAP = "100"
 
-# Configure SUPABASE_URL and SUPABASE_ANON_KEY as Worker secrets for deployed
-# environments. Never put production secrets in this file or in browser code.
+[triggers]
+# Run hourly on weekdays; the application guard selects the first eligible
+# after-close run in New York time and skips weekends/holidays.
+crons = ["0 * * * 1-5"]
+
+# Configure SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and MARKETSTACK_API_KEY as
+# Worker secrets for deployed environments. Never put production secrets here.

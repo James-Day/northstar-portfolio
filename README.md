@@ -1,6 +1,6 @@
 # Northstar portfolio tracker
 
-Northstar is a US-focused portfolio-tracker prototype. It currently offers a clearly synthetic demo and an in-browser CSV preview only. It has no live account authentication, persistent storage, billing, brokerage connection, or market-price feed.
+Northstar is a US-focused portfolio-tracker prototype. It currently offers a clearly synthetic demo plus authenticated Robinhood CSV staging and review. Real reporting, billing, and production market-data operations remain gated behind the checklist.
 
 ## Local setup
 
@@ -20,4 +20,4 @@ The module boundaries are identity/billing, accounts, ingestion, ledger, calcula
 
 ## Marketstack during development
 
-Marketstack is not called by the application yet. The server-only adapter accepts a `MARKETSTACK_API_KEY` and a request-budget implementation; it queries the EOD endpoint once per unique symbol and normalizes close prices as decimal strings. Connect it to the scheduled job only after the price database and job persistence exist. For development, use a conservative cap below the official free-plan 100 monthly requests. Production configuration requires a commercial plan and rights review before any public release.
+The Worker’s scheduled handler now composes active-symbol discovery, the server-only Marketstack adapter, Supabase price persistence, retries, and durable job metrics. The hourly weekday cron is guarded by New York market-session rules. Configure `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `MARKETSTACK_API_KEY` as Worker secrets; keep `MARKETSTACK_MONTHLY_CAP` at or below the verified allowance (the local default is 100). Production configuration requires a commercial plan and rights review before any public release.
