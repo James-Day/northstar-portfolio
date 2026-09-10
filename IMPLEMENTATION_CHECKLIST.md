@@ -13,7 +13,7 @@ This file is the current implementation plan. Work through the numbered steps in
 - Keep commits large and coherent. Record meaningful milestone evidence rather than a log entry for every small UI change.
 - Never commit secrets. Configure credentials through local ignored environment files or the service's secret interface.
 
-**Current count: 102 tasks — 51 checked, 51 unchecked, across 13 ordered steps.**
+**Current count: 102 tasks — 52 checked, 50 unchecked, across 13 ordered steps.**
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -122,7 +122,7 @@ Owner: market data. Depends on instrument identity in step 06; licensing researc
 - [ ] **07.04** Record dataset version, actual license, attribution/share-alike requirements and upstream provenance evidence; resolve rights for intended paid storage/display before user-facing use. Do not treat spot checks as licensing clearance.
 - [x] **07.05** Add a runnable resumable seed job with durable cursor, instrument mapping, quarantine storage and operator review; execute a bounded seed and record rows/revision. Evidence: resumable DoltHub seed runner, durable job state/mappings/quarantine migration and repository boundary in commit `8b4bb54`.
 - [ ] **07.06** Independently verify representative stocks, ETFs, delisted names, ticker transitions and split boundaries; record expected/actual values and source evidence. Keep dividends sourced from brokerage activity.
-- [ ] **07.07** Prevent same-version price/correction overwrite; select authoritative revisions deterministically and track all source/correction dependencies needed to reproduce a report.
+- [x] **07.07** Prevent same-version price/correction overwrite; select authoritative revisions deterministically and track all source/correction dependencies needed to reproduce a report. Evidence: immutable revision triggers, fail-closed same-version conflict detection, explicit provider/correction precedence and report dependency payloads in commit `cb1a7d9`.
 - [ ] **07.08** Gate: repeat seed is safe, quarantined data cannot value portfolios, and representative stored prices are independently verified and traceable.
 
 ## 08 — Make daily pricing safe on the free development allowance
@@ -255,6 +255,7 @@ Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/sh
 | 2026-09-10 | 11.04 — Durable Stripe webhook handler | Commit `368c349`; verified raw events dispatch through recognized lifecycle handlers, preserve full payloads for replay/audit, resolve ownership from server-controlled customer mappings, and fail unresolved events for retry. Eight focused tests and typecheck passed. | Live Stripe/Supabase execution and staging webhook replay remain open. |
 | 2026-09-10 | 05.04/05.06 — Durable import queue and failure evidence | Commit `b77c092`; Cloudflare import jobs now claim and checkpoint processing through service-role RPCs, retry transient failures, persist poison/error evidence before acknowledgment, and expose safe replay primitives. Full validation: 79 test files / 274 tests and typecheck passed. | Live queue binding, Supabase migration execution and deployed import processing remain open. |
 | 2026-09-10 | 11.05 — Server-side entitlement enforcement | Commit `c7fe907`; billing access is evaluated at request time for report/freshness endpoints, trial expiry and failed/canceled states are denied, and authenticated billing status is shown in Settings. Focused API/billing tests and typecheck passed. | Live Stripe/Supabase entitlement updates, checkout lifecycle and hosted browser verification remain open. |
+| 2026-09-10 | 07.07 — Immutable deterministic price revisions | Commit `cb1a7d9`; same-version price/correction overwrites are rejected by database triggers, source precedence is deterministic, conflicts fail closed, and report snapshots retain selected price dependencies. Full validation: 79 test files / 282 tests and typecheck passed. | Live migration execution and production correction workflow remain open. |
 | 2026-09-10 | 05.03 — Verified private statement object binding | Commit `1c8f694`; authenticated object-binding verifies account ownership, private Storage access, 10 MB/byte-size limits and SHA-256 before persisting import metadata through an RLS-backed RPC. Focused tests (38) and typecheck passed. | Live Supabase Storage/RLS execution and queued import processing remain open. |
 | 2026-09-10 | 09.05 — Report outbox-to-queue wiring (partial) | Commit `ff69ddb`; scheduled transactional outbox dispatch claims report events, publishes typed jobs to `REPORT_QUEUE`, uses `waitUntil` for cron work, and retries safely. Queue tests (9) and typecheck passed. | Durable report input loaders, all import/undo/price-correction triggers, live queue bindings and end-to-end snapshot execution remain open. |
 
