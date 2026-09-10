@@ -12,5 +12,40 @@ MARKETSTACK_MONTHLY_CAP = "100"
 # after-close run in New York time and skips weekends/holidays.
 crons = ["0 * * * 1-5"]
 
+# Durable work queues are declared up front so imports and report publication
+# can move out of request time without changing the public API contract.
+[[queues.producers]]
+binding = "IMPORT_QUEUE"
+queue = "northstar-imports"
+
+[[queues.producers]]
+binding = "REPORT_QUEUE"
+queue = "northstar-reports"
+
+[[queues.producers]]
+binding = "PRICE_QUEUE"
+queue = "northstar-prices"
+
+[[queues.consumers]]
+queue = "northstar-imports"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 5
+dead_letter_queue = "northstar-imports-dlq"
+
+[[queues.consumers]]
+queue = "northstar-reports"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 5
+dead_letter_queue = "northstar-reports-dlq"
+
+[[queues.consumers]]
+queue = "northstar-prices"
+max_batch_size = 25
+max_batch_timeout = 30
+max_retries = 5
+dead_letter_queue = "northstar-prices-dlq"
+
 # Configure SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and MARKETSTACK_API_KEY as
 # Worker secrets for deployed environments. Never put production secrets here.
