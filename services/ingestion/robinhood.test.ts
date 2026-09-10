@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { parseRobinhoodActivityCsv } from '@/services/ingestion/robinhood';
 
 describe('parseRobinhoodActivityCsv', () => {
@@ -52,5 +53,18 @@ describe('parseRobinhoodActivityCsv', () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ status: 'supported', activity: { type: 'buy', symbol: 'VTI', amount: '-250' } });
+  });
+
+  it('parses the sanitized shape of the supplied Robinhood export and keeps SPL fail-closed', () => {
+    const csv = readFileSync(new URL('../../fixtures/robinhood/activity-sample.csv', import.meta.url), 'utf8');
+    const rows = parseRobinhoodActivityCsv(csv);
+
+    expect(rows).toHaveLength(4);
+    expect(rows.slice(0, 3)).toMatchObject([
+      { status: 'supported', activity: { type: 'dividend', symbol: 'COST', amount: '1.3' } },
+      { status: 'supported', activity: { type: 'buy', symbol: 'SCHG', quantity: '5', amount: '-138.38' } },
+      { status: 'supported', activity: { type: 'deposit', amount: '500' } },
+    ]);
+    expect(rows[3]).toMatchObject({ status: 'unsupported', message: expect.stringContaining('SPL') });
   });
 });

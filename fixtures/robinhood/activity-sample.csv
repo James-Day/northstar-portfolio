@@ -1,0 +1,6 @@
+"Activity Date","Process Date","Settle Date","Instrument","Description","Trans Code","Quantity","Price","Amount"
+"5/16/2025","5/16/2025","5/16/2025","COST","Cash Div: R/D 2025-05-02 P/D 2025-05-16 - 1 shares at 1.3","CDIV","","","$1.30"
+"5/16/2025","5/16/2025","5/19/2025","SCHG","Schwab US Large-Cap Growth ETF
+CUSIP: 808524300","Buy","5","$27.68","($138.38)"
+"5/16/2025","5/16/2025","5/16/2025","","ACH Deposit","ACH","","","$500.00"
+"10/11/2024","10/11/2024","10/11/2024","SCHD","CUSIP: 808524797","SPL","20","",""

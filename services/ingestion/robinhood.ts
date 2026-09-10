@@ -114,8 +114,8 @@ export function parseRobinhoodActivityCsv(csv: string): ParsedRobinhoodRow[] {
 
   return records.flatMap<ParsedRobinhoodRow>((raw, index) => {
     const rowNumber = index + 2;
-    if (Object.values(raw).every((value) => !value.trim())) return [];
-    const code = raw['trans code'].trim().toUpperCase();
+    if (Object.values(raw).every((value) => !String(value ?? '').trim())) return [];
+    const code = (raw['trans code'] ?? '').trim().toUpperCase();
     const type = transactionTypeFor(code, raw.description ?? '');
     if (!type) return [{ rowNumber, raw, status: 'unsupported', message: `Unsupported Robinhood transaction code: ${raw['trans code'] || '(blank)'}.` }];
     try {
