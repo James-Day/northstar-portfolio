@@ -13,7 +13,16 @@ import { SupabasePriceFreshnessReportRepository } from '@/services/supabase/pric
 import { SupabaseReportSnapshotReader, type ReportSnapshot } from '@/services/supabase/report-snapshot-reader';
 import { SupabaseSignedUploadRepository, type SignedUploadRepository } from '@/services/supabase/signed-upload-repository';
 import { SupabaseActivityRepository, type ActivityPage } from '@/services/supabase/activity-repository';
-import { StripeSignatureError, verifyStripeWebhook, type StripeBillingHttpDependencies } from '@/services/billing/stripe-http';
+import {
+  BillingConfigurationError,
+  StripeSignatureError,
+  buildBillingReturnUrl,
+  resolveBillingPriceId,
+  validateStripeSessionUrl,
+  verifyStripeWebhook,
+  type BillingPlan,
+  type StripeBillingHttpDependencies,
+} from '@/services/billing/stripe-http';
 
 export type ApiBindings = {
   APP_ENV?: 'development' | 'staging' | 'production';
@@ -24,6 +33,8 @@ export type ApiBindings = {
   MARKETSTACK_API_KEY?: string;
   MARKETSTACK_MONTHLY_CAP?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_MONTHLY_PRICE_ID?: string;
+  STRIPE_ANNUAL_PRICE_ID?: string;
 };
 
 export type ApiDependencies = {
@@ -83,6 +94,46 @@ export function createApi(dependencies: ApiDependencies = {}) {
       return context.json({ received: true });
     } catch (error) {
       if (error instanceof StripeSignatureError) return context.json({ error: 'invalid_webhook' }, 400);
+      throw error;
+    }
+  });
+
+  api.post('/v1/billing/checkout', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    if (!billing) return context.json({ error: 'billing_unavailable' }, 503);
+    const body = await context.req.json().catch(() => null) as { plan?: unknown } | null;
+    if (!body || (body.plan !== 'monthly' && body.plan !== 'annual')) return context.json({ error: 'invalid_plan' }, 400);
+    try {
+      const plan = body.plan as BillingPlan;
+      const priceId = resolveBillingPriceId(plan, { monthly: context.env.STRIPE_MONTHLY_PRICE_ID, annual: context.env.STRIPE_ANNUAL_PRICE_ID });
+      const result = await billing.createCheckoutSession({
+        userId: authenticated.user.id,
+        accessToken: authenticated.accessToken,
+        priceId,
+        successUrl: buildBillingReturnUrl(context.env.APP_ORIGIN, '/dashboard?billing=success'),
+        cancelUrl: buildBillingReturnUrl(context.env.APP_ORIGIN, '/dashboard?billing=cancelled'),
+      });
+      return context.json({ url: validateStripeSessionUrl(result.url) });
+    } catch (error) {
+      if (error instanceof BillingConfigurationError) return context.json({ error: 'billing_unavailable' }, 503);
+      throw error;
+    }
+  });
+
+  api.post('/v1/billing/portal', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    if (!billing) return context.json({ error: 'billing_unavailable' }, 503);
+    try {
+      const result = await billing.createBillingPortalSession({
+        userId: authenticated.user.id,
+        accessToken: authenticated.accessToken,
+        returnUrl: buildBillingReturnUrl(context.env.APP_ORIGIN, '/dashboard?billing=cancelled'),
+      });
+      return context.json({ url: validateStripeSessionUrl(result.url) });
+    } catch (error) {
+      if (error instanceof BillingConfigurationError) return context.json({ error: 'billing_unavailable' }, 503);
       throw error;
     }
   });

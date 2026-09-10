@@ -71,6 +71,56 @@ export type StripeBillingHttpDependencies = {
   handleVerifiedWebhook(event: VerifiedStripeEvent): Promise<void>;
 };
 
+export type BillingPlan = 'monthly' | 'annual';
+
+export class BillingConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BillingConfigurationError';
+  }
+}
+
+/**
+ * Resolve a server-configured price. Clients send a plan name so they cannot
+ * choose an arbitrary Stripe price or alter the amount charged.
+ */
+export function resolveBillingPriceId(plan: BillingPlan, prices: { monthly?: string; annual?: string }): string {
+  const priceId = prices[plan]?.trim();
+  if (!priceId || !/^price_[A-Za-z0-9]+$/.test(priceId)) {
+    throw new BillingConfigurationError(`Stripe ${plan} price is not configured.`);
+  }
+  return priceId;
+}
+
+/** Build a same-origin return URL from a trusted server origin and fixed path. */
+export function buildBillingReturnUrl(appOrigin: string | undefined, path: '/dashboard?billing=success' | '/dashboard?billing=cancelled'): string {
+  const value = appOrigin?.trim() || 'http://localhost:3000';
+  let origin: URL;
+  try {
+    origin = new URL(value);
+  } catch {
+    throw new BillingConfigurationError('APP_ORIGIN must be an absolute HTTP(S) URL.');
+  }
+  if (!['http:', 'https:'].includes(origin.protocol) || origin.username || origin.password || origin.search || origin.hash) {
+    throw new BillingConfigurationError('APP_ORIGIN must be a clean HTTP(S) origin.');
+  }
+  return new URL(path, origin).toString();
+}
+
+/** Stripe should only return a navigable HTTPS URL to the browser. */
+export function validateStripeSessionUrl(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new BillingConfigurationError('Stripe returned an invalid session URL.');
+  }
+  if (url.protocol !== 'https:' || url.username || url.password) {
+    throw new BillingConfigurationError('Stripe returned an unsafe session URL.');
+  }
+  return url.toString();
+}
+
 function parseSignatureHeader(value: string | null | undefined): { timestamp: number; signatures: string[] } {
   if (!value) throw new StripeSignatureError('Stripe signature header is missing.');
   let timestamp: number | undefined;

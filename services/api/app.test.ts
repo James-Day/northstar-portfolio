@@ -26,6 +26,63 @@ describe('standalone API', () => {
     expect(invoked).toBe(false);
   });
 
+  it('creates an authenticated checkout session from a server-selected price', async () => {
+    const calls: unknown[] = [];
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123' }),
+      billing: {
+        createCheckoutSession: async (input) => { calls.push(input); return { url: 'https://checkout.stripe.com/c/pay/cs_test' }; },
+        createBillingPortalSession: async () => ({ url: 'https://billing.stripe.com/p/session_test' }),
+        handleVerifiedWebhook: async () => undefined,
+      },
+    });
+    const response = await app.request('http://api.test/v1/billing/checkout', {
+      method: 'POST',
+      headers: { authorization: 'Bearer session-token', 'content-type': 'application/json' },
+      body: JSON.stringify({ plan: 'monthly', priceId: 'price_attacker_value' }),
+    }, { APP_ORIGIN: 'https://app.example.com', STRIPE_MONTHLY_PRICE_ID: 'price_monthlytest' });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ url: 'https://checkout.stripe.com/c/pay/cs_test' });
+    expect(calls).toEqual([{
+      userId: 'user-123',
+      accessToken: 'session-token',
+      priceId: 'price_monthlytest',
+      successUrl: 'https://app.example.com/dashboard?billing=success',
+      cancelUrl: 'https://app.example.com/dashboard?billing=cancelled',
+    }]);
+  });
+
+  it('creates an authenticated billing portal session using the same app origin', async () => {
+    let received: unknown;
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123' }),
+      billing: {
+        createCheckoutSession: async () => ({ url: 'https://checkout.stripe.com/c/pay/cs_test' }),
+        createBillingPortalSession: async (input) => { received = input; return { url: 'https://billing.stripe.com/p/session_test' }; },
+        handleVerifiedWebhook: async () => undefined,
+      },
+    });
+    const response = await app.request('http://api.test/v1/billing/portal', { method: 'POST', headers: { authorization: 'Bearer session-token' } }, { APP_ORIGIN: 'https://app.example.com' });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ url: 'https://billing.stripe.com/p/session_test' });
+    expect(received).toEqual({ userId: 'user-123', accessToken: 'session-token', returnUrl: 'https://app.example.com/dashboard?billing=cancelled' });
+  });
+
+  it('rejects invalid plans, missing configured prices and unsafe session URLs', async () => {
+    const billing = {
+      createCheckoutSession: async () => ({ url: 'http://unsafe.example.test/session' }),
+      createBillingPortalSession: async () => ({ url: 'https://billing.stripe.com/p/session_test' }),
+      handleVerifiedWebhook: async () => undefined,
+    };
+    const app = createApi({ verifySession: async () => ({ id: 'user-123' }), billing });
+    const invalidPlan = await app.request('http://api.test/v1/billing/checkout', { method: 'POST', headers: { authorization: 'Bearer token', 'content-type': 'application/json' }, body: JSON.stringify({ plan: 'weekly' }) }, { STRIPE_MONTHLY_PRICE_ID: 'price_monthlytest' });
+    expect(invalidPlan.status).toBe(400);
+    const missingPrice = await app.request('http://api.test/v1/billing/checkout', { method: 'POST', headers: { authorization: 'Bearer token', 'content-type': 'application/json' }, body: JSON.stringify({ plan: 'annual' }) }, { STRIPE_MONTHLY_PRICE_ID: 'price_monthlytest' });
+    expect(missingPrice.status).toBe(503);
+    const unsafeUrl = await app.request('http://api.test/v1/billing/checkout', { method: 'POST', headers: { authorization: 'Bearer token', 'content-type': 'application/json' }, body: JSON.stringify({ plan: 'monthly' }) }, { STRIPE_MONTHLY_PRICE_ID: 'price_monthlytest' });
+    expect(unsafeUrl.status).toBe(503);
+  });
+
   it('serves a deployment-safe health response without exposing bindings', async () => {
     const app = createApi();
     const response = await app.request('http://api.test/health', undefined, {
