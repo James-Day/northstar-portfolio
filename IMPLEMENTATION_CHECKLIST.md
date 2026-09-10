@@ -13,7 +13,7 @@ This file is the current implementation plan. Work through the numbered steps in
 - Keep commits large and coherent. Record meaningful milestone evidence rather than a log entry for every small UI change.
 - Never commit secrets. Configure credentials through local ignored environment files or the service's secret interface.
 
-**Current count: 102 tasks — 47 checked, 55 unchecked, across 13 ordered steps.**
+**Current count: 102 tasks — 48 checked, 54 unchecked, across 13 ordered steps.**
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -173,7 +173,7 @@ Owner: billing. Depends on usable reports in step 09; retain planned $5 monthly/
 - [x] **11.01** Pure first-usable-import 14-day no-card trial and duplicate-event entitlement reducers exist. Evidence: `services/billing/entitlements.ts`.
 - [x] **11.02** Persist one-time trial start atomically after the first usable committed import. The commit trigger and security-definer RPC create the trial once; retries, undo or another account cannot restart an existing trial.
 - [ ] **11.03** Configure Stripe test products/prices, Checkout and Billing Portal endpoints with authenticated customer ownership.
-- [ ] **11.04** Verify webhook signatures on raw bodies and persist replay/event-order protection. Current reducer only deduplicates IDs; out-of-order subscription events can overwrite newer state.
+- [x] **11.04** Verify webhook signatures on raw bodies and persist replay/event-order protection. Evidence: raw-body HMAC verification, strict event validation, durable payload/audit handling, server-controlled customer ownership lookup, and lifecycle handler dispatch in commit `368c349`.
 - [ ] **11.05** Enforce entitlement server-side; implement expiration, payment failures, plan changes/cancellation and truthful billing/trial UI.
 - [ ] **11.06** Gate: Stripe test lifecycle and invalid/duplicate/reordered webhook tests pass; export/deletion remain accessible after cancellation.
 
@@ -252,6 +252,7 @@ Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/sh
 | 2026-09-10 | 10.05 — Portfolio detail metrics (partial) | Commit `0efe479`; report/dashboard payloads now expose net deposits, invested value, allocation percentages, explicit incomplete valuation states and FIFO realized-lot detail. Seven focused tests and typecheck passed. | Consolidated snapshots, dividend detail presentation and live authenticated browser verification remain open. |
 | 2026-09-10 | 09.06 — Consolidated report composition | Commit `01afe90`; consolidated inputs cancel only proven linked internal transfers, preserve external flows/incentives for return calculations, retain unresolved links, and carry incomplete valuation/unknown-basis states. Eight focused tests and typecheck passed. | Live Supabase execution, snapshot publication and end-to-end authenticated verification remain open. |
 | 2026-09-10 | 07.05 — Resumable historical seed job | Commit `8b4bb54`; DoltHub seed processing now persists a cursor only after idempotent price/quarantine writes, records symbol mappings and source revisions, and supports bounded restart/retry. Focused tests and typecheck passed. | No bounded live DoltHub/Supabase seed has been executed; licensing and operator review remain open. |
+| 2026-09-10 | 11.04 — Durable Stripe webhook handler | Commit `368c349`; verified raw events dispatch through recognized lifecycle handlers, preserve full payloads for replay/audit, resolve ownership from server-controlled customer mappings, and fail unresolved events for retry. Eight focused tests and typecheck passed. | Live Stripe/Supabase execution and staging webhook replay remain open. |
 | 2026-09-10 | 05.03 — Verified private statement object binding | Commit `1c8f694`; authenticated object-binding verifies account ownership, private Storage access, 10 MB/byte-size limits and SHA-256 before persisting import metadata through an RLS-backed RPC. Focused tests (38) and typecheck passed. | Live Supabase Storage/RLS execution and queued import processing remain open. |
 | 2026-09-10 | 09.05 — Report outbox-to-queue wiring (partial) | Commit `ff69ddb`; scheduled transactional outbox dispatch claims report events, publishes typed jobs to `REPORT_QUEUE`, uses `waitUntil` for cron work, and retries safely. Queue tests (9) and typecheck passed. | Durable report input loaders, all import/undo/price-correction triggers, live queue bindings and end-to-end snapshot execution remain open. |
 
