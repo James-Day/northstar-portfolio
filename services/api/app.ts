@@ -11,6 +11,7 @@ import { ImportOperationRejectedError, SupabaseImportsRepository, type ImportsRe
 import type { PriceFreshnessReportRepository } from '@/services/reporting/price-freshness';
 import { SupabasePriceFreshnessReportRepository } from '@/services/supabase/price-freshness-report-repository';
 import { SupabaseReportSnapshotReader, type ReportSnapshot } from '@/services/supabase/report-snapshot-reader';
+import { SupabaseSignedUploadRepository, type SignedUploadRepository } from '@/services/supabase/signed-upload-repository';
 
 export type ApiBindings = {
   APP_ENV?: 'development' | 'staging' | 'production';
@@ -28,6 +29,7 @@ export type ApiDependencies = {
   importsRepository?: ImportsRepository;
   priceFreshnessRepository?: PriceFreshnessReportRepository;
   reportSnapshotReader?: { getLatest(accountId: string, accessToken: string): Promise<ReportSnapshot | undefined> };
+  signedUploadRepository?: SignedUploadRepository;
 };
 
 export function createApi(dependencies: ApiDependencies = {}) {
@@ -41,6 +43,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
   const importsRepository = dependencies.importsRepository;
   const priceFreshnessRepository = dependencies.priceFreshnessRepository;
   const reportSnapshotReader = dependencies.reportSnapshotReader;
+  const signedUploadRepository = dependencies.signedUploadRepository;
 
   api.use('*', async (context, next) => {
     const origin = context.req.header('origin');
@@ -126,6 +129,17 @@ export function createApi(dependencies: ApiDependencies = {}) {
     const imports = importsRepository ?? createImportsRepository(context.env);
     const duplicateFile = await imports.hasFileHash(accountId, authenticated.accessToken, staged.fileSha256);
     return context.json({ import: { ...staged, duplicateFile } });
+  });
+
+  api.post('/v1/accounts/:accountId/upload-url', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    const body = await context.req.json().catch(() => null) as { fileName?: unknown } | null;
+    if (!body || typeof body.fileName !== 'string') return context.json({ error: 'file_name_required' }, 400);
+    const repository = signedUploadRepository ?? createSignedUploadRepository(context.env);
+    const upload = await repository.create(authenticated.user.id, authenticated.accessToken, context.req.param('accountId'), body.fileName);
+    if (!upload) return context.json({ error: 'not_found' }, 404);
+    return context.json({ upload }, 201);
   });
 
   api.post('/v1/accounts/:accountId/imports', async (context) => {
@@ -245,6 +259,15 @@ function createPriceFreshnessRepository(bindings: ApiBindings): PriceFreshnessRe
 function createReportSnapshotReader(bindings: ApiBindings) {
   if (!bindings.SUPABASE_URL || !bindings.SUPABASE_ANON_KEY) return undefined;
   return new SupabaseReportSnapshotReader({ supabaseUrl: bindings.SUPABASE_URL, anonKey: bindings.SUPABASE_ANON_KEY });
+}
+
+function createSignedUploadRepository(bindings: ApiBindings): SignedUploadRepository {
+  if (!bindings.SUPABASE_URL || !bindings.SUPABASE_ANON_KEY) throw new SessionConfigurationError();
+  return new SupabaseSignedUploadRepository({
+    supabaseUrl: bindings.SUPABASE_URL,
+    supabaseAnonKey: bindings.SUPABASE_ANON_KEY,
+    accounts: new SupabaseAccountsRepository({ supabaseUrl: bindings.SUPABASE_URL, supabaseAnonKey: bindings.SUPABASE_ANON_KEY }),
+  });
 }
 
 function readBearerToken(request: Request): string | undefined {

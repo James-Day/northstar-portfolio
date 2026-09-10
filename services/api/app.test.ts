@@ -301,4 +301,15 @@ describe('standalone API', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ import: { id: 'import-123' }, sourceRows: [{ status: 'supported' }] });
   });
+
+  it('creates a signed upload URL only for the authenticated account', async () => {
+    const create = async (userId: string, token: string, accountId: string, fileName: string) => {
+      expect([userId, token, accountId, fileName]).toEqual(['user-123', 'session-token', 'account-123', 'activity.csv']);
+      return { bucket: 'brokerage-statements' as const, path: 'user-123/account-123/upload.csv', token: 'upload-token', signedUrl: 'https://storage.test/upload' };
+    };
+    const app = createApi({ verifySession: async () => ({ id: 'user-123' }), signedUploadRepository: { create } });
+    const response = await app.request('http://api.test/v1/accounts/account-123/upload-url', { method: 'POST', headers: { authorization: 'Bearer session-token', 'content-type': 'application/json' }, body: JSON.stringify({ fileName: 'activity.csv' }) });
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ upload: { bucket: 'brokerage-statements', path: 'user-123/account-123/upload.csv', token: 'upload-token', signedUrl: 'https://storage.test/upload' } });
+  });
 });
