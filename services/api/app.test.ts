@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createApi } from '@/services/api/app';
 import { ImportOperationRejectedError } from '@/services/supabase/imports-repository';
+import { parseOpeningHistory } from '@/services/accounts/opening-history';
 
 describe('standalone API', () => {
   it('accepts a signed Stripe webhook using the untouched request body and injects processing', async () => {
@@ -252,6 +253,27 @@ describe('standalone API', () => {
 
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toMatchObject({ account: { id: 'account-123', accountType: 'roth_ira' } });
+  });
+
+  it('reads and saves owned opening history through the authenticated API', async () => {
+    const account = { id: 'account-123', userId: 'user-123', brokerage: 'robinhood' as const, accountType: 'individual' as const, name: 'Taxable', currency: 'USD' as const, activityCoveredThrough: null, createdAt: '2026-09-09T00:00:00.000Z' };
+    let saved: unknown;
+    const history = parseOpeningHistory({ openingCash: '125.5', activityCoveredFrom: null, incompleteReason: 'History begins after account opening.', positions: [{ instrumentId: 'vti', quantity: '2.5', acquiredOn: null, totalCostBasis: null }] });
+    const app = createApi({ verifySession: async () => ({ id: 'user-123' }), accountsRepository: { list: async () => [], get: async () => account, create: async () => account }, openingHistoryRepository: { get: async (accountId, userId, token) => { expect([accountId, userId, token]).toEqual([account.id, 'user-123', 'session-token']); return history; }, save: async (accountId, userId, token, value) => { expect([accountId, userId, token]).toEqual([account.id, 'user-123', 'session-token']); saved = value; return value; } } });
+    const headers = { authorization: 'Bearer session-token', 'content-type': 'application/json' };
+    const read = await app.request(`http://api.test/v1/accounts/${account.id}/opening-history`, { headers });
+    expect(read.status).toBe(200);
+    await expect(read.json()).resolves.toEqual({ history });
+    const write = await app.request(`http://api.test/v1/accounts/${account.id}/opening-history`, { method: 'PUT', headers, body: JSON.stringify(history) });
+    expect(write.status).toBe(200);
+    expect(saved).toEqual(history);
+  });
+
+  it('rejects incomplete opening history without an explanation', async () => {
+    const account = { id: 'account-123', userId: 'user-123', brokerage: 'robinhood' as const, accountType: 'individual' as const, name: 'Taxable', currency: 'USD' as const, activityCoveredThrough: null, createdAt: '2026-09-09T00:00:00.000Z' };
+    const app = createApi({ verifySession: async () => ({ id: 'user-123' }), accountsRepository: { list: async () => [], get: async () => account, create: async () => account }, openingHistoryRepository: { get: async () => undefined, save: async () => { throw new Error('must not save'); } } });
+    const response = await app.request(`http://api.test/v1/accounts/${account.id}/opening-history`, { method: 'PUT', headers: { authorization: 'Bearer session-token', 'content-type': 'application/json' }, body: JSON.stringify({ openingCash: '0', activityCoveredFrom: null, incompleteReason: null, positions: [{ instrumentId: 'vti', quantity: '1', acquiredOn: null, totalCostBasis: null }] }) });
+    expect(response.status).toBe(400);
   });
 
   it('parses a CSV only after the verified user owns the selected account, then checks its hash', async () => {

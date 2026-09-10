@@ -47,6 +47,7 @@ import { createPublicSupabaseClient } from "@/services/supabase/client";
 import type { AccountActivity, ActivityPage } from "@/services/supabase/activity-repository";
 import { filterReportHistory, reportPeriodDescription, reportPeriodOptions, type ReportPeriod } from "@/services/reporting/period-filter";
 import { SettingsPanel } from "@/components/settings-panel";
+import type { OpeningHistory } from "@/services/accounts/opening-history";
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
 type PublicApiConfig = { baseUrl: string };
@@ -57,6 +58,7 @@ type LiveAccount = {
   brokerage: "robinhood";
   created_at: string;
 };
+type LiveOpeningHistory = OpeningHistory;
 type LiveImportPreview = {
   accountId: string;
   duplicateFile: boolean;
@@ -165,6 +167,8 @@ export function PortfolioApp({
   const [accountsError, setAccountsError] = useState<string>();
   const [accountsRequestVersion, setAccountsRequestVersion] = useState(0);
   const [selectedAccountId, setSelectedAccountId] = useState<string>();
+  const [openingHistory, setOpeningHistory] = useState<LiveOpeningHistory>();
+  const [openingHistoryLoading, setOpeningHistoryLoading] = useState(false);
   const [livePreview, setLivePreview] = useState<LiveImportPreview>();
   const [stagedCsv, setStagedCsv] = useState<string>();
   const [isStagingImport, setIsStagingImport] = useState(false);
@@ -246,6 +250,30 @@ export function PortfolioApp({
     )
       setSelectedAccountId(accounts[0]?.id);
   }, [accounts, selectedAccountId]);
+
+  useEffect(() => {
+    if (!client || !apiConfig || !userId || !selectedAccountId) { setOpeningHistory(undefined); return; }
+    let active = true;
+    setOpeningHistoryLoading(true);
+    void client.auth.getSession().then(async ({ data }) => {
+      if (!data.session?.access_token) return;
+      const response = await fetch(`${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/opening-history`, { headers: { authorization: `Bearer ${data.session.access_token}` } });
+      const payload: unknown = await response.json();
+      if (!response.ok) throw new Error('Opening history is unavailable.');
+      if (active && payload && typeof payload === 'object' && 'history' in payload) setOpeningHistory((payload as { history: LiveOpeningHistory | null }).history ?? undefined);
+    }).catch(() => { if (active) setOpeningHistory(undefined); }).finally(() => { if (active) setOpeningHistoryLoading(false); });
+    return () => { active = false; };
+  }, [apiConfig, client, selectedAccountId, userId]);
+
+  async function saveOpeningHistory(history: OpeningHistory) {
+    if (!client || !apiConfig || !selectedAccountId) throw new Error('Select an account first.');
+    const { data } = await client.auth.getSession();
+    if (!data.session?.access_token) throw new Error('Your sign-in session has expired.');
+    const response = await fetch(`${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/opening-history`, { method: 'PUT', headers: { authorization: `Bearer ${data.session.access_token}`, 'content-type': 'application/json' }, body: JSON.stringify(history) });
+    const payload: unknown = await response.json();
+    if (!response.ok || !payload || typeof payload !== 'object' || !('history' in payload)) throw new Error(payload && typeof payload === 'object' && 'error' in payload ? String(payload.error) : 'Opening history could not be saved.');
+    setOpeningHistory((payload as { history: LiveOpeningHistory }).history);
+  }
 
   useEffect(() => {
     if (!client || !apiConfig || !userId || !selectedAccountId) {
@@ -776,6 +804,10 @@ export function PortfolioApp({
               onRetry={() => setAccountsRequestVersion((value) => value + 1)}
               canCreate={Boolean(client && userId)}
               onCreate={createAccount}
+              selectedAccountId={selectedAccountId}
+              openingHistory={openingHistory}
+              openingHistoryLoading={openingHistoryLoading}
+              onSaveOpeningHistory={saveOpeningHistory}
             />
           )}
           {active === "Documents" && (
@@ -1231,6 +1263,10 @@ function Accounts({
   onRetry,
   canCreate,
   onCreate,
+  selectedAccountId,
+  openingHistory,
+  openingHistoryLoading,
+  onSaveOpeningHistory,
 }: {
   summary: ReturnType<typeof calculateSummary>;
   accounts: LiveAccount[];
@@ -1242,6 +1278,10 @@ function Accounts({
     name: string;
     accountType: LiveAccount["account_type"];
   }) => Promise<void>;
+  selectedAccountId?: string;
+  openingHistory?: OpeningHistory;
+  openingHistoryLoading: boolean;
+  onSaveOpeningHistory: (history: OpeningHistory) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -1347,6 +1387,7 @@ function Accounts({
           </div>
         </section>
       ) : (
+        <>
         <section className="space-y-3">
           {accounts.map((account) => (
             <article
@@ -1368,6 +1409,8 @@ function Accounts({
             </article>
           ))}
         </section>
+        {selectedAccountId && <OpeningHistoryEditor history={openingHistory} loading={openingHistoryLoading} onSave={onSaveOpeningHistory} />}
+        </>
       )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="rounded-3xl bg-white p-6 md:p-8">
@@ -1430,6 +1473,19 @@ function Accounts({
       </Dialog>
     </>
   );
+}
+
+function OpeningHistoryEditor({ history, loading, onSave }: { history?: OpeningHistory; loading: boolean; onSave: (history: OpeningHistory) => Promise<void> }) {
+  const [cash, setCash] = useState(history?.openingCash ?? '0');
+  const [coveredFrom, setCoveredFrom] = useState(history?.activityCoveredFrom ?? '');
+  const [reason, setReason] = useState(history?.incompleteReason ?? '');
+  const [positions, setPositions] = useState(JSON.stringify(history?.positions ?? [], null, 2));
+  const [message, setMessage] = useState<string>();
+  useEffect(() => { setCash(history?.openingCash ?? '0'); setCoveredFrom(history?.activityCoveredFrom ?? ''); setReason(history?.incompleteReason ?? ''); setPositions(JSON.stringify(history?.positions ?? [], null, 2)); }, [history]);
+  async function submit() {
+    try { setMessage(undefined); const parsed = JSON.parse(positions); await onSave({ openingCash: cash as OpeningHistory['openingCash'], activityCoveredFrom: coveredFrom ? coveredFrom as OpeningHistory['activityCoveredFrom'] : null, incompleteReason: reason || null, positions: parsed }); setMessage('Opening history saved.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Opening history could not be saved.'); }
+  }
+  return <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-3"><div><Pill tone="slate">Incomplete history</Pill><h2 className="mt-3 text-xl font-bold">Opening balances and lots</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Record what your first statement does not include. Leave acquisition dates or basis null when unknown and explain the gap.</p></div><Button type="button" disabled={loading} onClick={submit} className="rounded-xl bg-[#185da8] text-white">Save opening history</Button></div><div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold text-slate-700">Opening cash<input value={cash} onChange={(event) => setCash(event.target.value)} inputMode="decimal" className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3 font-normal" /></label><label className="text-sm font-semibold text-slate-700">Activity covered from<input type="date" value={coveredFrom} onChange={(event) => setCoveredFrom(event.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3 font-normal" /></label></div><label className="mt-4 block text-sm font-semibold text-slate-700">Incomplete-history explanation<textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={2} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 font-normal" placeholder="Example: imported history begins after account opening." /></label><label className="mt-4 block text-sm font-semibold text-slate-700">Opening lots (JSON)<textarea value={positions} onChange={(event) => setPositions(event.target.value)} rows={6} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs font-normal" aria-describedby="opening-lots-help" /><span id="opening-lots-help" className="mt-1 block text-xs font-normal text-slate-500">Each item uses instrumentId, quantity, acquiredOn, and totalCostBasis. Use null for unknown date or basis.</span></label>{message && <p role="status" className="mt-3 text-sm text-slate-600">{message}</p>}</section>;
 }
 
 function accountTypeLabel(accountType: LiveAccount["account_type"]) {

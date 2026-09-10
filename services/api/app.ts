@@ -5,6 +5,9 @@ import {
   verifySupabaseSession,
 } from '@/services/auth/server-session';
 import { validateCreatePortfolioAccount, type AccountsRepository } from '@/services/accounts/accounts';
+import { parseOpeningHistory } from '@/services/accounts/opening-history';
+import type { OpeningHistoryRepository } from '@/services/accounts/opening-history-repository';
+import { SupabaseOpeningHistoryRepository } from '@/services/supabase/opening-history-repository';
 import { SupabaseAccountsRepository } from '@/services/supabase/accounts-repository';
 import { stageRobinhoodImport, toPersistableImportStage } from '@/services/ingestion/staging';
 import { ImportOperationRejectedError, SupabaseImportsRepository, type ImportsRepository } from '@/services/supabase/imports-repository';
@@ -49,6 +52,7 @@ export type ApiDependencies = {
   reportSnapshotReader?: { getLatest(accountId: string, accessToken: string): Promise<ReportSnapshot | undefined> };
   signedUploadRepository?: SignedUploadRepository;
   activityRepository?: { list(accountId: string, accessToken: string, input?: { limit?: number; offset?: number }): Promise<ActivityPage> };
+  openingHistoryRepository?: OpeningHistoryRepository;
   deletionRequestRepository?: { request(userId: string, accessToken: string): Promise<{ id: string; status: string; requestedAt: string }> };
   billing?: StripeBillingHttpDependencies;
 };
@@ -66,6 +70,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
   const reportSnapshotReader = dependencies.reportSnapshotReader;
   const signedUploadRepository = dependencies.signedUploadRepository;
   const activityRepository = dependencies.activityRepository;
+  const openingHistoryRepository = dependencies.openingHistoryRepository;
   const deletionRequestRepository = dependencies.deletionRequestRepository;
   const billing = dependencies.billing;
 
@@ -77,7 +82,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
       context.header('access-control-allow-origin', origin);
       context.header('vary', 'Origin');
       context.header('access-control-allow-headers', 'authorization,content-type,x-file-name');
-      context.header('access-control-allow-methods', 'GET,POST,OPTIONS');
+      context.header('access-control-allow-methods', 'GET,POST,PUT,OPTIONS');
     }
     if (context.req.method === 'OPTIONS') return context.body(null, 204);
     await next();
@@ -179,6 +184,29 @@ export function createApi(dependencies: ApiDependencies = {}) {
     const repository = accountsRepository ?? createAccountsRepository(context.env);
     const account = await repository.create(authenticated.user.id, authenticated.accessToken, input);
     return context.json({ account }, 201);
+  });
+
+  api.get('/v1/accounts/:accountId/opening-history', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    const accountId = context.req.param('accountId');
+    const accounts = accountsRepository ?? createAccountsRepository(context.env);
+    if (!await accounts.get(authenticated.user.id, authenticated.accessToken, accountId)) return context.json({ error: 'not_found' }, 404);
+    const repository = openingHistoryRepository ?? createOpeningHistoryRepository(context.env);
+    const history = await repository.get(accountId, authenticated.user.id, authenticated.accessToken);
+    return context.json({ history: history ?? null });
+  });
+
+  api.put('/v1/accounts/:accountId/opening-history', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    const accountId = context.req.param('accountId');
+    const accounts = accountsRepository ?? createAccountsRepository(context.env);
+    if (!await accounts.get(authenticated.user.id, authenticated.accessToken, accountId)) return context.json({ error: 'not_found' }, 404);
+    let history;
+    try { history = parseOpeningHistory(await context.req.json()); } catch (error) { return context.json({ error: error instanceof Error ? error.message : 'invalid_opening_history' }, 400); }
+    const repository = openingHistoryRepository ?? createOpeningHistoryRepository(context.env);
+    return context.json({ history: await repository.save(accountId, authenticated.user.id, authenticated.accessToken, history) });
   });
 
   api.get('/v1/accounts/:accountId/price-freshness', async (context) => {
@@ -452,6 +480,11 @@ function createSignedUploadRepository(bindings: ApiBindings): SignedUploadReposi
 function createActivityRepository(bindings: ApiBindings) {
   if (!bindings.SUPABASE_URL || !bindings.SUPABASE_ANON_KEY) throw new SessionConfigurationError();
   return new SupabaseActivityRepository({ supabaseUrl: bindings.SUPABASE_URL, anonKey: bindings.SUPABASE_ANON_KEY });
+}
+
+function createOpeningHistoryRepository(bindings: ApiBindings): OpeningHistoryRepository {
+  if (!bindings.SUPABASE_URL || !bindings.SUPABASE_ANON_KEY) throw new SessionConfigurationError();
+  return new SupabaseOpeningHistoryRepository({ supabaseUrl: bindings.SUPABASE_URL, supabaseAnonKey: bindings.SUPABASE_ANON_KEY });
 }
 
 function parseIntegerQuery(value: string | undefined): number | undefined {
