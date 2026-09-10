@@ -40,7 +40,11 @@ function boundedInteger(value: number | undefined, fallback: number, maximum: nu
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  const message = error instanceof Error ? error.message : String(error);
+  return message
+    .replace(/https?:\/\/[^\s]+/gi, '[redacted-url]')
+    .replace(/(authorization|token|secret|api[-_]?key)\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
+    .slice(0, 1000);
 }
 
 /**

@@ -42,4 +42,14 @@ describe('raw file retention executor', () => {
     expect(repository.markDeleted).not.toHaveBeenCalled();
     expect(repository.markFailure).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ error: 'Private object still exists after deletion.' }));
   });
+
+  it('redacts URLs and credential-shaped values from durable failure evidence', async () => {
+    const repository = repo([candidate('6')]);
+    const storage = { delete: vi.fn().mockRejectedValue(new Error('request https://storage.test/object?token=abc authorization: Bearer-secret')), verifyDeleted: vi.fn() };
+    await runRawFileRetention({ repository, storage });
+    const error = repository.markFailure.mock.calls[0][1].error;
+    expect(error).toContain('[redacted-url]');
+    expect(error).toContain('authorization=[redacted]');
+    expect(error).not.toContain('abc');
+  });
 });
