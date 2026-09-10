@@ -1,340 +1,220 @@
 # Portfolio tracker implementation checklist
 
-Last audited: September 9, 2026.
+Last audited: September 10, 2026. Source baseline: `60ba90a`.
 
-This is the source of truth for implementation progress. `[x]` means the specific deliverable exists; `[ ]` means it still requires implementation or verification. A visual screen does not count as its backend being complete. Complete work in the numbered order below. On completion, record the date, commit, and relevant verification in the completion log.
+## How to use this checklist
 
-## Current state
+This file is the current implementation plan. Work through the numbered steps in order, taking the first unchecked task within each step. Check off only the exact deliverable described. Each step ends with a separate acceptance gate: working building blocks do not imply an integrated feature is complete.
 
-The application is a privately deployed visual prototype. It is not ready for real financial reporting or paying customers. Earlier descriptions of a completed MVP overstated the implementation.
+- `[x]` = implementation exists and has supporting code/test evidence for the stated scope.
+- `[ ]` = implementation, correction, integration, or verification remains.
+- Checked tasks are deliberately narrow. Local verification does not prove hosted deployment.
+- Stable IDs such as **04.03** are used in future work logs. Do not renumber existing IDs when adding tasks.
+- Keep commits large and coherent. Record meaningful milestone evidence rather than a log entry for every small UI change.
+- Never commit secrets. Configure credentials through local ignored environment files or the service's secret interface.
 
-| Original plan area | Actual status | Evidence / limitation |
+**Current count: 102 tasks — 33 checked, 69 unchecked, across 13 ordered steps.**
+
+Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
+
+## Audit conclusion
+
+The project has a substantial local implementation: authentication wiring, account setup, durable import APIs/RPCs, decimal accounting functions, historical/daily price adapters, report storage/readers, and a dashboard that can render supplied snapshots. It is **not yet an end-to-end portfolio tracker**: committed activity is not automatically replayed into reconciled positions and reports. Billing and privacy execution remain largely unconnected.
+
+The frontend uses React/TypeScript/Tailwind with **Vinext/Vite and Sites**. A separate **Hono Cloudflare Worker** exists; Supabase is the database/auth/storage boundary. Preserve this documented stack rather than restarting the approved UI.
+
+| Area | Current evidence | Remaining boundary |
 | --- | --- | --- |
-| React, TypeScript, Tailwind, components | Foundation exists | Uses Vinext on Vite and the Sites Worker scaffold; not the planned standalone React/Hono architecture |
-| Landing page and pricing | Visual implementation exists | `/`; $5/month and $49/year copy; no checkout |
-| Dashboard | Visual implementation exists | `/dashboard`; static holdings, chart, user identity, trial and freshness labels |
-| Sign-in | UI only | `/sign-in`; real Supabase flows remain unconnected to the screen |
-| User database / authentication | Local development implementation verified | Local Supabase schema, email/password users, Worker bearer-session verification, and RLS-backed account/import APIs were exercised; no hosted project or protected app pages yet |
-| CSV import | Durable review staging implemented locally | Immutable review imports/source rows stage atomically in local Supabase; no file-object upload, commit, or dashboard reporting yet |
-| Financial calculations | Placeholder | Floating-point arithmetic, hard-coded realized basis deduction, no FIFO or Modified Dietz |
-| Price database / historical seed | Not implemented | `demoHoldings` and `demoPrices` in `lib/portfolio.ts` supply displayed prices |
-| Marketstack | Development provider foundation | Server-only EOD adapter and free-plan budget guard exist; no configured key, database persistence, or scheduled refresh |
-| Billing / trial | Not implemented | No Stripe integration; trial label is hard-coded |
-| Security / deletion / exports | Not implemented | No raw-file retention job, account deletion or export workflow |
-| Automated tests / CI | Foundation exists | Vitest unit tests and CI configuration exist; database and browser-flow coverage remain pending |
-| Hosting | Private prototype deployed | Last confirmed deployment: version 3, commit `49d0287388a7c438758c05fe3616aa62e44664d8`; not rechecked remotely in this audit |
-| Branding | Partial local change | Compass mark exists and is used on local landing page; branding changes are uncommitted and not confirmed deployed; name remains Northstar |
+| Public product | Landing, sign-in, synthetic demo, compass mark, pricing copy | Final branding, accessibility audit, deployment verification |
+| Identity/accounts | Supabase client auth, verified API tokens, RLS account list/create, account selection UI | Protected private routes, recovery completion, live OAuth/session verification |
+| Imports | Strict parser, sanitized sample, persisted review, commit/discard/latest-only undo APIs and controls | Concurrency/replay fixes, private file lifecycle, queue execution, full fixture acceptance |
+| Accounting | Tested decimal FIFO, fees, income, transfers, corporate-action helpers | One authoritative chronological replay into persisted positions |
+| Prices | DoltHub ingestion/writers; Marketstack cron composition, retry and metrics code | Verified seed, daily fetch deduplication, accurate durable quota accounting, live execution |
+| Reports | Valuation/return functions, snapshot publisher/read API, snapshot-backed UI | Database input loader, outbox-to-report execution, consolidated/detail reports |
+| Billing/privacy | Pure entitlement, trial, retention and deletion rules | Durable effects, Stripe HTTP integration, enforcement, export/deletion UI |
+| Tests | Typecheck and 160 tests across 50 files passed in this audit | Real database, storage and authenticated browser regression suites |
 
-### Completed deliverables, with narrow scope
+No hosted services, price datasets, provider credentials, or commercial licensing were reverified in this documentation audit. Previous local Supabase integration evidence is retained in [the historical log](docs/IMPLEMENTATION_HISTORY.md); it is not a fresh live test.
 
-- [x] Initialize repository, package lockfile, React/TypeScript/Vite-based scaffold and UI primitives.
-- [x] Establish the navy/blue visual direction approved by the user.
-- [x] Create landing, sign-in and dashboard routes.
-- [x] Display synthetic holdings, activity, income and a portfolio chart.
-- [x] Add working navigation between overview, accounts, activity and documents views.
-- [x] Add browser CSV selection and a client-side 10 MB size check.
-- [x] Add a preliminary parser and review dialog with warning counts.
-- [x] Display planned $5/month and $49/year pricing.
-- [x] Successfully build and privately deploy the prototype in the previous implementation turns.
-- [x] Create a local SVG compass logo component. This only checks off asset creation.
+## 01 — Establish a reproducible development and verification baseline
 
-## Ordered implementation backlog
+Owner: platform/integration. Start here; later steps rely on a repeatable local database and API.
 
-### 01 — Make the prototype truthful and safe to evaluate
+- [x] **01.01** Repository, React/TypeScript/Tailwind UI, module boundaries, decimal-string/date/instrument contracts exist. Evidence: `package.json`, `services/module-boundaries.ts`, `lib/domain/`.
+- [x] **01.02** Local Supabase configuration, migrations, private bucket/RLS definitions and setup documentation exist. Evidence: `supabase/`, `README.md`.
+- [x] **01.03** Standalone Hono API Worker, cron/queue declarations, environment template and server-side provider configuration exist. Evidence: `workers/api.ts`, `wrangler.api.toml`, `.env.example`.
+- [x] **01.04** CI runs typecheck, Vitest and build; Playwright scripts and three public-page tests exist. Evidence: `.github/workflows/checks.yml`, `tests/e2e/public-pages.spec.ts`. Browser tests are not yet in CI.
+- [ ] **01.05** Add a repeatable local integration harness: reset/apply migrations, seed two isolated users plus instrument aliases, start API/frontend, and clean up test data. Read `docs/DOCKER_WINDOWS_RECOVERY.md` before Docker repairs.
+- [ ] **01.06** Automate database constraints/RLS tests for every user-owned table, private objects and service-only global writes; test guessed IDs and direct database writes, not only mocked repositories.
+- [ ] **01.07** Gate: run the documented workflow from a fresh checkout and record migration, database-isolation, typecheck, unit and build results. Confirm browser output excludes service/provider secrets.
 
-- [x] Clearly label all synthetic prices, charts, accounts and performance as demo data.
-- [x] Disable fake password/Google success paths until authentication exists; provide an explicitly named demo link instead.
-- [x] Remove unsupported claims that files are encrypted/stored/purged and that reports are current or complete.
-- [x] Keep parsed uploads in staging state; closing review must not replace portfolio activity.
-- [x] Prevent uploaded activity from being combined with demo holdings or hard-coded realized gains.
-- [x] Replace inactive actions with clear unavailable states until implemented.
+## 02 — Finish identity and account access
 
-Acceptance: entering arbitrary credentials cannot appear to authenticate; canceling an import changes nothing; real CSV rows cannot produce synthetic financial reports.
+Owner: identity/accounts. Depends on step 01.
 
-### 02 — Establish the production backend and test foundation
+- [x] **02.01** Email/password signup/sign-in/sign-out, Google initiation and password-reset initiation boundaries exist; sign-in and callback screens use configured Supabase. Evidence: `services/auth/`, `components/sign-in-page.tsx`, `components/auth-callback-page.tsx`.
+- [x] **02.02** Existing private API endpoints verify bearer sessions; account/import queries use user RLS or explicit ownership checks. Evidence: `services/api/app.ts`, `services/auth/server-session.ts`.
+- [x] **02.03** Authenticated account naming/creation for brokerage, traditional IRA and Roth IRA, listing, selection and load-error retry UI exist. Evidence: `components/portfolio-app.tsx`, `services/accounts/`.
+- [x] **02.04** Signed-in shell uses session identity and an account-workspace label; public synthetic demo is labeled separately. Evidence: `components/portfolio-app.tsx`.
+- [ ] **02.05** Separate private workspace routing from public demo; enforce server-side access where private pages are served and show an explicit session-loading state.
+- [ ] **02.06** Complete recovery password submission and verify signup verification, session renewal, logout/revocation and account switching; clear private cached UI data on session changes.
+- [ ] **02.07** Configure/verify Google and email redirects in the target environment, including final origin and invalid callback handling.
+- [ ] **02.08** Gate: two real local users can create/select each supported account type; invalid/revoked sessions cannot read private account data in API or browser flows.
 
-- [x] Preserve the approved UI and document the existing Vinext/Sites deviation from the original stack.
-- [ ] Establish a standalone Cloudflare Hono API and Queue/scheduler deployment configuration, with Supabase over HTTP. Hono, scheduler, and queue bindings now bundle cleanly; queue consumers, auth session validation, and host redirect verification remain.
-- [x] Create module boundaries for identity/billing, accounts, ingestion, ledger, calculations, market data and reporting.
-- [x] Add decimal arithmetic; use decimal strings at API boundaries and `NUMERIC(38,12)` in Postgres. Use numbers only for final chart/display conversion.
-- [x] Add date-only economic dates, stable instrument IDs, effective-dated ticker aliases and typed validation contracts.
-- [x] Add `.env.example`, secret handling, configuration checks and local setup documentation. Adjust the current `.env*` ignore rule so the example can be tracked safely.
-- [x] Add typecheck, Vitest and Playwright scripts plus CI. Review dependency audit findings without blind major-version upgrades.
-- [ ] Add database integration tests and real browser flows when the persistent backend and authenticated routes exist.
+## 03 — Make imported activity trustworthy
 
-Acceptance: a fresh checkout can run documented checks; missing secrets fail clearly; no provider/service secrets enter the browser bundle.
+Owner: ingestion. Depends on steps 01–02.
 
-### 03 — Create persistent databases and private storage
+- [x] **03.01** CSV parsing supports quoting, multiline fields, BOMs, official footer/blank records, strict dates/decimals/headers and server parser limits of 10 MB/50,000 rows. Evidence: `services/ingestion/robinhood.ts` and tests.
+- [x] **03.02** Supported activity mappings, raw-row/error preservation, SHA-256/parser metadata and unsupported-row blocking exist. Evidence: `services/ingestion/staging.ts`, `ledger-normalization.ts`.
+- [x] **03.03** A sanitized regression sample derived from supplied-export cases exists. Evidence: `fixtures/robinhood/activity-sample.csv`; this is not full brokerage/IRA acceptance.
+- [x] **03.04** User confirms an owned account for persisted imports; account-scoped preview/staging and review/history APIs exist. Evidence: `services/api/app.ts`, `services/supabase/imports-repository.ts`.
+- [ ] **03.05** Add representative sanitized individual, traditional IRA and Roth IRA exports with independent row-level expected results. The user already supplied one brokerage example; obtain only missing coverage.
+- [ ] **03.06** Reconcile actual dividend/reinvestment CSV semantics so separately reported dividends plus buys never create a second dividend; verify fees, transfers, incentives and fractional activity across parser, SQL and calculation paths.
+- [ ] **03.07** Add durable issue resolution or explicit non-reportable handling for unsupported rows, missing aliases and incomplete history; never silently dismiss material blockers.
+- [ ] **03.08** Gate: accepted fixtures reconcile every row, quantity and cash amount; malformed values and unsupported assets cannot produce an apparently complete account.
 
-- [x] Initialize local Supabase CLI configuration with development auth, redirects, 10 MB upload limit, and email-verification defaults.
-- [x] Provision and reset a runnable local Supabase database; production configuration remains separate and unconfigured.
-- [x] Draft the initial migration for profiles, brokerage/IRA accounts, imports, immutable source rows, normalized ledger entries, lots/opening balances, instruments/aliases, price revisions, corporate actions/corrections, report snapshots, billing state, audit events and job outbox.
-- [x] Apply and verify the migration locally; row-level security and ownership constraints cover every user-owned table. Global prices are shared data with restricted writes.
-- [x] Define a private brokerage-statement bucket and ownership policies in the initial migration.
-- [ ] Verify signed upload access and account ownership validation against real storage. A tested server-side signed-upload boundary now validates account ownership before requesting a URL; live storage verification remains.
-- [x] Add transactional operations for import commit/undo and versioned report publication.
+## 04 — Correct transactional commit, overlap detection and undo
 
-Acceptance: data survives reload and a second session; user A cannot read or modify user B's accounts, imports or objects, even with guessed IDs.
+Owner: ingestion/database. Depends on step 03. Finish before trusting persisted positions.
 
-### 04 — Implement real authentication
+- [x] **04.01** Atomic staging, source-row retention, commit RPC, latest-import undo RPC and outbox inserts exist. Evidence: staging/commit/undo migrations and `services/supabase/imports-repository.ts`.
+- [x] **04.02** Multiplicity-aware fingerprint helpers and SQL overlap checks exist; review/history/commit/discard/latest-only undo UI is connected. Evidence: `services/ingestion/deduplication.ts`, `components/portfolio-app.tsx`.
+- [ ] **04.03** Serialize commits/undo at account level. Current commit locks one import, allowing two different overlapping imports to observe the same prior counts. Prove concurrent overlapping commits preserve intended multiplicity.
+- [ ] **04.04** Exclude undone imports from effective duplicate counts and define identical-file reimport/retry behavior. Current overlap SQL counts retained ledger rows regardless of import status.
+- [ ] **04.05** Make repeated commit/undo requests return stable outcomes, including retries after an unknown network result; test same-file staging races and fingerprint canonicalization across TS/SQL.
+- [ ] **04.06** Preserve original parsing evidence when deriving duplicate/review statuses; enforce permitted mutations and transition rules against direct client writes as well as API calls.
+- [ ] **04.07** Gate: database tests cover repeated files/trades, overlapping exports, concurrent requests, undo/reimport and rollback on blockers. Undo restores effective activity while preserving audit records.
 
-- [x] Implement a tested Supabase email/password signup, sign-in, sign-out, and provider-error boundary.
-- [x] Implement a tested Google OAuth initiation boundary with configured callbacks.
-- [x] Implement a tested password-reset initiation boundary and expired-session error handling.
-- [x] Wire the sign-in screen and `/auth/callback` route to the Supabase client when public configuration is present; keep credential controls unavailable otherwise.
-- [ ] Configure Supabase email verification, Google OAuth redirect URLs, session renewal, and revoked-session behavior in a live project.
-- [x] Add Worker API bearer-session verification and a protected identity endpoint (`GET /v1/me`).
-- [ ] Protect application pages and remaining API endpoints on the server; keep the public demo separate.
-- [ ] Replace James/JC placeholders with authenticated profile data.
+## 05 — Complete private uploads and background execution
 
-Acceptance: valid users can sign in and return later; invalid credentials fail; unauthenticated and revoked sessions cannot access private data. Supabase manages password hashes; never store plaintext passwords in app tables.
+Owner: platform/ingestion. Depends on step 04; queue consumers must use the corrected transaction rules.
 
-### 05 — Implement accounts and opening history
+- [x] **05.01** Private bucket policies and owned-account signed-upload API/repository exist. Evidence: initial migration, `services/supabase/signed-upload-repository.ts`.
+- [x] **05.02** Typed import/report/price jobs and retry-aware dispatcher exist. Evidence: `services/queues/`. Worker has no `queue` export or durable handlers yet.
+- [ ] **05.03** Upload the actual object, bind verified object metadata/hash to its import, enforce streamed request limits and validate ownership/size/content server-side before processing.
+- [ ] **05.04** Wire Cloudflare queue entrypoint and durable import handler; persist processing/progress/failure state and let browser review poll durable results.
+- [ ] **05.05** Dispatch the transactional outbox with claim/retry/idempotency semantics. Translate `import.committed`/`import.undone` events to typed recomputation jobs; verify account ownership at execution.
+- [ ] **05.06** Persist rejected-job/error evidence before acknowledgment; implement dead-letter inspection and safe replay.
+- [ ] **05.07** Gate: real storage isolation and queued import tests pass; retry/crash never loses an upload, commits twice or silently drops failed work.
 
-- [x] Add tested authenticated API contracts to list and create Robinhood individual brokerage, traditional IRA, and Roth IRA accounts through Supabase RLS.
-- [ ] Create, name and select Robinhood individual brokerage, traditional IRA and Roth IRA accounts.
-- [ ] Associate every import with a confirmed account; do not claim account detection from a CSV that lacks that information.
-- [x] Add opening-history contracts for cash, positions and lots with known/unknown basis and dates.
-- [x] Record activity coverage separately from valuation freshness.
+## 06 — Reconcile persisted accounting and opening history
 
-Acceptance: multiple accounts remain separate, fractional positions are supported, and unknown basis remains explicitly unknown.
+Owner: ledger/calculations. Depends on steps 04–05.
 
-### 06 — Replace the CSV parser with a validated importer
+- [x] **06.01** Pure decimal FIFO/cash/fee/dividend/unknown-basis calculations exist with fixtures. Evidence: `services/ledger/fifo.ts` and tests.
+- [x] **06.02** Opening cash/position/lot validation contracts exist. Evidence: `services/accounts/opening-history.ts`.
+- [x] **06.03** Transfer matching/basis-preserving lot helpers and validated corporate-action guards exist. Evidence: `services/ledger/transfers.ts`, `corporate-actions.ts`. These do not prove persisted execution.
+- [ ] **06.04** Persist/edit opening cash and known/unknown lots through owned APIs/UI; mark incomplete cost basis/return coverage without inventing dates or basis.
+- [ ] **06.05** Build an authoritative loader/replay of only effective committed ledger events plus opening history; use deterministic same-day ordering and reconcile SQL normalization to engine contracts.
+- [ ] **06.06** Rebuild/persist lot quantities and realized matches after buys, sales and undo. Current commit inserts purchase lots but does not consume lots on sales; active-symbol discovery therefore cannot yet be trusted.
+- [ ] **06.07** Apply splits in chronological event order, before later trades. Current valuation applies actions after replaying all trades through a date, which can incorrectly split post-action purchases or process post-split sales against pre-split quantities. Test buy → split → buy/sell and repeated actions.
+- [ ] **06.08** Persist and execute reconciled cross-account cash/share transfers, preserve basis/dates, and keep unresolved transfers explicit. Preserve stable instrument identity across ticker aliases.
+- [ ] **06.09** Gate: database-derived cash, positions, FIFO gains, fees, DRIP, transfers and splits reconcile to independent fixtures before and after undo. Analytical gains are labeled “not tax reporting.”
 
-- [ ] Obtain redacted official brokerage and IRA CSV fixtures; add sanitized fixtures with expected results.
-- [x] Use a real CSV parser supporting quoted commas, escaped quotes, embedded newlines and BOMs.
-- [x] Ignore the blank/footer records appended by official Robinhood activity exports without dropping transaction rows.
-- [x] Validate dates, signed amounts, parentheses, decimals, required headers and row counts; enforce 10 MB / 50,000 rows in the server-side parser.
-- [x] Map verified Robinhood transaction codes rather than guessing from descriptions or using Process Date as the transaction type.
-- [x] Normalize buys/sells, dividends, reinvestment buys, interest, fees, deposits/withdrawals, incentives and supported transfers.
-- [x] Preserve raw rows and parsing errors in the parser result; unsupported rows remain visible instead of disappearing.
-- [x] Default unfamiliar transaction codes to material during import review, so a reportable import cannot commit until their impact is resolved.
-- [x] Add a server-side preview contract that requires a confirmed owned account, records the original CSV SHA-256 and parser version, derives review/date-range metadata, and checks persisted identical-file hashes.
-- [x] Persist the file hash, parser version, source rows, and review metadata with local staged imports. Commit-blocking state still requires the durable commit workflow.
+## 07 — Establish trusted historical prices
 
-Acceptance: supported fixtures reconcile row-for-row; malformed values never silently become zero; unsupported assets/codes remain visible.
+Owner: market data. Depends on instrument identity in step 06; licensing research may proceed earlier.
 
-### 07 — Build durable review, commit, deduplication and undo
+- [x] **07.01** Bounded DoltHub reader/ingestion coordinator, revision checks and date-effective alias resolution exist. Evidence: `services/market-data/dolthub.ts`, `historical-ingestion.ts`.
+- [x] **07.02** Unadjusted close/revision writers and evidence-bearing correction resolver/writer exist. Evidence: `services/supabase/historical-prices-repository.ts`, `services/market-data/price-corrections.ts`.
+- [x] **07.03** Invalid/duplicate/extreme-close quarantine and missing-session/alias-gap checks exist. Evidence: `services/market-data/quality.ts`, historical-ingestion tests.
+- [ ] **07.04** Record dataset version, actual license, attribution/share-alike requirements and upstream provenance evidence; resolve rights for intended paid storage/display before user-facing use. Do not treat spot checks as licensing clearance.
+- [ ] **07.05** Add a runnable resumable seed job with durable cursor, instrument mapping, quarantine storage and operator review; execute a bounded seed and record rows/revision.
+- [ ] **07.06** Independently verify representative stocks, ETFs, delisted names, ticker transitions and split boundaries; record expected/actual values and source evidence. Keep dividends sourced from brokerage activity.
+- [ ] **07.07** Prevent same-version price/correction overwrite; select authoritative revisions deterministically and track all source/correction dependencies needed to reproduce a report.
+- [ ] **07.08** Gate: repeat seed is safe, quarantined data cannot value portfolios, and representative stored prices are independently verified and traceable.
 
-- [x] Define and test durable import lifecycle transitions for staging, review, commit, discard, failure retry, and undo.
-- [x] Add and locally verify an RLS-scoped atomic staging RPC and authenticated API route that persist an import plus immutable source rows together.
-- [x] Add authenticated API contracts to list staged import history, retrieve preserved review rows, and discard a review-ready import without deleting audit history.
-- [ ] Queue parsing and persist staged results with progress/failure status.
-- [ ] Show source rows, interpreted transactions, account/date range, duplicates and actionable warnings.
-- [x] Display preserved source-row statuses, interpreted activity, and parser messages in the authenticated review dialog.
-- [x] Implement multiplicity-aware overlap fingerprints including account, date, type, symbol, quantity, price, amount and description.
-- [x] Connect fingerprints to persisted file hashes and committed imports for identical-file idempotency.
-- [x] Commit accepted records atomically with concurrency protection and an outbox event for recomputation.
-- [x] Add discard, import history and undo that preserves audit history and recomputes downstream state.
-- [x] Show account-scoped import history and expose undo only for the latest committed import, matching the database constraint.
+## 08 — Make daily pricing safe on the free development allowance
 
-Acceptance: repeated and overlapping files never double-count; legitimate identical trades remain distinct; interrupted/retried commits are safe; undo restores the prior report state.
+Owner: market data/platform. Depends on steps 06–07.
 
-### 08 — Implement the accounting engine
+- [x] **08.01** Server-only Marketstack provider, decimal responses and configurable budget exist. Evidence: `services/market-data/marketstack.ts`.
+- [x] **08.02** New York EOD/standard-holiday guard, unique-symbol reader, response validation, retry/backoff, storage writer and scheduled Worker composition exist. Evidence: `workers/api.ts`, `services/market-data/daily-refresh.ts`, `services/supabase/active-symbols-repository.ts`.
+- [x] **08.03** Durable run metrics, monthly usage reader, preflight cap and freshness classifiers/read API/UI exist. These are foundations, not a proven hard quota guarantee.
+- [ ] **08.04** Claim symbol/trading-date work durably and skip already-fetched closes before calling the provider. Hourly cron currently permits repeated after-close fetches; upserting prices alone does not save quota.
+- [ ] **08.05** Fix request accounting: skipped runs currently emit attempt symbol counts that become quota units; reserve budget atomically before actual calls, reconcile attempts/failures and prevent concurrent overspend.
+- [ ] **08.06** Add paginated active-position/alias reads and provider-sized batches, explicit unresolved aliases, delayed-publication handling and gap backfills. Verify extraordinary calendar closures and session overrides.
+- [ ] **08.07** Configure a free development key, confirm its current allowance, and run a deliberately tiny live fetch into the database. Keep automatic schedules off until 08.04–08.05 pass; no purchase/upgrade.
+- [ ] **08.08** Deliver quota/failure/stale-price alerts and durable recovery visibility; test provider outage and partial responses without fabricating closes.
+- [ ] **08.09** Gate: two users with one shared holding cause one symbol/date fetch; repeated/concurrent cron and dashboard loads add no redundant calls; free cap is enforced across retries.
 
-- [x] Normalize reviewed Robinhood rows into ledger-entry drafts; model DRIP as dividend income plus a separate reinvestment buy, preserve signed cash flows, and require a resolved stable instrument ID.
-- [x] Add a pure decimal ledger core that derives cash and open lots from normalized events.
-- [x] Implement FIFO lots and analytical realized gains/losses; label them as not tax reporting.
-- [x] Apply net trade amounts/fees once and preserve unknown basis through sales.
-- [x] Record dividend income and a separate reinvestment purchase without double counting.
-- [x] Link reconciled internal transfers for consolidated reporting and flag unresolved transfers.
-- [x] Preserve transferred share lots and basis through persisted cross-account transfers.
-- [x] Enforce validated corporate actions before applying quantity/basis changes; never automatically apply quarantined split rows.
+## 09 — Generate reproducible reports automatically
 
-Acceptance: hand-calculated fixtures cover partial lot sales, fractional shares, fees, DRIP, transfers, incentives and splits; no hard-coded basis deductions remain.
+Owner: reporting/calculations. Depends on steps 05–08.
 
-### 09 — Populate the historical-price database
+- [x] **09.01** Daily valuation and Modified Dietz/chain functions exist, excluding contributions/incentives and exposing missing values/invalid periods. Evidence: `services/calculations/`.
+- [x] **09.02** Snapshot builder, versioned publisher/repository and authenticated reader endpoint exist. Evidence: `services/reporting/`, `services/supabase/report-snapshot*`.
+- [x] **09.03** Snapshot payloads support holdings/history/income/gains plus separate activity/price coverage fields.
+- [ ] **09.04** Compose persisted effective ledger, opening history, calendar, validated actions and selected stored prices into report inputs; use corrected chronological replay from step 06.
+- [ ] **09.05** Wire report queue handler and import/undo/price-correction triggers through publication; reject stale workers and make retry/snapshot revision selection deterministic.
+- [ ] **09.06** Generate consolidated views that cancel linked internal transfers while excluding external flows and incentives; preserve unknown basis and incomplete return periods.
+- [ ] **09.07** Validate return/gain definitions and disclose daily flow timing approximation; do not bridge gaps, annualize short periods or imply tax calculations.
+- [ ] **09.08** Gate: upload → commit → queue → stored report completes without manually supplying a snapshot; undo/correction regenerates matching results and previous revisions remain reproducible.
 
-- [x] Implement a bounded/resumable DoltHub close-price source reader that observes a stable source revision for each page.
-- [x] Connect DoltHub pages to stable instrument mapping and persisted ingestion metadata.
-- [x] Store unadjusted daily closes; keep dividend income sourced from brokerage activity.
-- [ ] Validate selected stocks, ETFs, ticker changes, delisted securities and split boundaries against independent records.
-- [x] Detect invalid closes, duplicate dates, and large jumps; quarantine suspicious records without altering holdings.
-- [x] Add trading-calendar missing-date and ticker-alias discontinuity checks during database ingestion.
-- [ ] Add evidence-backed corrections and immutable price revisions; track report dependencies on revisions. A pure correction resolver now requires evidence/version and preserves the source close; persistence and report orchestration remain.
-- [ ] Record dataset attribution/share-alike obligations and resolve upstream provenance and commercial usage questions before public launch. A few successful spot checks do not settle licensing or whole-dataset quality.
+## 10 — Finish the usable portfolio experience
 
-Acceptance: repeated seed jobs are idempotent; suspicious records are excluded from authoritative valuations; a stored close can be traced to its source and correction history.
+Owner: product UI. Depends on step 09.
 
-### 10 — Connect daily Marketstack pricing
+- [x] **10.01** Approved landing/sign-in/demo design, compass asset, navigation and $5/month/$49/year pricing copy exist.
+- [x] **10.02** Live overview reads snapshots/freshness, renders holdings/value history/income/cash/gains where supplied, and has account selection plus loading/error/retry/awaiting-report states. Synthetic activity is hidden for authenticated users.
+- [x] **10.03** Persisted import review/history/commit/discard/latest-only undo controls exist; public skip links and active-navigation labels exist.
+- [ ] **10.04** Implement persisted activity list with pagination/filtering and ledger-to-source-row detail; current live Activity panel is a placeholder.
+- [ ] **10.05** Finish value/return period controls, consolidated/account selection, allocation, invested capital/net deposits, dividend and realized-lot detail views.
+- [ ] **10.06** Complete opening-history and actionable warning flows; distinguish no holdings, missing report, stale report, partial history and unavailable prices without synthetic fallback.
+- [ ] **10.07** Verify dialog focus/keyboard/screen-reader behavior, accessible tables, mobile layouts and 200% enlargement across authenticated flows.
+- [ ] **10.08** Audit any retained WebMCP hooks against actual authorized app actions/state; remove unsupported claims or obsolete hooks.
+- [ ] **10.09** Gate: authenticated browser fixture flows reconcile displayed numbers to stored records; every enabled action works and logout/account switching cannot leak prior account values.
 
-- [x] Implement the server-only provider HTTP adapter and normalized decimal-string responses.
-- [x] Add a free-development request budget object; configure an actual key and confirm the allowance before scheduling.
-- [x] Add a tested New York-time standard NYSE full-day holiday calendar and EOD eligibility guard; extraordinary closures and early closes remain explicit operational overrides.
-- [x] Add a tested EOD refresh coordinator that coalesces supplied symbols and rejects incomplete, duplicate, off-date, or unrequested provider results before persistence.
-- [ ] Schedule after-market-close updates using U.S. trading sessions, holidays and daylight saving time.
-- [ ] Fetch each unique currently held symbol once across users; use shared database values for every dashboard view.
-- [ ] Add retry/backoff, pagination where needed, idempotency, gap backfills and dead-letter visibility.
-- [ ] Add request budgeting, a hard application cap, quota alerts, failure metrics and stale-price metrics. A durable monthly usage reader and preflight cap guard now prevent over-cap provider calls; alert delivery and full stale-price metrics remain.
-- [ ] Before paid launch, activate the agreed commercial tier and verify cache/display rights; do not purchase or upgrade automatically.
+## 11 — Implement real trial and subscription lifecycle
 
-Acceptance: two users holding the same symbol reuse one price fetch; weekends do not waste requests; failures show honest freshness; opening dashboards consumes no provider quota.
+Owner: billing. Depends on usable reports in step 09; retain planned $5 monthly/$49 annual pricing.
 
-### 11 — Implement valuation and return history
+- [x] **11.01** Pure first-usable-import 14-day no-card trial and duplicate-event entitlement reducers exist. Evidence: `services/billing/entitlements.ts`.
+- [ ] **11.02** Persist one-time trial start atomically after the first usable committed import; retries, undo or another account must not restart it.
+- [ ] **11.03** Configure Stripe test products/prices, Checkout and Billing Portal endpoints with authenticated customer ownership.
+- [ ] **11.04** Verify webhook signatures on raw bodies and persist replay/event-order protection. Current reducer only deduplicates IDs; out-of-order subscription events can overwrite newer state.
+- [ ] **11.05** Enforce entitlement server-side; implement expiration, payment failures, plan changes/cancellation and truthful billing/trial UI.
+- [ ] **11.06** Gate: Stripe test lifecycle and invalid/duplicate/reordered webhook tests pass; export/deletion remain accessible after cancellation.
 
-- [x] Value daily actual quantities plus cash using stored unadjusted closes and verified corporate actions.
-- [x] Compute gain as ending value minus beginning value minus external flows and excluded incentives.
-- [x] Implement estimated daily Modified Dietz: `(end - start - flow) / (start + 0.5 * flow)`, then chain valid daily returns. Disclose the intraday-flow approximation.
-- [ ] Exclude external contributions/withdrawals and incentives from investment return; offset linked internal transfers in consolidated views.
-- [x] Mark missing-data/invalid-denominator intervals unavailable; never chain across a gap or annualize short periods.
-- [x] Publish versioned report snapshots atomically with activity and price coverage.
+## 12 — Execute privacy and operational safeguards
 
-Acceptance: deposits alone create no profit, reinvestment does not double income, missing prices do not become zero, and historical snapshots reconcile to independent fixtures.
+Owner: privacy/platform. Depends on working storage, reports and billing.
 
-### 12 — Connect the approved screens to real reports
+- [x] **12.01** Pure 30-day raw-file retention rules and deletion lifecycle/cleanup contracts exist. Evidence: `services/privacy/`.
+- [ ] **12.02** Run scheduled private-object retention with durable audit, retries and verified deletion; retain normalized product activity as specified.
+- [ ] **12.03** Add safe self-service transaction/report CSV export, including spreadsheet-formula escaping and access after cancellation.
+- [ ] **12.04** Implement user/data deletion across auth, storage, accounts, reports and billing; revoke access and handle partially failed cleanup.
+- [ ] **12.05** Complete settings UI for exports, deletion and billing; publish accurate privacy/terms and retention explanations.
+- [ ] **12.06** Enforce rate limits, request validation, redacted logs, least-privilege roles and secret handling across all execution paths.
+- [ ] **12.07** Add actionable import/queue/report/provider monitoring; configure backups and document a successful restore drill with recovery targets.
+- [ ] **12.08** Gate: actual retention/export/deletion and restore tests pass in an isolated environment; canceled/deleted-user behavior is verified.
 
-- [ ] Replace all demo-backed production values with authenticated database-backed API responses.
-- [ ] Add account/consolidated selection, value/return charts, allocation, holdings, net deposits, gains, cash, dividend and realized-gain details. Persisted snapshots now carry and render dividend income and realized gain/loss when supplied by the ledger; the Overview now exposes account selection, while consolidated selection, allocation, and full detail views remain.
-- [ ] Implement loading, empty, incomplete-history, stale-price, failure and retry states.
-- [ ] Wire import history, undo, account setup and settings actions.
-- [ ] Use accessible dialog/table/navigation primitives; verify keyboard operation, focus, mobile layouts and 200% text enlargement.
-- [ ] Ensure any retained WebMCP tools share the real state/actions and pass contract checks; do not claim untested tool support.
+## 13 — Prove the complete MVP and prepare deployment
 
-Acceptance: no synthetic values leak into a real account; each visible number can be reconciled to ledger and price records; every enabled action works.
+Owner: integration/platform. Depends on all earlier acceptance gates.
 
-### 13 — Implement trials and billing
+- [ ] **13.01** Run real database/RLS/storage and authenticated Playwright suites in CI alongside unit/typecheck/build; install required browser/runtime dependencies.
+- [ ] **13.02** Verify signup → account → upload → resolve/review → commit → accurate dashboard → trial → billing with representative brokerage and IRA files.
+- [ ] **13.03** Run adversarial regression cases: cross-user IDs, session expiry, concurrent import/undo, duplicate DRIP, split chronology, unavailable prices, queue replay, quota concurrency and webhook ordering.
+- [ ] **13.04** Configure and verify hosted Supabase/auth, API origins, Worker queues/cron/secrets, storage, retention and Stripe in staging; document deployed revisions.
+- [ ] **13.05** Choose final product name/domain, check conflicts, and apply/verify logo/favicon consistently. Northstar remains the working name.
+- [ ] **13.06** Confirm production market-data storage/display rights and an approved commercial plan before paid launch; free Marketstack remains development-only unless verified rights establish otherwise. Do not upgrade automatically.
+- [ ] **13.07** Verify operating costs against $45–75/month before marketing, escalating estimates above $100; use current provider allowances/prices rather than old planning assumptions.
+- [ ] **13.08** Gate: record all passing launch evidence, production configuration, recovery/rollback procedure and deployed version before inviting paying users.
 
-- [ ] Create Stripe test products/prices for $5 monthly and $49 annual plans; configure production separately.
-- [x] Implement the one-time no-card 14-day trial rule after a usable committed import.
-- [x] Implement replay-safe entitlement webhook state handling; signature verification and Stripe HTTP endpoints remain pending.
-- [ ] Add Checkout, Billing Portal and signed webhook HTTP handling.
-- [ ] Enforce entitlement on the server and handle expiration, failed payments, cancellation and plan changes.
-- [ ] Preserve export/deletion access after cancellation; replace the hard-coded trial countdown.
+## External inputs and scope
 
-Acceptance: test-mode full lifecycle passes, invalid signatures are rejected, and duplicate/reordered webhooks cannot corrupt access.
+Request missing external inputs when their step is ready: additional sanitized IRA/brokerage coverage (03.05), data provenance/rights evidence (07.04), a free development Marketstack key (08.07), OAuth target configuration (02.07), Stripe test configuration (11.03), and hosted service/domain access (13.04–13.06). Existing credentials were not inspected in this audit; do not assume they are missing.
 
-### 14 — Complete privacy, operations and recovery
+MVP scope: USD long U.S. stocks/ETFs, fractional shares, cash, Robinhood activity CSVs for individual/traditional/Roth accounts; $5/month or $49/year with a 14-day no-card trial after the first usable import. Unknown basis/history stays explicit; no tax or investment advice.
 
-- [x] Implement and test 30-day raw-file eligibility and auditable one-time deletion state.
-- [ ] Run the retention job against private storage with retries and verify deletions in a configured environment.
-- [x] Add a tested account/user-deletion lifecycle and cleanup plan covering raw files, accounts, profile, and subscription cleanup.
-- [ ] Execute deletion against live storage, billing, and database records; add safe CSV/report export.
-- [ ] Apply rate limits, upload validation, safe logging, secret management and least-privilege access.
-- [ ] Add queue, import, report and pricing monitoring with actionable alerts.
-- [ ] Configure backups; execute and document a restore drill with chosen recovery objectives.
-- [ ] Publish accurate privacy/terms content matching actual behavior and data-source requirements.
+Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/shorts, FX, wash sales/tax filing, benchmarks, money-weighted returns, recommendations, forecasting, households, banking and budgeting. Keep typed provider/import interfaces for expansion.
 
-Acceptance: deletion and retention are verified against real storage; exports remain available after cancellation; restoration is demonstrated rather than merely configured.
+## Audit and future milestone log
 
-### 15 — Finish branding and launch verification
-
-- [ ] Choose the final product name and check domain/name conflicts before adopting it.
-- [ ] Apply the selected logo consistently to landing, sign-in, dashboard and favicon; verify and publish the local branding changes.
-- [ ] Run unit, integration, RLS/storage isolation and end-to-end suites in CI.
-- [ ] Verify signup → account creation → upload → review → commit → accurate dashboard → trial → billing with representative brokerage and IRA files.
-- [ ] Verify cross-user isolation, expired sessions, import concurrency, undo, missing prices and webhook replay.
-- [ ] Confirm production auth, database, queue, retention, price provider, commercial data rights and billing configuration.
-- [ ] Verify operating costs against the $45–75/month target and review any estimate above $100, excluding marketing.
-- [ ] Launch to the intended audience only after the gates above pass and record deployed version/verification evidence.
-
-Acceptance: launch gates are all checked with evidence. A successful frontend build alone does not meet this gate.
-
-## External inputs needed
-
-- [ ] Redacted real Robinhood brokerage, traditional IRA and Roth IRA activity exports.
-- [ ] Supabase project configuration and authorized deployment access.
-- [ ] Google OAuth configuration for the final application origin.
-- [ ] Marketstack development key, followed by agreed commercial production configuration.
-- [ ] Stripe test/live account configuration and webhook secrets.
-- [ ] Final brand/domain choice and production data-licensing resolution.
-
-Never put secrets in this checklist, commit them, or ask for them in ordinary chat when a secret configuration interface is available. Missing service access can block live verification while local implementation and fixture tests continue.
-
-## Scope retained from the plan
-
-MVP: U.S. investors, USD, long stocks/ETFs including fractional shares, cash, Robinhood activity CSVs, brokerage and traditional/Roth IRAs. $5/month or $49/year; no permanent free tier, with a clearly synthetic public demo.
-
-Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futures, margin/shorts, foreign exchange, tax/wash-sale reporting, benchmarks, money-weighted returns, advice/forecasting, households, banking and budgeting. Preserve provider/import adapters for expansion without implementing these now.
-
-## Completion log
-
-| Date | Checklist ID / deliverable | Evidence | Remaining limitation |
+| Date | Scope | Evidence | Limits |
 | --- | --- | --- | --- |
-| 2026-09-09 | Repository audit and checklist created | Read routes, UI components, portfolio logic, package/config and Git status | No live services or runtime tests verified in this audit |
-| 2026-09-09 | 01 — Truthful and safe prototype | Commit `9890b19`; synthetic labels, temporary CSV preview, disabled fake sign-in, and accurate unavailable states; `npm run build`, `npx tsc --noEmit`, and local `/dashboard` HTTP 200 passed | Full lint remains blocked by pre-existing vendored UI lint errors; no authentication, storage, reporting, or price data exists |
-| 2026-09-09 | 02 — Backend/test foundation (partial) | Commit `9890b19`; exact-decimal/date/instrument contracts, server-only environment template, Hono API shell, Vitest/Playwright scripts, CI, README, dependency updates; `npm run typecheck`, `npm test` (2 passing), and `npm run build` passed | API shell is not mounted; Supabase, queues, database tests, and browser flows require service configuration and implementation |
-| 2026-09-09 | 03 — Persistence (schema foundation) | Commit `2c5712c`; initial Supabase migration and public-client factory added; `npm run typecheck`, `npm test` (2 passing), and `npm run build` passed | Migration and storage policies are unverified until a development Supabase project is configured |
-| 2026-09-09 | 10 — Marketstack provider (partial) | Commit `0bd1f98`; server-only EOD adapter and request-budget guard added; `npm run typecheck`, `npm test` (4 passing), and `npm run build` passed | No free key, price database, schedule, metrics, retry, or dashboard integration yet |
-| 2026-09-09 | 08 — Accounting engine (partial) | Commit `956f410`; decimal FIFO core added with fractional-lot, fee, DRIP, and unknown-basis fixtures; `npm run typecheck`, `npm test` (7 passing), and `npm run build` passed | Engine is not yet driven from the database; internal transfers and validated corporate actions remain unimplemented |
-| 2026-09-09 | 06 — CSV parser (partial) | Commit `672a6f3`; strict CSV parser added with quoted-field/BOM, exact-code, amount/date, and unsupported-row fixtures; `npm run typecheck`, `npm test` (10 passing), and `npm run build` passed | Official redacted brokerage and IRA CSV fixtures are still required to validate headers and transaction-code coverage |
-| 2026-09-09 | 11 — Returns core (partial) | Commit `9e39fa3`; decimal Modified Dietz and non-bridging chain logic added with contribution, incentive, gap, and invalid-denominator fixtures; `npm run typecheck`, `npm test` (14 passing), and `npm run build` passed | No database-backed daily valuations, U.S. trading calendar, report snapshots, or dashboard integration yet |
-| 2026-09-09 | 05 — Accounts/opening history (partial) | Commit `24d6f07`; supported account-type and incomplete-opening-history validation added; `npm run typecheck`, `npm test` (17 passing), and `npm run build` passed | Account creation, selection, and persistence require Supabase configuration and authenticated UI work |
-| 2026-09-09 | 09 — Price quality (partial) | Commit `8257aa9`; candidate-close quarantine guard added with duplicate, invalid-close, extreme-move, and normal-history fixtures; `npm run typecheck`, `npm test` (19 passing), and `npm run build` passed | DoltHub ingestion, independent validation, aliases, corrections, and licensing resolution remain unimplemented |
-| 2026-09-09 | 07 — Import deduplication (partial) | Commit `1d8e14d`; multiplicity-aware activity fingerprinting and overlap exclusion added; `npm run typecheck`, `npm test` (22 passing), and `npm run build` passed | Queue-backed staging, atomic commit/undo, persisted idempotency, and import history require the Supabase backend |
-| 2026-09-09 | 07 — Atomic import commit (partial) | Commit pending; RLS-scoped `commit_import` migration locks review-ready imports, persists ledger entries/lots, treats DRIP as income plus reinvestment, marks imports committed, and writes a report-recompute outbox event. Endpoint/repository tests plus `npm run typecheck`, `npm test` (93 passing), `npm run build`, Worker dry-run, and local schema lint passed. | Persisted overlap-fingerprint enforcement, FIFO lot consumption on sales, background recomputation, undo, and UI review/commit remain. |
-| 2026-09-09 | 06/07 — Real-export parser coverage and durable overlap exclusion (partial) | A user-provided 589-row Robinhood activity CSV established exact mappings for `CDIV`, `MDIV`, `AFEE`, `SLIP`, and `ACH` descriptions; blank records are ignored and split rows remain explicit blockers. Local Supabase integration committed an overlapping two-row import as one new activity with `duplicate,supported` source statuses. | Validated split handling, sanitized shareable fixtures, UI review, and report recomputation remain. |
-| 2026-09-09 | 07 — Auditable latest-import undo (partial) | `undo_import` keeps source/ledger records, removes derived lots for the latest committed import, changes its status to `undone`, and emits an outbox event. Local Supabase integration verified `undone`, one retained ledger entry, and zero remaining derived lots. | Report recomputation worker and user-facing undo controls remain. |
-| 2026-09-09 | 11 — Daily valuation core (partial) | Exact-decimal valuation derives cash and quantities from the normalized ledger, values only against supplied closes, calculates daily Modified Dietz and time-weighted return, and makes missing/gapped intervals unavailable. Fixtures cover deposits, incentives, DRIP, and missing prices. | Database report inputs, corporate actions, internal transfers, snapshots, and dashboard reads remain. |
-| 2026-09-09 | 04/05 — Local authenticated account setup (partial) | Local Supabase configuration enables the existing sign-in flow; dashboard account setup lists and creates RLS-scoped Robinhood individual, Traditional IRA, and Roth IRA accounts without showing synthetic values as real balances. | Live deployment configuration, account selection, imports, and reports remain. |
-| 2026-09-09 | 07/12 — Authenticated staged-import entry point (partial) | Signed-in users select a real account and send CSVs to the Worker for server-side preview and staging. Development CORS admits only the local app origin and expected import headers; the UI distinguishes staged review from portfolio commitment. | Source-row review, background processing, commit/undo controls, production origin configuration, and reports remain. |
-| 2026-09-09 | 06/07/12 — Robinhood export review and history controls (partial) | Official-export footer handling, persisted source-row review, commit control, account-scoped history, and latest-only undo controls added. | Supported split handling, discard control, background report recomputation, and report display remain. |
-| 2026-09-09 | 07/12 — Staged-import discard control | The review dialog now calls the authenticated discard endpoint when a staged import is closed or discarded, refreshes account-scoped history, prevents dismissal during a request, and clears committed review state safely. `npm run typecheck`, `npm test` (107 passing), `npm run build`, and `git diff --check` passed. | Background report recomputation and real report display remain. |
-| 2026-09-09 | 06 — Supplied-export regression fixture (partial) | Added a sanitized Robinhood activity fixture covering embedded descriptions, `CDIV`, `Buy`, `ACH`, `SPL`, blank rows, and strict split blocking. Hardened footer handling for undefined mapped columns. `npm run typecheck`, `npm test` (108 passing), and `git diff --check` passed. | Redacted individual, traditional IRA, and Roth IRA fixtures with row-level expected reconciliations are still required. |
-| 2026-09-09 | 09 — Historical ingestion boundary (partial) | Added stable instrument alias resolution, source-revision propagation, quality quarantine, and deterministic retry deduplication for DoltHub close pages. `npm run typecheck`, `npm test` (110 passing), and `git diff --check` passed. | Supabase price-revision/daily-price upserts, trading-calendar gaps, corrections, independent validation, and licensing review remain. |
-| 2026-09-09 | 09 — Historical price persistence boundary (partial) | Added a server-only Supabase writer that reuses immutable DoltHub revisions and idempotently upserts stable-instrument daily closes; empty pages avoid unnecessary writes. `npm run typecheck`, `npm test` (112 passing), and `git diff --check` passed. | Live service wiring, scheduled ingestion, gap/correction workflows, independent validation, and licensing review remain. |
-| 2026-09-09 | 10 — Daily refresh job runner (partial) | Added a dependency-injected runner that applies the New York EOD/session guard, coalesces symbols, validates complete provider results, and persists one shared batch. `npm run typecheck`, `npm test` (114 passing), and `git diff --check` passed. | Cloudflare cron wiring, active-symbol discovery, retries/backoff, quota metrics, and production persistence remain. |
-| 2026-09-09 | 10 — Active-symbol discovery (partial) | Added a server-only Supabase reader that finds positive open lots across users, resolves current effective ticker aliases, and returns one sorted unique symbol set; empty portfolios short-circuit safely. `npm run typecheck`, `npm test` (116 passing), and `git diff --check` passed. | Scheduled Worker invocation, provider fetch/persistence wiring, retries/backoff, quota metrics, and stale-price reporting remain. |
-| 2026-09-09 | 10 — Daily refresh retry safeguard (partial) | Added bounded exponential backoff with injectable delays around the guarded daily refresh; transient failures retry while the final error remains visible for job monitoring. `npm run typecheck`, `npm test` (117 passing), and `git diff --check` passed. | Cloudflare schedule, durable job state/dead-letter handling, quota alerts, and stale-price metrics remain. |
-| 2026-09-09 | 10 — Daily refresh telemetry (partial) | Added structured events for refresh attempts, skips, transient/final failures, and persisted batches, including symbol counts and upsert totals. `npm run typecheck`, `npm test` (118 passing), and `git diff --check` passed. | Durable metrics sink, quota alerts, stale-price metrics, and Cloudflare schedule wiring remain. |
-| 2026-09-09 | 10 — Refresh metrics and quota guard (partial) | Added an event collector for attempts, failures, skips, requested symbols, and persisted rows, plus a configurable quota evaluator with the planned 20% reserve alert. `npm run typecheck`, `npm test` (120 passing), and `git diff --check` passed. | Durable metrics storage, provider request reconciliation, stale-price metrics, alerts delivery, and Cloudflare schedule wiring remain. |
-| 2026-09-09 | 10 — Durable market-data run metrics (partial) | Added the service-only `market_data_job_runs` table and REST repository for persisted status, retry/failure, symbol, row, quota, and error counters; local `supabase db lint` passed. `npm run typecheck`, `npm test` (121 passing), and `git diff --check` passed. | Worker orchestration, metrics aggregation sink integration, quota alerts delivery, and stale-price metrics remain. |
-| 2026-09-09 | 10 — Refresh-to-metrics orchestration (partial) | Connected the retryable refresh runner and telemetry collector to a durable run-recorder interface; persisted, skipped, and terminal-failure outcomes each produce one operational record with quota and retry counters. `npm run typecheck`, `npm test` (122 passing), and `git diff --check` passed. | Cloudflare scheduled invocation, live active-symbol/provider/persistence composition, quota alert delivery, and stale-price metrics remain. |
-| 2026-09-09 | 10 — Scheduler composition boundary (partial) | Added a scheduler-ready composition function that loads active symbols and invokes the complete guarded/retryable refresh with persistence and durable run recording. `npm run typecheck`, `npm test` (123 passing), and `git diff --check` passed. | Cloudflare `scheduled` hook, deployment bindings/secrets, live Marketstack writer, quota alert delivery, and stale-price metrics remain. |
-| 2026-09-09 | 10 — Cloudflare scheduled adapter (partial) | Added a `waitUntil`-based Cloudflare scheduled-event adapter and included Worker tests in Vitest; the adapter passes scheduler timestamps into the full refresh composition. `npm run typecheck`, `npm test` (124 passing), Worker dry-run, and `git diff --check` passed. | Production Worker export/factory wiring, deployment bindings/secrets, live Marketstack writer, quota alerts, and stale-price metrics remain. |
-| 2026-09-09 | 10 — Production refresh composition (partial) | Attached the Worker `scheduled` export to concrete Supabase active-symbol, Marketstack, daily-price, and durable-run repositories; required secrets and monthly cap are explicit bindings, and missing configuration fails closed. `npm run typecheck`, `npm test` (125 passing), Worker dry-run, and `git diff --check` passed. | Cloudflare cron declaration, deployed secrets, live provider/database execution, quota alert delivery, and stale-price metrics remain. |
-| 2026-09-09 | 10 — Cron and deployment configuration (partial) | Declared an hourly weekday Cloudflare cron, retained the New York EOD eligibility guard for DST/holidays, added the local 100-request cap, and documented required Worker secrets and production rights review. `npm run typecheck`, `npm test` (125 passing), Worker dry-run, and `git diff --check` passed. | Deploying the Worker, configuring secrets, live provider/database execution, quota alert delivery, and stale-price metrics remain. |
-| 2026-09-09 | 10/12 — Stale-price classification (partial) | Added a pure freshness evaluator that labels each active symbol current, stale, or missing against the expected valuation date, preserving explicit missing data for UI/report disclosure. `npm run typecheck`, `npm test` (126 passing), and `git diff --check` passed. | Database latest-close query, dashboard freshness display, and live scheduled execution remain. |
-| 2026-09-09 | 10/12 — Latest-close storage reader (partial) | Added a service-only Supabase reader that returns the newest stored daily-price date per stable instrument and preserves null for missing history. `npm run typecheck`, `npm test` (127 passing), and `git diff --check` passed. | Symbol-to-ID report composition, dashboard freshness display, and live scheduled execution remain. |
-| 2026-09-09 | 12 — Report freshness composition (partial) | Added a storage-independent report join that maps stable instrument IDs to symbols and emits dashboard-ready current, stale, or missing price states. `npm run typecheck`, `npm test` (128 passing), and `git diff --check` passed. | Authenticated report API, dashboard integration, and live scheduled execution remain. |
-| 2026-09-09 | 12 — Authenticated freshness API (partial) | Added `GET /v1/accounts/:accountId/price-freshness`, requiring a verified bearer session and delegating account ownership/data access to an injected report repository; unavailable reporting storage returns an explicit 503. `npm run typecheck`, `npm test` (129 passing), and `git diff --check` passed. | Concrete Supabase report repository, dashboard integration, and live scheduled execution remain. |
-| 2026-09-09 | 12 — Supabase freshness report repository (partial) | Added the concrete service-only repository that verifies account ownership, reads open lots, resolves effective aliases, queries latest stored closes, and composes current/stale/missing rows. `npm run typecheck`, `npm test` (131 passing), and `git diff --check` passed. | Worker/API factory wiring, dashboard integration, and live scheduled execution remain. |
-| 2026-09-09 | 12 — Freshness API factory wiring (partial) | The API now constructs the concrete Supabase freshness repository from service bindings automatically, retaining injected repositories for tests and explicit 503 behavior when bindings are absent. `npm run typecheck`, `npm test` (131 passing), Worker dry-run, and `git diff --check` passed. | Dashboard client integration and live scheduled execution remain. |
-| 2026-09-09 | 12 — Dashboard freshness integration (partial) | Signed-in users with a selected account now load the authenticated freshness report and see current/stale/missing counts, loading state, and explicit unavailable errors; synthetic demo users remain isolated from live report state. `npm run typecheck`, `npm test` (131 passing), `npm run build`, and `git diff --check` passed. | Full report values/charts, authenticated browser E2E, and live service configuration remain. |
-| 2026-09-09 | 11/12 — Versioned report snapshot publisher (partial) | Added a service-only Supabase publisher for immutable account/consolidated/dashboard snapshots, carrying as-of date, import-state revision, price-revision dependency, and decimal payloads in one insert. `npm run typecheck`, `npm test` (132 passing), local `supabase db lint`, and `git diff --check` passed. | Snapshot generation from persisted ledger/price inputs and authenticated dashboard report reads remain. |
-| 2026-09-09 | 11/12 — Snapshot payload generation (partial) | Added a report payload builder from exact valuation history, preserving activity/price coverage, latest holdings/cash/value, chained return, and unavailable valuation dates. `npm run typecheck`, `npm test` (133 passing), and `git diff --check` passed. | Persisted ledger/price loading, atomic publication orchestration, and authenticated dashboard report reads remain. |
-| 2026-09-09 | 12 — Persisted report read API (partial) | Added a caller-token Supabase snapshot reader and authenticated `GET /v1/accounts/:accountId/report` with RLS-backed latest-snapshot lookup, explicit 503 configuration handling, and 404 empty state. `npm run typecheck`, `npm test` (135 passing), and `git diff --check` passed. | Snapshot generation orchestration, dashboard report integration, and live service configuration remain. |
-| 2026-09-09 | 12 — Dashboard persisted snapshot values (partial) | Dashboard now loads the latest authenticated report snapshot and replaces demo hero value, cash, return, as-of date, and labeling when present; no-snapshot users retain the synthetic demo. `npm run typecheck`, `npm test` (135 passing), `npm run build`, and `git diff --check` passed. | Real holdings tables/charts, snapshot generation from persisted inputs, and browser E2E remain. |
-| 2026-09-09 | 12 — Dashboard persisted holdings (partial) | Authenticated snapshots now replace the synthetic holdings table with stored instrument IDs, quantities, closes, values, and explicit unavailable states; demo users retain synthetic holdings. `npm run typecheck`, `npm test` (135 passing), `npm run build`, and `git diff --check` passed. | Display-name mapping, real charts/dividends/realized gains, and browser E2E remain. |
-| 2026-09-09 | 12 — Instrument display labels (partial) | Added stable label resolution that prefers nonblank stored instrument names and falls back to internal IDs; persisted holdings render both when a friendly name is present. `npm run typecheck`, `npm test` (136 passing), and `git diff --check` passed. | Database display-name loading, real charts/dividends/realized gains, and browser E2E remain. |
-| 2026-09-10 | 02 — Cloudflare queue deployment bindings (partial) | Declared separate import, report, and price Cloudflare Queues with bounded batch/retry settings and dead-letter queues in `wrangler.api.toml`; Wrangler dry-run confirmed all bindings. Documented that request handlers remain authoritative until consumers are implemented. | Queue producers/consumers, persistent processing status, and deployed queue resources remain. |
-| 2026-09-10 | 02 — Typed portfolio module boundaries | Added the public `PortfolioModulePorts` composition contract and test for identity/billing, accounts, ingestion, ledger, calculations, market data, and reporting seams. Documented the dependency direction so adapters can evolve behind typed ports. `npm run typecheck`, `npm test`, and `git diff --check` passed. | Queue consumers, live service configuration, and database/browser integration remain. |
-| 2026-09-10 | 03 — Private signed statement upload boundary (partial) | Added an account-ownership check and server-only Supabase Storage signed-upload repository for the private `brokerage-statements` bucket, with path-traversal/file-name validation and failure handling. Repository tests cover authorized, unauthorized, and invalid-name cases. | Live Supabase Storage execution, upload completion, retention job, and import linkage remain. |
-| 2026-09-10 | 03/11 — Idempotent report publication | Added a generated publication key and unique index for report snapshots, then changed the service repository to use conflict-safe upserts so retried publication cannot duplicate the same account/date/import/price revision. Repository coverage verifies the conflict target and merge preference. | Migration still requires application to a configured project; report generation from persisted inputs remains. |
-| 2026-09-10 | 05 — Account activity coverage | Added a transactional Supabase trigger that derives each account’s activity coverage from its committed imports and recomputes it after commit or undo, keeping it independent from valuation price freshness. Local schema lint passed. | Live project migration and UI display remain. |
-| 2026-09-10 | 03/07 — Signed-upload API boundary (partial) | Added authenticated `POST /v1/accounts/:accountId/upload-url`, forwarding the verified user token through the account ownership check before issuing a private Storage URL. API coverage verifies the account-scoped request and response. | Browser upload completion, storage-object linkage, retention execution, and live-project verification remain. |
-| 2026-09-10 | 06 — Complete supported activity normalization | Added regression coverage for Robinhood buys, sells, cash dividends, interest, fees, IRA contributions/distributions, and internal transfers, including signed cash-flow and external-flow semantics. | Persisted import processing and live fixtures remain. |
-| 2026-09-10 | 09 — Resumable historical-page persistence | Added `ingestDoltHubHistory`, which walks bounded pages, preserves one source revision, resolves date-effective stable aliases, persists accepted unadjusted closes, and aggregates quarantined records. Revision changes fail closed. Coverage now checks both-page cursoring and revision mismatch handling. | Live DoltHub run, independent validation, corrections, and licensing review remain. |
-| 2026-09-10 | 09 — Historical continuity safeguards | Added trading-calendar-aware missing-date detection and date-effective alias-gap detection to historical ingestion; issues are surfaced as metadata without inventing prices. Tests cover a missing trading day and an unresolved ticker. | Live dataset validation, corrections, and licensing review remain. |
-| 2026-09-10 | 09 — Evidence-backed correction persistence (partial) | Added a service-only Supabase writer for evidence-backed corrections with an idempotent instrument/date/version conflict key; repository coverage verifies persisted evidence and retry-safe upserts. | Report dependency wiring and independent evidence review remain. |
-| 2026-09-10 | 11/12 — Ledger report metrics in snapshots (partial) | Snapshot payloads now carry exact ledger net deposits, dividend income, and FIFO realized gain/loss, and authenticated dashboard cards render persisted dividend/realized values when present. | Snapshot generation still needs persisted-ledger orchestration; charts, allocation, and live detail views remain. |
-| 2026-09-10 | 11/12 — Persisted valuation chart data (partial) | Snapshot payloads now include daily valuation points, preserving nulls for unavailable dates; the authenticated dashboard chart uses persisted history and never falls back to synthetic demo points for a live account. | Snapshot generation from persisted inputs, allocation, and live detail views remain. |
-| 2026-09-10 | 12 — Dashboard report state handling (partial) | Added explicit authenticated report loading, failure, and incomplete-valuation messaging; failed requests no longer silently fall back to synthetic-looking values. | Empty-snapshot copy, stale retry actions, and browser E2E remain. |
-| 2026-09-10 | 12 — Dashboard account selection (partial) | Added an accessible Overview account selector wired to the authenticated report/freshness reload path; consolidated reporting remains unavailable until its snapshot pipeline exists. | Consolidated selection, allocation, and browser E2E remain. |
-| 2026-09-10 | 12 — Dashboard retry states (partial) | Added explicit Retry controls for failed authenticated report and price-freshness requests, re-running the same account-scoped API calls without mixing in demo data. | Empty-snapshot copy, stale-specific actions, and browser E2E remain. |
-| 2026-09-10 | 01/12 — Prevent demo leakage for live accounts | Authenticated account context now shows an explicit awaiting-report state, blank metrics, and no synthetic holdings/chart fallback until a persisted snapshot exists; unauthenticated visitors retain the demo. | Full empty-state, stale handling, and browser E2E remain. |
-| 2026-09-10 | 02/12 — Public browser smoke coverage | Added Playwright smoke tests for landing, sign-in, and clearly labeled synthetic dashboard routes. These intentionally do not claim authenticated E2E coverage before a hosted Supabase project exists. | Authenticated import/report flows and live browser fixtures remain. |
-| 2026-09-10 | 03/12 — Public keyboard landmarks (partial) | Added focus-visible skip links and stable content landmarks to the landing and sign-in surfaces, with browser assertions for keyboard focus and destinations. | Authenticated dashboard/import accessibility, mobile layouts, and 200% text verification remain. |
-| 2026-09-10 | 04/12 — Price freshness detail (partial) | The account-scoped dashboard freshness panel now lists every tracked symbol with current, stale, or missing status and its latest stored close date. | Live storage verification, stale-price remediation actions, and full accessibility coverage remain. |
-| 2026-09-10 | 05/12 — Coverage dates (partial) | Live dashboard reports now show activity coverage and price coverage as separate dates, with unavailable values explicit when the snapshot omits them. | Consolidated coverage, live fixtures, and incomplete-history interaction testing remain. |
-| 2026-09-10 | 06/12 — Typed queue dispatcher (partial) | Added discriminated import, report, and price job contracts plus a retry-aware dispatcher that acknowledges malformed poison messages and retries transient handler failures. | Wire handlers to durable repositories, Cloudflare Queue events, and dead-letter monitoring. |
-| 2026-09-10 | 07/12 — Live price-source labeling (partial) | Live account reports now identify their values as stored daily closes, while the unauthenticated synthetic demo retains the explicit disconnected label. | Provider provenance, live deployment, and full authenticated browser coverage remain. |
-| 2026-09-10 | 08/12 — Activity demo isolation (partial) | Authenticated Activity views now show an explicit pending-reader state and import action instead of synthetic transactions; the synthetic table remains limited to unauthenticated demo sessions. | Persisted activity reader, live activity rows, and authenticated browser fixtures remain. |
-| 2026-09-10 | 09/12 — Account loading recovery (partial) | Account loading failures now remain visible with an accessible alert and retry action instead of silently falling back to an empty account list. | Live backend fixtures, retry telemetry, and complete authenticated flow coverage remain. |
-| 2026-09-10 | 10/12 — Authenticated shell clarity (partial) | Signed-in sessions now use an account-workspace label instead of the synthetic-demo badge; section navigation has an accessible label and current-section marker. | Full authenticated accessibility audit and live fixtures remain. |
-| 2026-09-10 | 11 — Snapshot publication composition | Added a reporting composition service that builds an exact payload, requires a valuation as-of date, carries activity/price/import revisions, and publishes through the idempotent snapshot writer. Tests verify the full handoff and empty-history rejection. | Persisted-ledger input loading and live deployment remain. |
-| 2026-09-10 | 11 — Corporate-action-aware valuation | Valuation now applies only validated, effective-dated splits and symbol changes to open lots before pricing, preserving basis and quarantining unvalidated actions through the existing guard. Fixtures verify split quantity/value behavior. | Persisted corporate-action loading, live report orchestration, and independent source validation remain. |
-| 2026-09-10 | 10 — Durable monthly Marketstack cap guard (partial) | Added a service-only monthly quota reader over durable pricing-run metrics and a preflight guard that skips before provider calls when the application cap would be exceeded; worker scheduling now supplies the guard. Tests cover cap exhaustion. | Quota alert delivery, production persistence, and full stale-price metrics remain. |
-| 2026-09-10 | 08 — Cross-account lot transfer basis | Added FIFO lot transfer application for reconciled inbound/outbound share transfers, preserving acquisition dates and proportional cost basis while leaving insufficient or mismatched transfers unresolved. Tests cover partial-lot transfers and rollback on insufficient shares. | Persisted transfer execution and consolidated report orchestration remain. |
-| 2026-09-09 | 07 — Import workflow (partial) | Lifecycle and review-commit blocking rules added; `npm run typecheck`, `npm test` (25 passing), and `npm run build` passed | Lifecycle is not yet persisted or processed through queues |
-| 2026-09-09 | 08 — Corporate-action safeguards (partial) | Validated split and ticker-change lot handling added; `npm run typecheck`, `npm test` (28 passing), and `npm run build` passed | Corporate actions are not yet sourced, evidenced, or connected to stored price history |
-| 2026-09-09 | 08 — Internal-transfer linking (partial) | Reconciled-account transfer linking and unresolved-transfer rules added; `npm run typecheck`, `npm test` (30 passing), and `npm run build` passed | Transferred lots/basis require persisted cross-account transfer workflows |
-| 2026-09-09 | 04 — Authentication boundary (partial) | Supabase email/password, Google OAuth, reset, sign-out, and error-path interfaces added; `npm run typecheck`, `npm test` (33 passing), and `npm run build` passed | Live provider configuration, session handling, protected routes, and profile UI require a configured Supabase project |
-| 2026-09-09 | 13 — Billing entitlement rules (partial) | One-time trial and replay-safe event reducers added; `npm run typecheck`, `npm test` (36 passing), and `npm run build` passed | Stripe products, signed HTTP webhooks, checkout, billing portal, and server enforcement require Stripe configuration |
-| 2026-09-09 | 14 — Raw-file retention (partial) | 30-day retention eligibility and auditable deletion-state rules added; `npm run typecheck`, `npm test` (38 passing), and `npm run build` passed | Storage deletion job, retries, and verification require private Supabase storage |
-| 2026-09-09 | 14 — User-deletion rules (partial) | User-data deletion lifecycle and complete cleanup-plan rules added; `npm run typecheck`, `npm test` (40 passing), and `npm run build` passed | Actual storage, billing, database, and export execution requires configured services |
-| 2026-09-09 | 03/04 — Local Supabase configuration (partial) | Supabase CLI configuration initialized with product-aligned local auth, redirects, file-size settings, and a local public-client configuration | Docker Desktop 4.90.0 has a Windows runtime-socket failure that prevents stable local database startup; no hosted Supabase project is linked |
-| 2026-09-09 | 04 — Worker session verification (partial) | Commit `02c4f26`; `GET /v1/me` verifies Supabase bearer tokens server-side and returns only a validated user; `npm run typecheck`, `npm test` (48 passing), `npm run build`, and Worker dry-run passed | Hosted Supabase configuration, frontend route protection, and persistence authorization are still incomplete |
-| 2026-09-09 | 02 — Standalone API Worker foundation (partial) | Hono Worker entrypoint, deployment config, binding-safe health route, and dry-run bundle added; `npm run typecheck` and `npm test` (41 passing) passed | Queues, schedules, authenticated API routes, and deployed configuration remain pending |
-| 2026-09-09 | 02/03/04/07 — Local database and authenticated import staging | Docker Desktop 4.90.0 repaired; local Supabase reset applied all three migrations and `db lint` passed. A real local user created an account, previewed and staged a CSV, listed its staged import, and a second authenticated user was denied access. Worker compatibility date and Worker-safe `fetch` adapters were corrected. `npm run typecheck`, `npm test` (88 passing), `npm run build`, and Worker dry-run passed | No hosted Supabase project, private file-object upload, durable commit/undo, or protected app UI yet |
+| 2026-09-10 | Checklist re-audit at `60ba90a` | Read API/UI, migrations, queue/price/report/ledger/billing paths and test/CI setup; reran typecheck and Vitest: 50 files / 160 tests passed. Replaced stale status summary, split implementation from integration gates, added concrete correctness work, and reordered dependencies. | Documentation only; no fixes, hosted/database/storage/provider/browser execution or license clearance claimed. |
 
-For each future implementation task: select the next numbered milestone, complete its checks, run its acceptance scenarios, and update this file with the date, commit and test results. Leave any unverified subtask unchecked. Do not count an entire milestone complete because its screen exists.
+Earlier implementation history is preserved in [docs/IMPLEMENTATION_HISTORY.md](docs/IMPLEMENTATION_HISTORY.md). Its old checkmarks/limits are historical, not current status. For each future milestone, record stable task IDs, commit, tests and remaining limits here; update counts only for this file's task lines.
