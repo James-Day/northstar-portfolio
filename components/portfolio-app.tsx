@@ -12,6 +12,7 @@ import { Activity, calculateSummary, demoActivities, demoHoldings, demoPrices, p
 import { createPublicSupabaseClient } from '@/services/supabase/client';
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
+type LiveAccount = { id: string; name: string; account_type: 'individual' | 'traditional_ira' | 'roth_ira'; brokerage: 'robinhood'; created_at: string };
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const precise = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
@@ -33,19 +34,50 @@ export function PortfolioApp({ supabaseConfig }: { supabaseConfig?: PublicSupaba
   const summary = useMemo(() => calculateSummary(demoActivities), []);
   const client = useMemo(() => supabaseConfig ? createPublicSupabaseClient(supabaseConfig) : undefined, [supabaseConfig]);
   const [email, setEmail] = useState<string>();
+  const [userId, setUserId] = useState<string>();
+  const [accounts, setAccounts] = useState<LiveAccount[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
 
   useEffect(() => {
     if (!client) return;
     let active = true;
     void client.auth.getUser().then(({ data }) => {
-      if (active) setEmail(data.user?.email);
+      if (active) {
+        setEmail(data.user?.email);
+        setUserId(data.user?.id);
+      }
     });
-    const { data: listener } = client.auth.onAuthStateChange((_event, session) => setEmail(session?.user.email));
+    const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
+      setEmail(session?.user.email);
+      setUserId(session?.user.id);
+    });
     return () => {
       active = false;
       listener.subscription.unsubscribe();
     };
   }, [client]);
+
+  useEffect(() => {
+    if (!client || !userId) {
+      setAccounts([]);
+      return;
+    }
+    let active = true;
+    setAccountsLoading(true);
+    void client.from('accounts').select('id,name,account_type,brokerage,created_at').order('created_at', { ascending: true }).then(({ data, error }) => {
+      if (!active) return;
+      setAccountsLoading(false);
+      if (!error) setAccounts((data ?? []) as LiveAccount[]);
+    });
+    return () => { active = false; };
+  }, [client, userId]);
+
+  async function createAccount(input: { name: string; accountType: LiveAccount['account_type'] }) {
+    if (!client || !userId) throw new Error('Sign in before creating an account.');
+    const { data, error } = await client.from('accounts').insert({ user_id: userId, brokerage: 'robinhood', account_type: input.accountType, name: input.name.trim(), currency: 'USD' }).select('id,name,account_type,brokerage,created_at').single();
+    if (error) throw new Error(error.message);
+    setAccounts((current) => [...current, data as LiveAccount]);
+  }
 
   async function signOut() {
     await client?.auth.signOut();
@@ -100,7 +132,7 @@ export function PortfolioApp({ supabaseConfig }: { supabaseConfig?: PublicSupaba
         <button onClick={() => setMenuOpen(true)} className="mb-5 grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white md:hidden" aria-label="Open navigation"><Menu size={18} /></button>
         {active === 'Overview' && <Overview summary={summary} onUpload={openFileChooser} />}
         {active === 'Activity' && <ActivityPanel onUpload={openFileChooser} />}
-        {active === 'Accounts' && <Accounts summary={summary} />}
+        {active === 'Accounts' && <Accounts summary={summary} accounts={accounts} isLoading={accountsLoading} canCreate={Boolean(client && userId)} onCreate={createAccount} />}
         {active === 'Documents' && <Documents onUpload={openFileChooser} uploadError={uploadError} />}
       </section>
     </div>
@@ -121,7 +153,37 @@ function Holdings() { return <section className="rounded-3xl border border-slate
 
 function ActivityPanel({ onUpload }: { onUpload: () => void }) { return <><div className="mb-8 flex items-end justify-between"><div><Pill tone="gold">Demo data</Pill><h1 className="mt-3 text-3xl font-bold tracking-tight">Example activity</h1></div><Button onClick={onUpload} className="rounded-xl bg-[#185da8] text-white"><Plus size={16}/>Preview CSV</Button></div><section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><p className="mb-5 text-sm text-slate-500">Synthetic transactions only. A CSV preview is not saved and does not affect this example.</p><div className="overflow-x-auto"><table className="w-full min-w-[660px] text-left"><thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400"><tr><th className="pb-3">Date</th><th className="pb-3">Activity</th><th className="pb-3">Symbol</th><th className="pb-3">Details</th><th className="pb-3 text-right">Amount</th></tr></thead><tbody>{demoActivities.slice().reverse().map((item) => <tr key={item.id} className="border-b border-slate-50 last:border-0"><td className="py-4 text-sm text-slate-500">{item.date}</td><td className="py-4"><Pill tone={item.kind === 'dividend' ? 'green' : 'slate'}>{item.kind.replace('_', ' ')}</Pill></td><td className="py-4 text-sm font-bold">{item.symbol ?? '—'}</td><td className="py-4 text-sm text-slate-500">{item.description}</td><td className={`py-4 text-right text-sm font-bold ${item.amount >= 0 ? 'text-emerald-600' : ''}`}>{item.amount >= 0 ? '+' : ''}{precise.format(item.amount)}</td></tr>)}</tbody></table></div></section></>; }
 
-function Accounts({ summary }: { summary: ReturnType<typeof calculateSummary> }) { return <><div className="mb-8"><Pill tone="gold">Demo data</Pill><h1 className="mt-3 text-3xl font-bold tracking-tight">Example account</h1></div><section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center gap-4"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-700"><CircleDollarSign size={23}/></span><div className="flex-1"><p className="font-bold">Example taxable brokerage</p><p className="mt-0.5 text-sm text-slate-500">Fictional account · no brokerage connected</p></div><p className="text-xl font-bold">{fmt.format(summary.value)}</p></div></section></>; }
+function Accounts({ summary, accounts, isLoading, canCreate, onCreate }: { summary: ReturnType<typeof calculateSummary>; accounts: LiveAccount[]; isLoading: boolean; canCreate: boolean; onCreate: (input: { name: string; accountType: LiveAccount['account_type'] }) => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [accountType, setAccountType] = useState<LiveAccount['account_type']>('individual');
+  const [error, setError] = useState<string>();
+  const [saving, setSaving] = useState(false);
+
+  async function submit() {
+    if (!name.trim()) { setError('Give this account a name.'); return; }
+    setSaving(true);
+    setError(undefined);
+    try {
+      await onCreate({ name, accountType });
+      setName('');
+      setAccountType('individual');
+      setOpen(false);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'We could not create that account.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!canCreate) return <><div className="mb-8"><Pill tone="gold">Demo data</Pill><h1 className="mt-3 text-3xl font-bold tracking-tight">Example account</h1></div><section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center gap-4"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-700"><CircleDollarSign size={23}/></span><div className="flex-1"><p className="font-bold">Example taxable brokerage</p><p className="mt-0.5 text-sm text-slate-500">Fictional account · no brokerage connected</p></div><p className="text-xl font-bold">{fmt.format(summary.value)}</p></div></section></>;
+
+  return <><div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><Pill tone="green">Your accounts</Pill><h1 className="mt-3 text-3xl font-bold tracking-tight">Accounts</h1><p className="mt-2 text-sm text-slate-500">Accounts are stored securely. Values appear after a committed import and price coverage.</p></div><Button onClick={() => setOpen(true)} className="rounded-xl bg-[#185da8] text-white"><Plus size={16}/>Add account</Button></div>{isLoading ? <section className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">Loading your accounts…</section> : accounts.length === 0 ? <section className="grid min-h-64 place-items-center rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><div><WalletCards className="mx-auto text-[#185da8]" size={28}/><h2 className="mt-4 text-xl font-bold">Add your Robinhood account</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">Choose the account type before you upload its activity CSV. Your imported activity stays separate by account.</p><Button onClick={() => setOpen(true)} className="mt-5 rounded-xl bg-[#185da8] text-white">Add account</Button></div></section> : <section className="space-y-3">{accounts.map((account) => <article key={account.id} className="flex items-center gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-700"><CircleDollarSign size={23}/></span><div className="flex-1"><p className="font-bold">{account.name}</p><p className="mt-0.5 text-sm text-slate-500">Robinhood · {accountTypeLabel(account.account_type)}</p></div><p className="text-sm font-semibold text-slate-500">No live valuation yet</p></article>)}</section>}<Dialog open={open} onOpenChange={setOpen}><DialogContent className="rounded-3xl bg-white p-6 md:p-8"><DialogHeader><DialogTitle className="text-2xl font-bold">Add a Robinhood account</DialogTitle><DialogDescription className="text-sm text-slate-500">Select the account that matches the activity CSV you plan to import.</DialogDescription></DialogHeader><div className="space-y-4"><label className="block text-sm font-semibold text-slate-700">Account name<Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Taxable brokerage" className="mt-1.5 h-11 rounded-xl" autoFocus /></label><label className="block text-sm font-semibold text-slate-700">Account type<select value={accountType} onChange={(event) => setAccountType(event.target.value as LiveAccount['account_type'])} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-[#185da8] focus:ring-2 focus:ring-[#185da8]/20"><option value="individual">Individual brokerage</option><option value="traditional_ira">Traditional IRA</option><option value="roth_ira">Roth IRA</option></select></label>{error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}</div><DialogFooter><Button disabled={saving} onClick={submit} className="rounded-xl bg-[#185da8] text-white">{saving ? 'Creating…' : 'Create account'}</Button></DialogFooter></DialogContent></Dialog></>;
+}
+
+function accountTypeLabel(accountType: LiveAccount['account_type']) {
+  return { individual: 'Individual brokerage', traditional_ira: 'Traditional IRA', roth_ira: 'Roth IRA' }[accountType];
+}
 
 function Documents({ onUpload, uploadError }: { onUpload: () => void; uploadError: string }) { return <><div className="mb-8"><Pill tone="gold">Local preview only</Pill><h1 className="mt-3 text-3xl font-bold tracking-tight">CSV preview</h1></div><section className="grid min-h-80 place-items-center rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><div><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#eaf2ff] text-[#185da8]"><FileUp size={25}/></span><h2 className="mt-5 text-xl font-bold">Preview a Robinhood activity CSV</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">This early prototype reads a selected CSV in your browser only to show a temporary interpretation. It does not upload, store, or add the rows to a portfolio.</p><Button onClick={onUpload} className="mt-6 rounded-xl bg-[#185da8] text-white"><Upload size={16}/>Choose CSV</Button>{uploadError && <p role="alert" className="mx-auto mt-4 max-w-md rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{uploadError}</p>}<p className="mt-4 text-xs text-slate-400">CSV only · Up to 10 MB · Storage and secure import are not implemented yet</p></div></section></>; }
 
