@@ -33,8 +33,12 @@ const transactionCodes: Record<string, RobinhoodActivityType> = {
   'CASH DIVIDEND': 'dividend',
   'DIVIDEND REINVESTMENT': 'drip_buy',
   'DIVIDEND REINVEST': 'drip_buy',
+  CDIV: 'dividend',
+  MDIV: 'dividend',
   INTEREST: 'interest',
+  SLIP: 'interest',
   FEE: 'fee',
+  AFEE: 'fee',
   'ACH DEPOSIT': 'deposit',
   'ACH WITHDRAWAL': 'withdrawal',
   'IRA CONTRIBUTION': 'deposit',
@@ -45,6 +49,16 @@ const transactionCodes: Record<string, RobinhoodActivityType> = {
 };
 
 function normalizedHeader(header: string) { return header.trim().toLowerCase(); }
+
+function transactionTypeFor(code: string, description: string): RobinhoodActivityType | undefined {
+  if (code === 'ACH') {
+    const normalizedDescription = description.trim().toUpperCase();
+    if (normalizedDescription === 'ACH DEPOSIT') return 'deposit';
+    if (normalizedDescription === 'ACH WITHDRAWAL') return 'withdrawal';
+    return undefined;
+  }
+  return transactionCodes[code];
+}
 
 function parseDate(value: string): IsoDate {
   const trimmed = value.trim();
@@ -94,11 +108,12 @@ export function parseRobinhoodActivityCsv(csv: string): ParsedRobinhoodRow[] {
     if (!headerSet.has(required)) throw new Error(`Robinhood CSV is missing the required ${required} column.`);
   }
 
-  return records.map((raw, index) => {
+  return records.flatMap<ParsedRobinhoodRow>((raw, index) => {
     const rowNumber = index + 2;
+    if (Object.values(raw).every((value) => !value.trim())) return [];
     const code = raw['trans code'].trim().toUpperCase();
-    const type = transactionCodes[code];
-    if (!type) return { rowNumber, raw, status: 'unsupported', message: `Unsupported Robinhood transaction code: ${raw['trans code'] || '(blank)'}.` };
+    const type = transactionTypeFor(code, raw.description ?? '');
+    if (!type) return [{ rowNumber, raw, status: 'unsupported', message: `Unsupported Robinhood transaction code: ${raw['trans code'] || '(blank)'}.` }];
     try {
       const symbol = raw.instrument?.trim().toUpperCase() || null;
       const quantity = parseDecimal(raw.quantity ?? raw['quantity transacted'] ?? '', 'quantity', true);
@@ -107,7 +122,7 @@ export function parseRobinhoodActivityCsv(csv: string): ParsedRobinhoodRow[] {
       if (['buy', 'sell', 'drip_buy'].includes(type) && (!symbol || !quantity || new Decimal(quantity).lte(0))) {
         throw new Error(`Row ${rowNumber} requires an instrument and positive quantity for ${type}.`);
       }
-      return {
+      return [{
         rowNumber,
         raw,
         status: 'supported',
@@ -120,14 +135,14 @@ export function parseRobinhoodActivityCsv(csv: string): ParsedRobinhoodRow[] {
           amount: directedAmount(type, amount!),
           description: raw.description?.trim() || raw['trans code'].trim(),
         },
-      };
+      }];
     } catch (error) {
-      return {
+      return [{
         rowNumber,
         raw,
         status: 'invalid',
         message: error instanceof Error ? error.message : `Row ${rowNumber} is invalid.`,
-      };
+      }];
     }
   });
 }

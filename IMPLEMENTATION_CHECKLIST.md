@@ -104,7 +104,7 @@ Acceptance: multiple accounts remain separate, fractional positions are supporte
 - [ ] Obtain redacted official brokerage and IRA CSV fixtures; add sanitized fixtures with expected results.
 - [x] Use a real CSV parser supporting quoted commas, escaped quotes, embedded newlines and BOMs.
 - [x] Validate dates, signed amounts, parentheses, decimals, required headers and row counts; enforce 10 MB / 50,000 rows in the server-side parser.
-- [ ] Map verified Robinhood transaction codes rather than guessing from descriptions or using Process Date as the transaction type.
+- [x] Map verified Robinhood transaction codes rather than guessing from descriptions or using Process Date as the transaction type.
 - [ ] Normalize buys/sells, dividends, reinvestment buys, interest, fees, deposits/withdrawals, incentives and supported transfers.
 - [x] Preserve raw rows and parsing errors in the parser result; unsupported rows remain visible instead of disappearing.
 - [x] Default unfamiliar transaction codes to material during import review, so a reportable import cannot commit until their impact is resolved.
@@ -121,7 +121,7 @@ Acceptance: supported fixtures reconcile row-for-row; malformed values never sil
 - [ ] Queue parsing and persist staged results with progress/failure status.
 - [ ] Show source rows, interpreted transactions, account/date range, duplicates and actionable warnings.
 - [x] Implement multiplicity-aware overlap fingerprints including account, date, type, symbol, quantity, price, amount and description.
-- [ ] Connect fingerprints to persisted file hashes and committed imports for identical-file idempotency.
+- [x] Connect fingerprints to persisted file hashes and committed imports for identical-file idempotency.
 - [x] Commit accepted records atomically with concurrency protection and an outbox event for recomputation.
 - [ ] Add discard, import history and undo that preserves audit history and recomputes downstream state.
 
@@ -259,6 +259,7 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 09 — Price quality (partial) | Commit `8257aa9`; candidate-close quarantine guard added with duplicate, invalid-close, extreme-move, and normal-history fixtures; `npm run typecheck`, `npm test` (19 passing), and `npm run build` passed | DoltHub ingestion, independent validation, aliases, corrections, and licensing resolution remain unimplemented |
 | 2026-09-09 | 07 — Import deduplication (partial) | Commit `1d8e14d`; multiplicity-aware activity fingerprinting and overlap exclusion added; `npm run typecheck`, `npm test` (22 passing), and `npm run build` passed | Queue-backed staging, atomic commit/undo, persisted idempotency, and import history require the Supabase backend |
 | 2026-09-09 | 07 — Atomic import commit (partial) | Commit pending; RLS-scoped `commit_import` migration locks review-ready imports, persists ledger entries/lots, treats DRIP as income plus reinvestment, marks imports committed, and writes a report-recompute outbox event. Endpoint/repository tests plus `npm run typecheck`, `npm test` (93 passing), `npm run build`, Worker dry-run, and local schema lint passed. | Persisted overlap-fingerprint enforcement, FIFO lot consumption on sales, background recomputation, undo, and UI review/commit remain. |
+| 2026-09-09 | 06/07 — Real-export parser coverage and durable overlap exclusion (partial) | A user-provided 589-row Robinhood activity CSV established exact mappings for `CDIV`, `MDIV`, `AFEE`, `SLIP`, and `ACH` descriptions; blank records are ignored and split rows remain explicit blockers. Local Supabase integration committed an overlapping two-row import as one new activity with `duplicate,supported` source statuses. | Validated split handling, sanitized shareable fixtures, UI review, and report recomputation remain. |
 | 2026-09-09 | 07 — Import workflow (partial) | Lifecycle and review-commit blocking rules added; `npm run typecheck`, `npm test` (25 passing), and `npm run build` passed | Lifecycle is not yet persisted or processed through queues |
 | 2026-09-09 | 08 — Corporate-action safeguards (partial) | Validated split and ticker-change lot handling added; `npm run typecheck`, `npm test` (28 passing), and `npm run build` passed | Corporate actions are not yet sourced, evidenced, or connected to stored price history |
 | 2026-09-09 | 08 — Internal-transfer linking (partial) | Reconciled-account transfer linking and unresolved-transfer rules added; `npm run typecheck`, `npm test` (30 passing), and `npm run build` passed | Transferred lots/basis require persisted cross-account transfer workflows |
