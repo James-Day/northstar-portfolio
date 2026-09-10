@@ -8,6 +8,13 @@ Northstar is a US-focused portfolio-tracker prototype. It currently offers a cle
 2. Run `npm install` and `npm run dev`.
 3. Run `npm run typecheck`, `npm test`, and `npm run build` before submitting changes.
 
+For a local database reset, install the Supabase CLI and Docker Desktop, then
+run `supabase start` followed by `supabase db reset` from this repository. The
+reset applies every migration and the deterministic `supabase/seed.sql`
+fixtures; it does not touch a hosted project. Use the local Auth API to create
+two test users and verify that each can see only its own accounts before
+running authenticated browser tests.
+
 ## Architecture direction
 
 The present UI is a Vinext/Sites application. The planned production system keeps a separate Cloudflare Hono API boundary and uses Supabase over HTTP for authentication, PostgreSQL, and private storage. Financial values cross API boundaries as canonical decimal strings and will be stored as `NUMERIC(38,12)` in PostgreSQL. Economic dates are `YYYY-MM-DD`; system events will use UTC timestamps.
