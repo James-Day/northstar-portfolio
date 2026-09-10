@@ -1,0 +1,11 @@
+import { describe, expect, it, vi } from 'vitest';
+import { SupabaseReportSnapshotReader } from '@/services/supabase/report-snapshot-reader';
+
+describe('Supabase report snapshot reader', () => {
+  it('reads the latest account snapshot with the caller token', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify([{ id: '11111111-1111-4111-8111-111111111111', user_id: '22222222-2222-4222-8222-222222222222', account_id: '33333333-3333-4333-8333-333333333333', report_type: 'account_daily', as_of_date: '2026-07-06', import_state_revision: 'rev-1', price_revision_id: null, payload: { totalValue: '100' }, published_at: '2026-07-06T23:00:00Z' }])));
+    const reader = new SupabaseReportSnapshotReader({ supabaseUrl: 'https://supabase.test', anonKey: 'public-key', fetcher: fetcher as typeof fetch });
+    await expect(reader.getLatest('33333333-3333-4333-8333-333333333333', 'user-token')).resolves.toMatchObject({ asOfDate: '2026-07-06', payload: { totalValue: '100' } });
+    expect(fetcher.mock.calls[0][1].headers.authorization).toBe('Bearer user-token');
+  });
+});

@@ -61,6 +61,13 @@ describe('standalone API', () => {
     await expect(response.json()).resolves.toEqual({ report: { expectedDate: '2026-07-06', rows: [{ symbol: 'AAPL', expectedDate: '2026-07-06', latestDate: null, status: 'missing' }] } });
   });
 
+  it('serves the latest persisted report snapshot through the authenticated route', async () => {
+    const app = createApi({ verifySession: async () => ({ id: 'user-123' }), reportSnapshotReader: { getLatest: async (accountId, token) => { expect(accountId).toBe('account-123'); expect(token).toBe('session-token'); return { id: '11111111-1111-4111-8111-111111111111', userId: 'user-123', accountId: 'account-123', reportType: 'account_daily', asOfDate: '2026-07-06', importStateRevision: 'rev-1', priceRevisionId: null, payload: { totalValue: '100' }, publishedAt: '2026-07-06T23:00:00Z' }; } } });
+    const response = await app.request('http://api.test/v1/accounts/account-123/report', { headers: { authorization: 'Bearer session-token' } });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ snapshot: { asOfDate: '2026-07-06', payload: { totalValue: '100' } } });
+  });
+
   it('lists accounts only after verifying the caller and carries the same token into the RLS repository', async () => {
     const list = async (userId: string, token: string) => {
       expect(userId).toBe('user-123');

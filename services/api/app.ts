@@ -10,6 +10,7 @@ import { stageRobinhoodImport, toPersistableImportStage } from '@/services/inges
 import { ImportOperationRejectedError, SupabaseImportsRepository, type ImportsRepository } from '@/services/supabase/imports-repository';
 import type { PriceFreshnessReportRepository } from '@/services/reporting/price-freshness';
 import { SupabasePriceFreshnessReportRepository } from '@/services/supabase/price-freshness-report-repository';
+import { SupabaseReportSnapshotReader, type ReportSnapshot } from '@/services/supabase/report-snapshot-reader';
 
 export type ApiBindings = {
   APP_ENV?: 'development' | 'staging' | 'production';
@@ -26,6 +27,7 @@ export type ApiDependencies = {
   accountsRepository?: AccountsRepository;
   importsRepository?: ImportsRepository;
   priceFreshnessRepository?: PriceFreshnessReportRepository;
+  reportSnapshotReader?: { getLatest(accountId: string, accessToken: string): Promise<ReportSnapshot | undefined> };
 };
 
 export function createApi(dependencies: ApiDependencies = {}) {
@@ -38,6 +40,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
   const accountsRepository = dependencies.accountsRepository;
   const importsRepository = dependencies.importsRepository;
   const priceFreshnessRepository = dependencies.priceFreshnessRepository;
+  const reportSnapshotReader = dependencies.reportSnapshotReader;
 
   api.use('*', async (context, next) => {
     const origin = context.req.header('origin');
@@ -98,6 +101,16 @@ export function createApi(dependencies: ApiDependencies = {}) {
     const report = await repository.get(context.req.param('accountId'), authenticated.user.id, authenticated.accessToken);
     if (!report) return context.json({ error: 'not_found' }, 404);
     return context.json({ report });
+  });
+
+  api.get('/v1/accounts/:accountId/report', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    const reader = reportSnapshotReader ?? createReportSnapshotReader(context.env);
+    if (!reader) return context.json({ error: 'reporting_unavailable' }, 503);
+    const snapshot = await reader.getLatest(context.req.param('accountId'), authenticated.accessToken);
+    if (!snapshot) return context.json({ error: 'not_found' }, 404);
+    return context.json({ snapshot });
   });
 
   api.post('/v1/accounts/:accountId/import-preview', async (context) => {
@@ -227,6 +240,11 @@ function createImportsRepository(bindings: ApiBindings): ImportsRepository {
 function createPriceFreshnessRepository(bindings: ApiBindings): PriceFreshnessReportRepository | undefined {
   if (!bindings.SUPABASE_URL || !bindings.SUPABASE_SERVICE_ROLE_KEY) return undefined;
   return new SupabasePriceFreshnessReportRepository({ supabaseUrl: bindings.SUPABASE_URL, serviceRoleKey: bindings.SUPABASE_SERVICE_ROLE_KEY });
+}
+
+function createReportSnapshotReader(bindings: ApiBindings) {
+  if (!bindings.SUPABASE_URL || !bindings.SUPABASE_ANON_KEY) return undefined;
+  return new SupabaseReportSnapshotReader({ supabaseUrl: bindings.SUPABASE_URL, anonKey: bindings.SUPABASE_ANON_KEY });
 }
 
 function readBearerToken(request: Request): string | undefined {
