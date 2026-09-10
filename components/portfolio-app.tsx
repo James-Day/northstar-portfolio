@@ -89,6 +89,7 @@ type LiveImportSummary = {
   createdAt: string;
   committedAt?: string | null;
 };
+type LiveFreshnessReport = { expectedDate: string; rows: Array<{ symbol: string; expectedDate: string; latestDate: string | null; status: 'current' | 'stale' | 'missing' }> };
 
 const fmt = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -164,6 +165,9 @@ export function PortfolioApp({
   const [importHistory, setImportHistory] = useState<LiveImportSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0);
+  const [freshnessReport, setFreshnessReport] = useState<LiveFreshnessReport>();
+  const [freshnessLoading, setFreshnessLoading] = useState(false);
+  const [freshnessError, setFreshnessError] = useState<string>();
 
   useEffect(() => {
     if (!client) return;
@@ -250,6 +254,21 @@ export function PortfolioApp({
       active = false;
     };
   }, [apiConfig, client, historyVersion, selectedAccountId, userId]);
+
+  useEffect(() => {
+    if (!client || !apiConfig || !userId || !selectedAccountId) { setFreshnessReport(undefined); return; }
+    let active = true;
+    setFreshnessLoading(true);
+    setFreshnessError(undefined);
+    void client.auth.getSession().then(async ({ data }) => {
+      if (!data.session?.access_token) throw new Error('Your sign-in session has expired.');
+      const response = await fetch(`${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/price-freshness`, { headers: { authorization: `Bearer ${data.session.access_token}` } });
+      const payload: unknown = await response.json();
+      if (!response.ok) throw new Error(payload && typeof payload === 'object' && 'error' in payload ? String(payload.error).replaceAll('_', ' ') : 'Freshness data is unavailable.');
+      if (active && payload && typeof payload === 'object' && 'report' in payload) setFreshnessReport((payload as { report: LiveFreshnessReport }).report);
+    }).catch((error) => { if (active) setFreshnessError(error instanceof Error ? error.message : 'Freshness data is unavailable.'); }).finally(() => { if (active) setFreshnessLoading(false); });
+    return () => { active = false; };
+  }, [apiConfig, client, selectedAccountId, userId]);
 
   async function createAccount(input: {
     name: string;
@@ -619,7 +638,7 @@ export function PortfolioApp({
             <Menu size={18} />
           </button>
           {active === "Overview" && (
-            <Overview summary={summary} onUpload={openFileChooser} />
+            <Overview summary={summary} onUpload={openFileChooser} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} />
           )}
           {active === "Activity" && (
             <ActivityPanel onUpload={openFileChooser} />
@@ -679,9 +698,15 @@ export function PortfolioApp({
 function Overview({
   summary,
   onUpload,
+  freshnessReport,
+  freshnessLoading,
+  freshnessError,
 }: {
   summary: ReturnType<typeof calculateSummary>;
   onUpload: () => void;
+  freshnessReport?: LiveFreshnessReport;
+  freshnessLoading: boolean;
+  freshnessError?: string;
 }) {
   return (
     <>
@@ -703,6 +728,17 @@ function Overview({
           Preview a CSV
         </Button>
       </div>
+      {(freshnessLoading || freshnessError || freshnessReport) && (
+        <section className="mb-7 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div><p className="text-sm font-bold">Stored price freshness</p><p className="mt-1 text-xs text-slate-500">Expected through {freshnessReport?.expectedDate ?? "—"}</p></div>
+            {freshnessLoading && <Pill>Checking…</Pill>}
+            {freshnessError && <Pill tone="gold">Unavailable</Pill>}
+            {freshnessReport && !freshnessLoading && <div className="flex gap-2 text-xs font-semibold"><Pill tone="green">{freshnessReport.rows.filter((row) => row.status === "current").length} current</Pill><Pill tone="gold">{freshnessReport.rows.filter((row) => row.status === "stale").length} stale</Pill><Pill>{freshnessReport.rows.filter((row) => row.status === "missing").length} missing</Pill></div>}
+          </div>
+          {freshnessError && <p className="mt-3 text-sm text-amber-800">{freshnessError}</p>}
+        </section>
+      )}
       <div className="mb-7 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,.85fr)]">
         <section className="overflow-hidden rounded-3xl bg-[#152b4a] p-6 text-white shadow-[0_18px_55px_rgba(21,43,74,.16)] md:p-8">
           <div className="flex items-start justify-between">
