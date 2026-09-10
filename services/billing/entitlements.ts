@@ -11,6 +11,31 @@ export type Entitlement = {
   lastWebhookId: string | null;
 };
 
+export type EntitlementAccessReason = 'active' | 'trialing' | 'trial_expired' | 'past_due' | 'canceled' | 'inactive';
+
+export type EntitlementAccess = {
+  allowed: boolean;
+  reason: EntitlementAccessReason;
+  status: EntitlementStatus;
+  trialEndsAt: Date | null;
+};
+
+/**
+ * Computes the server-side access boundary from persisted billing state.
+ * A trial is effective only through its end instant; payment failures and
+ * cancellations stop paid features immediately until Stripe reports recovery.
+ */
+export function resolveEntitlementAccess(entitlement: Entitlement | undefined, now = new Date()): EntitlementAccess {
+  if (!entitlement) return { allowed: false, reason: 'inactive', status: 'inactive', trialEndsAt: null };
+  if (entitlement.status === 'trialing') {
+    const ends = entitlement.trialEndsAt;
+    if (!ends || ends.getTime() <= now.getTime()) return { allowed: false, reason: 'trial_expired', status: entitlement.status, trialEndsAt: ends };
+    return { allowed: true, reason: 'trialing', status: entitlement.status, trialEndsAt: ends };
+  }
+  if (entitlement.status === 'active') return { allowed: true, reason: 'active', status: entitlement.status, trialEndsAt: entitlement.trialEndsAt };
+  return { allowed: false, reason: entitlement.status, status: entitlement.status, trialEndsAt: entitlement.trialEndsAt };
+}
+
 export function startTrialAfterFirstUsableImport(entitlement: Entitlement, hasUsableCommittedImport: boolean, now: Date): Entitlement {
   if (!hasUsableCommittedImport || entitlement.trialStartedAt !== null) return entitlement;
   const trialEndsAt = new Date(now);

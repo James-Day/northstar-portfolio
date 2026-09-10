@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyBillingWebhook, startTrialAfterFirstUsableImport, type Entitlement } from '@/services/billing/entitlements';
+import { applyBillingWebhook, resolveEntitlementAccess, startTrialAfterFirstUsableImport, type Entitlement } from '@/services/billing/entitlements';
 
 const inactive = (): Entitlement => ({ status: 'inactive', trialStartedAt: null, trialEndsAt: null, processedWebhookIds: [], lastWebhookCreatedAt: null, lastWebhookId: null });
 
@@ -30,5 +30,15 @@ describe('billing entitlements', () => {
     const stale = applyBillingWebhook(first, { id: 'event-a', type: 'subscription_canceled', createdAt: new Date('2026-01-03T00:00:00Z') });
     expect(stale.status).toBe('active');
     expect(stale.processedWebhookIds).toEqual(['event-b', 'event-a']);
+  });
+
+  it('exposes truthful access at the trial boundary', () => {
+    const trial = startTrialAfterFirstUsableImport(inactive(), true, new Date('2026-01-01T00:00:00Z'));
+    expect(resolveEntitlementAccess(trial, new Date('2026-01-14T23:59:59Z'))).toMatchObject({ allowed: true, reason: 'trialing' });
+    expect(resolveEntitlementAccess(trial, new Date('2026-01-15T00:00:00Z'))).toMatchObject({ allowed: false, reason: 'trial_expired' });
+  });
+
+  it.each(['past_due', 'canceled', 'inactive'] as const)('denies paid features for %s billing state', (status) => {
+    expect(resolveEntitlementAccess({ ...inactive(), status }, new Date('2026-01-01T00:00:00Z'))).toMatchObject({ allowed: false, reason: status, status });
   });
 });

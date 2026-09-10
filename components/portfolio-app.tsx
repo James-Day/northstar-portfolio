@@ -101,6 +101,7 @@ type LiveReportHolding = { instrumentId: string; displayName?: string; quantity:
 type LiveRealizedSale = { eventId: string; date: string; instrumentId: string; quantity: string; proceeds: string; matchedCostBasis: string | null; gainLoss: string | null; basisKnown: boolean };
 type LiveReportSnapshot = { asOfDate: string; payload: { totalValue: string | null; cash: string | null; timeWeightedReturn: string | null; netDeposits?: string | null; dividendIncome?: string | null; realizedGainLoss?: string | null; realizedSales?: LiveRealizedSale[]; valueHistory?: Array<{ date: string; value: string | null }>; activityCoveredThrough: string | null; pricesThrough: string | null; holdings: LiveReportHolding[] } };
 type LiveActivityPage = ActivityPage;
+type LiveBillingStatus = { status: 'inactive' | 'trialing' | 'active' | 'past_due' | 'canceled'; allowed: boolean; reason: 'active' | 'trialing' | 'trial_expired' | 'past_due' | 'canceled' | 'inactive'; trialEndsAt: string | null };
 
 const fmt = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -197,6 +198,7 @@ export function PortfolioApp({
   const [activityError, setActivityError] = useState<string>();
   const [activityRequestVersion, setActivityRequestVersion] = useState(0);
   const [activityFilter, setActivityFilter] = useState("");
+  const [billingStatus, setBillingStatus] = useState<LiveBillingStatus>();
 
   useEffect(() => {
     if (!client) return;
@@ -218,6 +220,23 @@ export function PortfolioApp({
       listener.subscription.unsubscribe();
     };
   }, [client]);
+
+  useEffect(() => {
+    if (!client || !userId || !apiConfig) { setBillingStatus(undefined); return; }
+    let active = true;
+    void client.auth.getSession().then(async ({ data }) => {
+      if (!data.session?.access_token) return;
+      const response = await fetch(`${apiConfig.baseUrl}/v1/billing/status`, { headers: { authorization: `Bearer ${data.session.access_token}` } });
+      if (!response.ok) return;
+      const payload = await response.json().catch(() => undefined) as { entitlement?: { status?: unknown; trialEndsAt?: unknown }; access?: { allowed?: unknown; reason?: unknown } } | undefined;
+      const status = payload?.entitlement?.status;
+      const reason = payload?.access?.reason;
+      const trialEndsAt = payload?.entitlement?.trialEndsAt;
+      if (!active || (status !== 'inactive' && status !== 'trialing' && status !== 'active' && status !== 'past_due' && status !== 'canceled') || (reason !== 'active' && reason !== 'trialing' && reason !== 'trial_expired' && reason !== 'past_due' && reason !== 'canceled' && reason !== 'inactive')) return;
+      setBillingStatus({ status, allowed: payload?.access?.allowed === true, reason, trialEndsAt: typeof trialEndsAt === 'string' ? trialEndsAt : null });
+    });
+    return () => { active = false; };
+  }, [apiConfig, client, userId]);
 
   useEffect(() => {
     if (!client || !userId) {
@@ -839,6 +858,7 @@ export function PortfolioApp({
               onExportReport={() => downloadLiveExport("report")}
               onOpenBilling={openBillingPortal}
               onRequestDeletion={requestDeletion}
+              billingStatus={billingStatus}
             />
           )}
         </section>

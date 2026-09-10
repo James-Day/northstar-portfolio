@@ -2,8 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { createApi } from '@/services/api/app';
 import { ImportOperationRejectedError } from '@/services/supabase/imports-repository';
 import { parseOpeningHistory } from '@/services/accounts/opening-history';
+import type { Entitlement } from '@/services/billing/entitlements';
 
 describe('standalone API', () => {
+  const trialEntitlement = (status: Entitlement['status'] = 'trialing'): Entitlement => ({ status, trialStartedAt: new Date('2026-01-01T00:00:00Z'), trialEndsAt: new Date('2099-01-15T00:00:00Z'), processedWebhookIds: [], lastWebhookCreatedAt: null, lastWebhookId: null });
+
+  it('returns a truthful authenticated billing status', async () => {
+    const app = createApi({ verifySession: async () => ({ id: 'user-123' }), billingPersistence: { getEntitlement: async () => trialEntitlement(), startTrialAfterCommittedImport: async () => trialEntitlement(), applyVerifiedWebhook: async () => trialEntitlement() } });
+    const response = await app.request('http://api.test/v1/billing/status', { headers: { authorization: 'Bearer session-token' } });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ entitlement: { status: 'trialing' }, access: { allowed: true, reason: 'trialing' } });
+  });
+
+  it('blocks persisted report reads after cancellation while leaving billing status explicit', async () => {
+    const app = createApi({ verifySession: async () => ({ id: 'user-123' }), billingPersistence: { getEntitlement: async () => trialEntitlement('canceled'), startTrialAfterCommittedImport: async () => trialEntitlement('canceled'), applyVerifiedWebhook: async () => trialEntitlement('canceled') } });
+    const response = await app.request('http://api.test/v1/accounts/account-1/report', { headers: { authorization: 'Bearer session-token' } });
+    expect(response.status).toBe(402);
+    await expect(response.json()).resolves.toEqual({ error: 'entitlement_required', reason: 'canceled', trialEndsAt: '2099-01-15T00:00:00.000Z' });
+  });
+
   it('accepts a signed Stripe webhook using the untouched request body and injects processing', async () => {
     const timestamp = Math.floor(Date.now() / 1000);
     const body = JSON.stringify({ id: 'evt_api_123', type: 'customer.subscription.updated', created: timestamp, data: { object: { id: 'sub_123' } } });

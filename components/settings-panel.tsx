@@ -5,6 +5,7 @@ import { CreditCard, Download, ShieldCheck, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type SettingsAccount = { id: string; name: string };
+type BillingStatus = { status: 'inactive' | 'trialing' | 'active' | 'past_due' | 'canceled'; allowed: boolean; reason: 'active' | 'trialing' | 'trial_expired' | 'past_due' | 'canceled' | 'inactive'; trialEndsAt: string | null };
 
 export function SettingsPanel({
   email,
@@ -15,6 +16,7 @@ export function SettingsPanel({
   onExportReport,
   onOpenBilling,
   onRequestDeletion,
+  billingStatus,
 }: {
   email?: string;
   accounts: SettingsAccount[];
@@ -24,6 +26,7 @@ export function SettingsPanel({
   onExportReport: () => Promise<void>;
   onOpenBilling: () => Promise<void>;
   onRequestDeletion: () => Promise<void>;
+  billingStatus?: BillingStatus;
 }) {
   const [action, setAction] = useState<string>();
   const [message, setMessage] = useState<string>();
@@ -81,7 +84,7 @@ export function SettingsPanel({
           <p className="mt-4 flex gap-2 text-xs leading-5 text-slate-400"><ShieldCheck size={15} className="mt-0.5 shrink-0" />Exports are generated from your account-scoped records. Spreadsheet formula values are escaped.</p>
         </section>
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-start gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700"><CreditCard size={20} /></span><div><h2 className="text-lg font-bold">Subscription</h2><p className="mt-1 text-sm leading-6 text-slate-500">Update payment details, invoices or cancellation through Stripe’s hosted billing portal.</p></div></div>
+          <div className="flex items-start gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700"><CreditCard size={20} /></span><div><h2 className="text-lg font-bold">Subscription</h2><p className="mt-1 text-sm leading-6 text-slate-500">Update payment details, invoices or cancellation through Stripe’s hosted billing portal.</p>{billingStatus && <p className={`mt-3 text-sm font-semibold ${billingStatus.allowed ? "text-emerald-700" : "text-amber-700"}`} role="status">{billingStatus.reason === "trialing" ? `14-day trial · ends ${new Date(billingStatus.trialEndsAt ?? "").toLocaleDateString()}` : billingStatus.reason === "active" ? "Subscription active" : billingStatus.reason === "past_due" ? "Payment failed · update your payment method" : billingStatus.reason === "canceled" ? "Subscription canceled" : billingStatus.reason === "trial_expired" ? "Trial ended · choose a plan to continue" : "No active subscription"}</p>}</div></div>
           <Button type="button" variant="outline" disabled={Boolean(action)} onClick={() => run("billing", onOpenBilling)} className="mt-5 rounded-xl">{action === "billing" ? "Opening…" : "Manage billing"}</Button>
         </section>
         <section className="rounded-3xl border border-rose-200 bg-rose-50/60 p-6 shadow-sm lg:col-span-2">

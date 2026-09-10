@@ -27,6 +27,9 @@ import {
   type StripeBillingHttpDependencies,
 } from '@/services/billing/stripe-http';
 import { toCsv } from '@/services/privacy/export';
+import { resolveEntitlementAccess } from '@/services/billing/entitlements';
+import type { BillingPersistence } from '@/services/billing/persistence';
+import { SupabaseBillingRepository } from '@/services/supabase/billing-repository';
 
 const ACTIVITY_EXPORT_PAGE_SIZE = 100;
 const MAX_ACTIVITY_EXPORT_ROWS = 100_000;
@@ -55,6 +58,7 @@ export type ApiDependencies = {
   openingHistoryRepository?: OpeningHistoryRepository;
   deletionRequestRepository?: { request(userId: string, accessToken: string): Promise<{ id: string; status: string; requestedAt: string }> };
   billing?: StripeBillingHttpDependencies;
+  billingPersistence?: BillingPersistence;
 };
 
 export function createApi(dependencies: ApiDependencies = {}) {
@@ -73,6 +77,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
   const openingHistoryRepository = dependencies.openingHistoryRepository;
   const deletionRequestRepository = dependencies.deletionRequestRepository;
   const billing = dependencies.billing;
+  const billingPersistence = dependencies.billingPersistence;
 
   api.use('*', async (context, next) => {
     const origin = context.req.header('origin');
@@ -149,6 +154,16 @@ export function createApi(dependencies: ApiDependencies = {}) {
     }
   });
 
+  api.get('/v1/billing/status', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    const repository = billingPersistence ?? createBillingRepository(context.env);
+    if (!repository) return context.json({ error: 'billing_unavailable' }, 503);
+    const entitlement = await repository.getEntitlement(authenticated.user.id, authenticated.accessToken);
+    const access = resolveEntitlementAccess(entitlement);
+    return context.json({ entitlement: { status: access.status, trialEndsAt: access.trialEndsAt?.toISOString() ?? null }, access: { allowed: access.allowed, reason: access.reason } });
+  });
+
   api.post('/v1/me/deletion-request', async (context) => {
     const authenticated = await requireSession(context.req.raw, context.env, verifySession);
     if (authenticated instanceof Response) return authenticated;
@@ -212,6 +227,8 @@ export function createApi(dependencies: ApiDependencies = {}) {
   api.get('/v1/accounts/:accountId/price-freshness', async (context) => {
     const authenticated = await requireSession(context.req.raw, context.env, verifySession);
     if (authenticated instanceof Response) return authenticated;
+    const gate = await requireBillingAccess(billingPersistence ?? createBillingRepository(context.env), authenticated.user.id, authenticated.accessToken);
+    if (gate) return context.json(gate.body, gate.status);
     const repository = priceFreshnessRepository ?? createPriceFreshnessRepository(context.env);
     if (!repository) return context.json({ error: 'reporting_unavailable' }, 503);
     const report = await repository.get(context.req.param('accountId'), authenticated.user.id, authenticated.accessToken);
@@ -222,6 +239,8 @@ export function createApi(dependencies: ApiDependencies = {}) {
   api.get('/v1/accounts/:accountId/report', async (context) => {
     const authenticated = await requireSession(context.req.raw, context.env, verifySession);
     if (authenticated instanceof Response) return authenticated;
+    const gate = await requireBillingAccess(billingPersistence ?? createBillingRepository(context.env), authenticated.user.id, authenticated.accessToken);
+    if (gate) return context.json(gate.body, gate.status);
     const reader = reportSnapshotReader ?? createReportSnapshotReader(context.env);
     if (!reader) return context.json({ error: 'reporting_unavailable' }, 503);
     const snapshot = await reader.getLatest(context.req.param('accountId'), authenticated.accessToken);
@@ -497,6 +516,38 @@ function createActivityRepository(bindings: ApiBindings) {
 function createOpeningHistoryRepository(bindings: ApiBindings): OpeningHistoryRepository {
   if (!bindings.SUPABASE_URL || !bindings.SUPABASE_ANON_KEY) throw new SessionConfigurationError();
   return new SupabaseOpeningHistoryRepository({ supabaseUrl: bindings.SUPABASE_URL, supabaseAnonKey: bindings.SUPABASE_ANON_KEY });
+}
+
+function createBillingRepository(bindings: ApiBindings): BillingPersistence | undefined {
+  if (!bindings) return undefined;
+  if (!bindings.SUPABASE_URL || !bindings.SUPABASE_ANON_KEY) return undefined;
+  return new SupabaseBillingRepository({
+    supabaseUrl: bindings.SUPABASE_URL,
+    supabaseAnonKey: bindings.SUPABASE_ANON_KEY,
+    serviceRoleKey: bindings.SUPABASE_SERVICE_ROLE_KEY,
+  });
+}
+
+async function requireBillingAccess(
+  repository: BillingPersistence | undefined,
+  userId: string,
+  accessToken: string,
+): Promise<{ status: 402 | 503; body: { error: string; reason?: string; trialEndsAt?: string | null } } | undefined> {
+  // Keep local/demo deployments usable while billing is intentionally not
+  // configured. Once a repository is present, every decision is enforced
+  // from its server-read entitlement state.
+  if (!repository) return undefined;
+  const entitlement = await repository.getEntitlement(userId, accessToken);
+  const access = resolveEntitlementAccess(entitlement);
+  if (access.allowed) return undefined;
+  return {
+    status: 402,
+    body: {
+      error: 'entitlement_required',
+      reason: access.reason,
+      trialEndsAt: access.trialEndsAt?.toISOString() ?? null,
+    },
+  };
 }
 
 function parseIntegerQuery(value: string | undefined): number | undefined {
