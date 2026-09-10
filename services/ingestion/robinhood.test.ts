@@ -40,7 +40,7 @@ describe('parseRobinhoodActivityCsv', () => {
       { status: 'supported', activity: { type: 'deposit', amount: '500' } },
       { status: 'supported', activity: { type: 'withdrawal', amount: '-50' } },
     ]);
-    expect(rows[5]).toMatchObject({ status: 'unsupported', rowNumber: 8, message: expect.stringContaining('SPL') });
+    expect(rows[5]).toMatchObject({ status: 'unsupported', rowNumber: 8, message: 'Stock split for SCHD requires corporate-action review before this import can be committed.' });
   });
 
   it('ignores Robinhood’s trailing informational footer', () => {
@@ -65,6 +65,6 @@ describe('parseRobinhoodActivityCsv', () => {
       { status: 'supported', activity: { type: 'buy', symbol: 'SCHG', quantity: '5', amount: '-138.38' } },
       { status: 'supported', activity: { type: 'deposit', amount: '500' } },
     ]);
-    expect(rows[3]).toMatchObject({ status: 'unsupported', message: expect.stringContaining('SPL') });
+    expect(rows[3]).toMatchObject({ status: 'unsupported', message: 'Stock split for SCHD requires corporate-action review before this import can be committed.' });
   });
 });

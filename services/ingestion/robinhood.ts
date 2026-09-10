@@ -117,7 +117,13 @@ export function parseRobinhoodActivityCsv(csv: string): ParsedRobinhoodRow[] {
     if (Object.values(raw).every((value) => !String(value ?? '').trim())) return [];
     const code = (raw['trans code'] ?? '').trim().toUpperCase();
     const type = transactionTypeFor(code, raw.description ?? '');
-    if (!type) return [{ rowNumber, raw, status: 'unsupported', message: `Unsupported Robinhood transaction code: ${raw['trans code'] || '(blank)'}.` }];
+    if (!type) {
+      const symbol = raw.instrument?.trim().toUpperCase();
+      const message = code === 'SPL'
+        ? `Stock split${symbol ? ` for ${symbol}` : ''} requires corporate-action review before this import can be committed.`
+        : `Unsupported Robinhood transaction code: ${raw['trans code'] || '(blank)'}.`;
+      return [{ rowNumber, raw, status: 'unsupported', message }];
+    }
     try {
       const symbol = raw.instrument?.trim().toUpperCase() || null;
       const quantity = parseDecimal(raw.quantity ?? raw['quantity transacted'] ?? '', 'quantity', true);
