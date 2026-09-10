@@ -1,44 +1,44 @@
-import { Hono } from "hono";
+import { Hono } from 'hono';
 import {
   SessionConfigurationError,
   type AuthenticatedUser,
   verifySupabaseSession,
-} from "@/services/auth/server-session";
+} from '@/services/auth/server-session';
 import {
   validateCreatePortfolioAccount,
   type AccountsRepository,
-} from "@/services/accounts/accounts";
-import { parseOpeningHistory } from "@/services/accounts/opening-history";
-import type { OpeningHistoryRepository } from "@/services/accounts/opening-history-repository";
-import { SupabaseOpeningHistoryRepository } from "@/services/supabase/opening-history-repository";
-import { SupabaseAccountsRepository } from "@/services/supabase/accounts-repository";
+} from '@/services/accounts/accounts';
+import { parseOpeningHistory } from '@/services/accounts/opening-history';
+import type { OpeningHistoryRepository } from '@/services/accounts/opening-history-repository';
+import { SupabaseOpeningHistoryRepository } from '@/services/supabase/opening-history-repository';
+import { SupabaseAccountsRepository } from '@/services/supabase/accounts-repository';
 import {
   stageRobinhoodImport,
   toPersistableImportStage,
-} from "@/services/ingestion/staging";
+} from '@/services/ingestion/staging';
 import {
   ImportOperationRejectedError,
   SupabaseImportsRepository,
   type ImportsRepository,
-} from "@/services/supabase/imports-repository";
+} from '@/services/supabase/imports-repository';
 import {
   SupabaseImportIssueRepository,
   type ImportIssueRepository,
-} from "@/services/supabase/import-issue-repository";
-import type { PriceFreshnessReportRepository } from "@/services/reporting/price-freshness";
-import { SupabasePriceFreshnessReportRepository } from "@/services/supabase/price-freshness-report-repository";
+} from '@/services/supabase/import-issue-repository';
+import type { PriceFreshnessReportRepository } from '@/services/reporting/price-freshness';
+import { SupabasePriceFreshnessReportRepository } from '@/services/supabase/price-freshness-report-repository';
 import {
   SupabaseReportSnapshotReader,
   type ReportSnapshot,
-} from "@/services/supabase/report-snapshot-reader";
+} from '@/services/supabase/report-snapshot-reader';
 import {
   SupabaseSignedUploadRepository,
   type SignedUploadRepository,
-} from "@/services/supabase/signed-upload-repository";
+} from '@/services/supabase/signed-upload-repository';
 import {
   SupabaseActivityRepository,
   type ActivityPage,
-} from "@/services/supabase/activity-repository";
+} from '@/services/supabase/activity-repository';
 import {
   BillingConfigurationError,
   StripeSignatureError,
@@ -48,24 +48,31 @@ import {
   verifyStripeWebhook,
   type BillingPlan,
   type StripeBillingHttpDependencies,
-} from "@/services/billing/stripe-http";
-import { toCsv } from "@/services/privacy/export";
-import { resolveEntitlementAccess } from "@/services/billing/entitlements";
-import type { BillingPersistence } from "@/services/billing/persistence";
-import { SupabaseBillingRepository } from "@/services/supabase/billing-repository";
+} from '@/services/billing/stripe-http';
+import { toCsv } from '@/services/privacy/export';
+import { resolveEntitlementAccess } from '@/services/billing/entitlements';
+import type { BillingPersistence } from '@/services/billing/persistence';
+import { SupabaseBillingRepository } from '@/services/supabase/billing-repository';
 import {
   MemoryRateLimitStore,
+  RequestBodyTooLargeError,
+  readJsonRequest,
+  readOptionalJsonRequest,
+  readRequestText,
   requestClientKey,
   requestId,
   requestRateLimit,
   type RateLimitStore,
-} from "@/services/security/request-security";
+} from '@/services/security/request-security';
 
 const ACTIVITY_EXPORT_PAGE_SIZE = 100;
 const MAX_ACTIVITY_EXPORT_ROWS = 100_000;
+const MAX_JSON_BODY_BYTES = 64 * 1024;
+const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
+const MAX_CSV_BODY_BYTES = 10 * 1024 * 1024;
 
 export type ApiBindings = {
-  APP_ENV?: "development" | "staging" | "production";
+  APP_ENV?: 'development' | 'staging' | 'production';
   APP_ORIGIN?: string;
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
@@ -115,6 +122,20 @@ export type ApiDependencies = {
 
 export function createApi(dependencies: ApiDependencies = {}) {
   const api = new Hono<{ Bindings: ApiBindings }>();
+  api.onError((error, context) => {
+    const requestId = context.res.headers.get('x-request-id') ?? 'unknown';
+    if (error instanceof RequestBodyTooLargeError)
+      return context.json(
+        { error: 'request_too_large', maxBytes: error.maxBytes, requestId },
+        413,
+      );
+    if (error instanceof SyntaxError)
+      return context.json({ error: 'invalid_json', requestId }, 400);
+    // Do not serialize exception messages, stacks, provider responses, or
+    // request bodies. The request ID lets an operator correlate a redacted
+    // structured log entry without turning the API into an error oracle.
+    return context.json({ error: 'internal_error', requestId }, 500);
+  });
   const verifySession =
     dependencies.verifySession ??
     ((request, bindings) =>
@@ -133,81 +154,101 @@ export function createApi(dependencies: ApiDependencies = {}) {
   const deletionRequestRepository = dependencies.deletionRequestRepository;
   const billing = dependencies.billing;
   const billingPersistence = dependencies.billingPersistence;
-  const rateLimitStore = dependencies.rateLimitStore ?? new MemoryRateLimitStore();
+  const rateLimitStore =
+    dependencies.rateLimitStore ?? new MemoryRateLimitStore();
   const now = dependencies.now ?? Date.now;
 
-  api.use("*", async (context, next) => {
+  api.use('*', async (context, next) => {
     const request = context.req.raw;
     const id = requestId(request);
-    context.header("x-request-id", id);
-    if (request.method !== "OPTIONS") {
-      const policy = requestRateLimit(new URL(request.url).pathname, request.method);
-      const bucket = request.method === "POST" || request.method === "PUT" || request.method === "DELETE" ? "write" : "read";
-      const decision = rateLimitStore.consume(`${requestClientKey(request)}:${bucket}`, now(), policy.limit, policy.windowMs);
-      context.header("x-ratelimit-limit", String(decision.limit));
-      context.header("x-ratelimit-remaining", String(decision.remaining));
+    context.header('x-request-id', id);
+    if (request.method !== 'OPTIONS') {
+      const policy = requestRateLimit(
+        new URL(request.url).pathname,
+        request.method,
+      );
+      const bucket =
+        request.method === 'POST' ||
+        request.method === 'PUT' ||
+        request.method === 'DELETE'
+          ? 'write'
+          : 'read';
+      const decision = rateLimitStore.consume(
+        `${requestClientKey(request)}:${bucket}`,
+        now(),
+        policy.limit,
+        policy.windowMs,
+      );
+      context.header('x-ratelimit-limit', String(decision.limit));
+      context.header('x-ratelimit-remaining', String(decision.remaining));
       if (!decision.allowed) {
-        context.header("retry-after", String(decision.retryAfterSeconds));
-        return context.json({ error: "rate_limited", requestId: id }, 429);
+        context.header('retry-after', String(decision.retryAfterSeconds));
+        return context.json({ error: 'rate_limited', requestId: id }, 429);
       }
     }
-    const origin = context.req.header("origin");
+    const origin = context.req.header('origin');
     const bindings = context.env ?? {};
     const allowedOrigin =
       bindings.APP_ORIGIN?.trim() ||
-      (bindings.APP_ENV !== "production" ? "http://localhost:3000" : undefined);
+      (bindings.APP_ENV !== 'production' ? 'http://localhost:3000' : undefined);
     if (origin && allowedOrigin && origin === allowedOrigin) {
-      context.header("access-control-allow-origin", origin);
-      context.header("vary", "Origin");
+      context.header('access-control-allow-origin', origin);
+      context.header('vary', 'Origin');
       context.header(
-        "access-control-allow-headers",
-        "authorization,content-type,x-file-name",
+        'access-control-allow-headers',
+        'authorization,content-type,x-file-name',
       );
-      context.header("access-control-allow-methods", "GET,POST,PUT,OPTIONS");
+      context.header('access-control-allow-methods', 'GET,POST,PUT,OPTIONS');
     }
-    if (context.req.method === "OPTIONS") return context.body(null, 204);
+    if (context.req.method === 'OPTIONS') return context.body(null, 204);
     await next();
   });
 
-  api.get("/health", (context) =>
+  api.get('/health', (context) =>
     context.json({
-      status: "ok",
-      service: "northstar-api",
-      environment: (context.env ?? {}).APP_ENV ?? "development",
+      status: 'ok',
+      service: 'northstar-api',
+      environment: (context.env ?? {}).APP_ENV ?? 'development',
     }),
   );
 
-  api.post("/v1/billing/stripe/webhook", async (context) => {
-    if (!billing) return context.json({ error: "billing_unavailable" }, 503);
-    const rawBody = await context.req.text();
+  api.post('/v1/billing/stripe/webhook', async (context) => {
+    if (!billing) return context.json({ error: 'billing_unavailable' }, 503);
+    const rawBody = await readRequestText(
+      context.req.raw,
+      MAX_WEBHOOK_BODY_BYTES,
+    );
     try {
       const event = await verifyStripeWebhook(
         rawBody,
-        context.req.header("stripe-signature"),
+        context.req.header('stripe-signature'),
         context.env.STRIPE_WEBHOOK_SECRET,
       );
       await billing.handleVerifiedWebhook(event);
       return context.json({ received: true });
     } catch (error) {
       if (error instanceof StripeSignatureError)
-        return context.json({ error: "invalid_webhook" }, 400);
+        return context.json({ error: 'invalid_webhook' }, 400);
       throw error;
     }
   });
 
-  api.post("/v1/billing/checkout", async (context) => {
+  api.post('/v1/billing/checkout', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
       verifySession,
     );
     if (authenticated instanceof Response) return authenticated;
-    if (!billing) return context.json({ error: "billing_unavailable" }, 503);
-    const body = (await context.req.json().catch(() => null)) as {
+    if (!billing) return context.json({ error: 'billing_unavailable' }, 503);
+    const body = (await readOptionalJsonRequest(
+      context.req.raw,
+      MAX_JSON_BODY_BYTES,
+    )) as {
       plan?: unknown;
     } | null;
-    if (!body || (body.plan !== "monthly" && body.plan !== "annual"))
-      return context.json({ error: "invalid_plan" }, 400);
+    if (!body || (body.plan !== 'monthly' && body.plan !== 'annual'))
+      return context.json({ error: 'invalid_plan' }, 400);
     try {
       const plan = body.plan as BillingPlan;
       const priceId = resolveBillingPriceId(plan, {
@@ -220,47 +261,47 @@ export function createApi(dependencies: ApiDependencies = {}) {
         priceId,
         successUrl: buildBillingReturnUrl(
           context.env.APP_ORIGIN,
-          "/dashboard?billing=success",
+          '/dashboard?billing=success',
         ),
         cancelUrl: buildBillingReturnUrl(
           context.env.APP_ORIGIN,
-          "/dashboard?billing=cancelled",
+          '/dashboard?billing=cancelled',
         ),
       });
       return context.json({ url: validateStripeSessionUrl(result.url) });
     } catch (error) {
       if (error instanceof BillingConfigurationError)
-        return context.json({ error: "billing_unavailable" }, 503);
+        return context.json({ error: 'billing_unavailable' }, 503);
       throw error;
     }
   });
 
-  api.post("/v1/billing/portal", async (context) => {
+  api.post('/v1/billing/portal', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
       verifySession,
     );
     if (authenticated instanceof Response) return authenticated;
-    if (!billing) return context.json({ error: "billing_unavailable" }, 503);
+    if (!billing) return context.json({ error: 'billing_unavailable' }, 503);
     try {
       const result = await billing.createBillingPortalSession({
         userId: authenticated.user.id,
         accessToken: authenticated.accessToken,
         returnUrl: buildBillingReturnUrl(
           context.env.APP_ORIGIN,
-          "/dashboard?billing=cancelled",
+          '/dashboard?billing=cancelled',
         ),
       });
       return context.json({ url: validateStripeSessionUrl(result.url) });
     } catch (error) {
       if (error instanceof BillingConfigurationError)
-        return context.json({ error: "billing_unavailable" }, 503);
+        return context.json({ error: 'billing_unavailable' }, 503);
       throw error;
     }
   });
 
-  api.get("/v1/billing/status", async (context) => {
+  api.get('/v1/billing/status', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
@@ -269,7 +310,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
     if (authenticated instanceof Response) return authenticated;
     const repository =
       billingPersistence ?? createBillingRepository(context.env);
-    if (!repository) return context.json({ error: "billing_unavailable" }, 503);
+    if (!repository) return context.json({ error: 'billing_unavailable' }, 503);
     const entitlement = await repository.getEntitlement(
       authenticated.user.id,
       authenticated.accessToken,
@@ -284,7 +325,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
     });
   });
 
-  api.post("/v1/me/deletion-request", async (context) => {
+  api.post('/v1/me/deletion-request', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
@@ -292,7 +333,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
     );
     if (authenticated instanceof Response) return authenticated;
     if (!deletionRequestRepository)
-      return context.json({ error: "deletion_unavailable" }, 503);
+      return context.json({ error: 'deletion_unavailable' }, 503);
     const request = await deletionRequestRepository.request(
       authenticated.user.id,
       authenticated.accessToken,
@@ -300,20 +341,20 @@ export function createApi(dependencies: ApiDependencies = {}) {
     return context.json({ request }, 202);
   });
 
-  api.get("/v1/me", async (context) => {
+  api.get('/v1/me', async (context) => {
     try {
       const user = await verifySession(context.req.raw, context.env);
-      if (!user) return context.json({ error: "unauthorized" }, 401);
+      if (!user) return context.json({ error: 'unauthorized' }, 401);
       return context.json({ user });
     } catch (error) {
       if (error instanceof SessionConfigurationError) {
-        return context.json({ error: "service_unavailable" }, 503);
+        return context.json({ error: 'service_unavailable' }, 503);
       }
       throw error;
     }
   });
 
-  api.get("/v1/accounts", async (context) => {
+  api.get('/v1/accounts', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
@@ -330,14 +371,21 @@ export function createApi(dependencies: ApiDependencies = {}) {
     });
   });
 
-  api.post("/v1/accounts", async (context) => {
+  api.post('/v1/accounts', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
       verifySession,
     );
     if (authenticated instanceof Response) return authenticated;
-    const input = validateCreatePortfolioAccount(await context.req.json());
+    let input;
+    try {
+      input = validateCreatePortfolioAccount(
+        await readJsonRequest(context.req.raw, MAX_JSON_BODY_BYTES),
+      );
+    } catch {
+      return context.json({ error: 'invalid_account' }, 400);
+    }
     const repository =
       accountsRepository ?? createAccountsRepository(context.env);
     const account = await repository.create(
@@ -348,14 +396,14 @@ export function createApi(dependencies: ApiDependencies = {}) {
     return context.json({ account }, 201);
   });
 
-  api.get("/v1/accounts/:accountId/opening-history", async (context) => {
+  api.get('/v1/accounts/:accountId/opening-history', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
       verifySession,
     );
     if (authenticated instanceof Response) return authenticated;
-    const accountId = context.req.param("accountId");
+    const accountId = context.req.param('accountId');
     const accounts =
       accountsRepository ?? createAccountsRepository(context.env);
     if (
@@ -365,7 +413,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
         accountId,
       ))
     )
-      return context.json({ error: "not_found" }, 404);
+      return context.json({ error: 'not_found' }, 404);
     const repository =
       openingHistoryRepository ?? createOpeningHistoryRepository(context.env);
     const history = await repository.get(
@@ -376,14 +424,14 @@ export function createApi(dependencies: ApiDependencies = {}) {
     return context.json({ history: history ?? null });
   });
 
-  api.put("/v1/accounts/:accountId/opening-history", async (context) => {
+  api.put('/v1/accounts/:accountId/opening-history', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
       verifySession,
     );
     if (authenticated instanceof Response) return authenticated;
-    const accountId = context.req.param("accountId");
+    const accountId = context.req.param('accountId');
     const accounts =
       accountsRepository ?? createAccountsRepository(context.env);
     if (
@@ -393,15 +441,17 @@ export function createApi(dependencies: ApiDependencies = {}) {
         accountId,
       ))
     )
-      return context.json({ error: "not_found" }, 404);
+      return context.json({ error: 'not_found' }, 404);
     let history;
     try {
-      history = parseOpeningHistory(await context.req.json());
+      history = parseOpeningHistory(
+        await readJsonRequest(context.req.raw, MAX_JSON_BODY_BYTES),
+      );
     } catch (error) {
       return context.json(
         {
           error:
-            error instanceof Error ? error.message : "invalid_opening_history",
+            error instanceof Error ? error.message : 'invalid_opening_history',
         },
         400,
       );
@@ -418,7 +468,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
     });
   });
 
-  api.get("/v1/accounts/:accountId/price-freshness", async (context) => {
+  api.get('/v1/accounts/:accountId/price-freshness', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
@@ -434,17 +484,17 @@ export function createApi(dependencies: ApiDependencies = {}) {
     const repository =
       priceFreshnessRepository ?? createPriceFreshnessRepository(context.env);
     if (!repository)
-      return context.json({ error: "reporting_unavailable" }, 503);
+      return context.json({ error: 'reporting_unavailable' }, 503);
     const report = await repository.get(
-      context.req.param("accountId"),
+      context.req.param('accountId'),
       authenticated.user.id,
       authenticated.accessToken,
     );
-    if (!report) return context.json({ error: "not_found" }, 404);
+    if (!report) return context.json({ error: 'not_found' }, 404);
     return context.json({ report });
   });
 
-  api.get("/v1/accounts/:accountId/report", async (context) => {
+  api.get('/v1/accounts/:accountId/report', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
@@ -459,23 +509,23 @@ export function createApi(dependencies: ApiDependencies = {}) {
     if (gate) return context.json(gate.body, gate.status);
     const reader =
       reportSnapshotReader ?? createReportSnapshotReader(context.env);
-    if (!reader) return context.json({ error: "reporting_unavailable" }, 503);
+    if (!reader) return context.json({ error: 'reporting_unavailable' }, 503);
     const snapshot = await reader.getLatest(
-      context.req.param("accountId"),
+      context.req.param('accountId'),
       authenticated.accessToken,
     );
-    if (!snapshot) return context.json({ error: "not_found" }, 404);
+    if (!snapshot) return context.json({ error: 'not_found' }, 404);
     return context.json({ snapshot });
   });
 
-  api.get("/v1/accounts/:accountId/activity", async (context) => {
+  api.get('/v1/accounts/:accountId/activity', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
       verifySession,
     );
     if (authenticated instanceof Response) return authenticated;
-    const accountId = context.req.param("accountId");
+    const accountId = context.req.param('accountId');
     const accounts =
       accountsRepository ?? createAccountsRepository(context.env);
     if (
@@ -485,14 +535,14 @@ export function createApi(dependencies: ApiDependencies = {}) {
         accountId,
       ))
     )
-      return context.json({ error: "not_found" }, 404);
+      return context.json({ error: 'not_found' }, 404);
     let limit: number | undefined;
     let offset: number | undefined;
     try {
-      limit = parseIntegerQuery(context.req.query("limit"));
-      offset = parseIntegerQuery(context.req.query("offset"));
+      limit = parseIntegerQuery(context.req.query('limit'));
+      offset = parseIntegerQuery(context.req.query('offset'));
     } catch {
-      return context.json({ error: "invalid_pagination" }, 400);
+      return context.json({ error: 'invalid_pagination' }, 400);
     }
     const repository =
       activityRepository ?? createActivityRepository(context.env);
@@ -504,14 +554,14 @@ export function createApi(dependencies: ApiDependencies = {}) {
     });
   });
 
-  api.get("/v1/accounts/:accountId/activity.csv", async (context) => {
+  api.get('/v1/accounts/:accountId/activity.csv', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
       verifySession,
     );
     if (authenticated instanceof Response) return authenticated;
-    const accountId = context.req.param("accountId");
+    const accountId = context.req.param('accountId');
     const accounts =
       accountsRepository ?? createAccountsRepository(context.env);
     if (
@@ -521,7 +571,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
         accountId,
       ))
     )
-      return context.json({ error: "not_found" }, 404);
+      return context.json({ error: 'not_found' }, 404);
     const repository =
       activityRepository ?? createActivityRepository(context.env);
     const activity = await readAllActivityForExport(
@@ -531,15 +581,15 @@ export function createApi(dependencies: ApiDependencies = {}) {
     );
     const csv = toCsv(
       [
-        "date",
-        "type",
-        "instrument",
-        "quantity",
-        "unit_price",
-        "cash_amount",
-        "external_flow",
-        "description",
-        "source_row",
+        'date',
+        'type',
+        'instrument',
+        'quantity',
+        'unit_price',
+        'cash_amount',
+        'external_flow',
+        'description',
+        'source_row',
       ],
       activity.map((item) => [
         item.effectiveDate,
@@ -550,25 +600,25 @@ export function createApi(dependencies: ApiDependencies = {}) {
         item.cashAmount,
         item.externalFlow,
         item.description,
-        item.sourceRow?.rowNumber ?? "",
+        item.sourceRow?.rowNumber ?? '',
       ]),
     );
-    context.header("content-type", "text/csv; charset=utf-8");
+    context.header('content-type', 'text/csv; charset=utf-8');
     context.header(
-      "content-disposition",
+      'content-disposition',
       `attachment; filename="portfolio-activity-${accountId}.csv"`,
     );
     return context.body(csv);
   });
 
-  api.get("/v1/accounts/:accountId/report.csv", async (context) => {
+  api.get('/v1/accounts/:accountId/report.csv', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
       verifySession,
     );
     if (authenticated instanceof Response) return authenticated;
-    const accountId = context.req.param("accountId");
+    const accountId = context.req.param('accountId');
     const accounts =
       accountsRepository ?? createAccountsRepository(context.env);
     if (
@@ -578,15 +628,15 @@ export function createApi(dependencies: ApiDependencies = {}) {
         accountId,
       ))
     )
-      return context.json({ error: "not_found" }, 404);
+      return context.json({ error: 'not_found' }, 404);
     const reader =
       reportSnapshotReader ?? createReportSnapshotReader(context.env);
-    if (!reader) return context.json({ error: "reporting_unavailable" }, 503);
+    if (!reader) return context.json({ error: 'reporting_unavailable' }, 503);
     const snapshot = await reader.getLatest(
       accountId,
       authenticated.accessToken,
     );
-    if (!snapshot) return context.json({ error: "not_found" }, 404);
+    if (!snapshot) return context.json({ error: 'not_found' }, 404);
     const payload = snapshot.payload as {
       totalValue?: unknown;
       cash?: unknown;
@@ -605,73 +655,73 @@ export function createApi(dependencies: ApiDependencies = {}) {
       }>;
     };
     const rows: unknown[][] = [
-      ["snapshot", "as_of_date", snapshot.asOfDate, "", "", ""],
-      ["summary", "total_value", payload.totalValue, "", "", ""],
-      ["summary", "cash", payload.cash, "", "", ""],
+      ['snapshot', 'as_of_date', snapshot.asOfDate, '', '', ''],
+      ['summary', 'total_value', payload.totalValue, '', '', ''],
+      ['summary', 'cash', payload.cash, '', '', ''],
       [
-        "summary",
-        "time_weighted_return",
+        'summary',
+        'time_weighted_return',
         payload.timeWeightedReturn,
-        "",
-        "",
-        "",
+        '',
+        '',
+        '',
       ],
-      ["summary", "net_deposits", payload.netDeposits ?? "", "", "", ""],
-      ["summary", "dividend_income", payload.dividendIncome ?? "", "", "", ""],
+      ['summary', 'net_deposits', payload.netDeposits ?? '', '', '', ''],
+      ['summary', 'dividend_income', payload.dividendIncome ?? '', '', '', ''],
       [
-        "summary",
-        "realized_gain_loss",
-        payload.realizedGainLoss ?? "",
-        "",
-        "",
-        "",
+        'summary',
+        'realized_gain_loss',
+        payload.realizedGainLoss ?? '',
+        '',
+        '',
+        '',
       ],
       [
-        "coverage",
-        "activity_covered_through",
-        payload.activityCoveredThrough ?? "",
-        "",
-        "",
-        "",
+        'coverage',
+        'activity_covered_through',
+        payload.activityCoveredThrough ?? '',
+        '',
+        '',
+        '',
       ],
-      ["coverage", "prices_through", payload.pricesThrough ?? "", "", "", ""],
+      ['coverage', 'prices_through', payload.pricesThrough ?? '', '', '', ''],
     ];
     for (const holding of payload.holdings ?? [])
       rows.push([
-        "holding",
+        'holding',
         holding.instrumentId,
-        holding.displayName ?? "",
+        holding.displayName ?? '',
         holding.quantity,
-        holding.close ?? "",
-        holding.value ?? "",
+        holding.close ?? '',
+        holding.value ?? '',
       ]);
     const csv = toCsv(
       [
-        "section",
-        "field_or_symbol",
-        "value_or_name",
-        "quantity",
-        "close",
-        "value",
+        'section',
+        'field_or_symbol',
+        'value_or_name',
+        'quantity',
+        'close',
+        'value',
       ],
       rows,
     );
-    context.header("content-type", "text/csv; charset=utf-8");
+    context.header('content-type', 'text/csv; charset=utf-8');
     context.header(
-      "content-disposition",
+      'content-disposition',
       `attachment; filename="portfolio-report-${accountId}.csv"`,
     );
     return context.body(csv);
   });
 
-  api.post("/v1/accounts/:accountId/import-preview", async (context) => {
+  api.post('/v1/accounts/:accountId/import-preview', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
       verifySession,
     );
     if (authenticated instanceof Response) return authenticated;
-    const accountId = context.req.param("accountId");
+    const accountId = context.req.param('accountId');
     const accounts =
       accountsRepository ?? createAccountsRepository(context.env);
     const account = await accounts.get(
@@ -679,13 +729,13 @@ export function createApi(dependencies: ApiDependencies = {}) {
       authenticated.accessToken,
       accountId,
     );
-    if (!account) return context.json({ error: "not_found" }, 404);
-    const contentType = context.req.header("content-type")?.toLowerCase() ?? "";
-    if (!contentType.startsWith("text/csv"))
-      return context.json({ error: "unsupported_media_type" }, 415);
+    if (!account) return context.json({ error: 'not_found' }, 404);
+    const contentType = context.req.header('content-type')?.toLowerCase() ?? '';
+    if (!contentType.startsWith('text/csv'))
+      return context.json({ error: 'unsupported_media_type' }, 415);
     const staged = await stageRobinhoodImport(
       accountId,
-      await context.req.text(),
+      await readRequestText(context.req.raw, MAX_CSV_BODY_BYTES),
     );
     const imports = importsRepository ?? createImportsRepository(context.env);
     const duplicateFile = await imports.hasFileHash(
@@ -696,32 +746,35 @@ export function createApi(dependencies: ApiDependencies = {}) {
     return context.json({ import: { ...staged, duplicateFile } });
   });
 
-  api.post("/v1/accounts/:accountId/upload-url", async (context) => {
+  api.post('/v1/accounts/:accountId/upload-url', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
       verifySession,
     );
     if (authenticated instanceof Response) return authenticated;
-    const body = (await context.req.json().catch(() => null)) as {
+    const body = (await readOptionalJsonRequest(
+      context.req.raw,
+      MAX_JSON_BODY_BYTES,
+    )) as {
       fileName?: unknown;
     } | null;
-    if (!body || typeof body.fileName !== "string")
-      return context.json({ error: "file_name_required" }, 400);
+    if (!body || typeof body.fileName !== 'string')
+      return context.json({ error: 'file_name_required' }, 400);
     const repository =
       signedUploadRepository ?? createSignedUploadRepository(context.env);
     const upload = await repository.create(
       authenticated.user.id,
       authenticated.accessToken,
-      context.req.param("accountId"),
+      context.req.param('accountId'),
       body.fileName,
     );
-    if (!upload) return context.json({ error: "not_found" }, 404);
+    if (!upload) return context.json({ error: 'not_found' }, 404);
     return context.json({ upload }, 201);
   });
 
   api.post(
-    "/v1/accounts/:accountId/imports/:importId/object",
+    '/v1/accounts/:accountId/imports/:importId/object',
     async (context) => {
       const authenticated = await requireSession(
         context.req.raw,
@@ -729,44 +782,47 @@ export function createApi(dependencies: ApiDependencies = {}) {
         verifySession,
       );
       if (authenticated instanceof Response) return authenticated;
-      const body = (await context.req.json().catch(() => null)) as {
+      const body = (await readOptionalJsonRequest(
+        context.req.raw,
+        MAX_JSON_BODY_BYTES,
+      )) as {
         objectPath?: unknown;
         sha256?: unknown;
         size?: unknown;
       } | null;
       if (
         !body ||
-        typeof body.objectPath !== "string" ||
-        typeof body.sha256 !== "string" ||
-        typeof body.size !== "number"
+        typeof body.objectPath !== 'string' ||
+        typeof body.sha256 !== 'string' ||
+        typeof body.size !== 'number'
       )
-        return context.json({ error: "object_metadata_required" }, 400);
+        return context.json({ error: 'object_metadata_required' }, 400);
       const repository =
         signedUploadRepository ?? createSignedUploadRepository(context.env);
       if (!repository.bind)
-        return context.json({ error: "object_binding_unavailable" }, 503);
+        return context.json({ error: 'object_binding_unavailable' }, 503);
       const bound = await repository.bind(
         authenticated.user.id,
         authenticated.accessToken,
-        context.req.param("accountId"),
-        context.req.param("importId"),
+        context.req.param('accountId'),
+        context.req.param('importId'),
         body.objectPath,
         body.sha256,
         body.size,
       );
-      if (bound === undefined) return context.json({ error: "not_found" }, 404);
+      if (bound === undefined) return context.json({ error: 'not_found' }, 404);
       return context.json({ bound: true });
     },
   );
 
-  api.post("/v1/accounts/:accountId/imports", async (context) => {
+  api.post('/v1/accounts/:accountId/imports', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
       verifySession,
     );
     if (authenticated instanceof Response) return authenticated;
-    const accountId = context.req.param("accountId");
+    const accountId = context.req.param('accountId');
     const accounts =
       accountsRepository ?? createAccountsRepository(context.env);
     const account = await accounts.get(
@@ -774,14 +830,14 @@ export function createApi(dependencies: ApiDependencies = {}) {
       authenticated.accessToken,
       accountId,
     );
-    if (!account) return context.json({ error: "not_found" }, 404);
-    const contentType = context.req.header("content-type")?.toLowerCase() ?? "";
-    if (!contentType.startsWith("text/csv"))
-      return context.json({ error: "unsupported_media_type" }, 415);
-    const fileName = context.req.header("x-file-name") ?? "";
+    if (!account) return context.json({ error: 'not_found' }, 404);
+    const contentType = context.req.header('content-type')?.toLowerCase() ?? '';
+    if (!contentType.startsWith('text/csv'))
+      return context.json({ error: 'unsupported_media_type' }, 415);
+    const fileName = context.req.header('x-file-name') ?? '';
     const staged = await stageRobinhoodImport(
       accountId,
-      await context.req.text(),
+      await readRequestText(context.req.raw, MAX_CSV_BODY_BYTES),
     );
     const imports = importsRepository ?? createImportsRepository(context.env);
     if (
@@ -791,7 +847,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
         staged.fileSha256,
       )
     ) {
-      return context.json({ error: "duplicate_file" }, 409);
+      return context.json({ error: 'duplicate_file' }, 409);
     }
     const importRecord = await imports.stage(
       authenticated.accessToken,
@@ -810,14 +866,14 @@ export function createApi(dependencies: ApiDependencies = {}) {
     );
   });
 
-  api.get("/v1/accounts/:accountId/imports", async (context) => {
+  api.get('/v1/accounts/:accountId/imports', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
       verifySession,
     );
     if (authenticated instanceof Response) return authenticated;
-    const accountId = context.req.param("accountId");
+    const accountId = context.req.param('accountId');
     const accounts =
       accountsRepository ?? createAccountsRepository(context.env);
     if (
@@ -827,14 +883,14 @@ export function createApi(dependencies: ApiDependencies = {}) {
         accountId,
       ))
     )
-      return context.json({ error: "not_found" }, 404);
+      return context.json({ error: 'not_found' }, 404);
     const imports = importsRepository ?? createImportsRepository(context.env);
     return context.json({
       imports: await imports.list(accountId, authenticated.accessToken),
     });
   });
 
-  api.get("/v1/imports/:importId", async (context) => {
+  api.get('/v1/imports/:importId', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
@@ -843,14 +899,14 @@ export function createApi(dependencies: ApiDependencies = {}) {
     if (authenticated instanceof Response) return authenticated;
     const imports = importsRepository ?? createImportsRepository(context.env);
     const detail = await imports.get(
-      context.req.param("importId"),
+      context.req.param('importId'),
       authenticated.accessToken,
     );
-    if (!detail) return context.json({ error: "not_found" }, 404);
+    if (!detail) return context.json({ error: 'not_found' }, 404);
     return context.json(detail);
   });
 
-  api.get("/v1/imports/:importId/issues", async (context) => {
+  api.get('/v1/imports/:importId/issues', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
@@ -861,27 +917,30 @@ export function createApi(dependencies: ApiDependencies = {}) {
       importIssueRepository ?? createImportIssueRepository(context.env);
     return context.json({
       resolutions: await repository.list(
-        context.req.param("importId"),
+        context.req.param('importId'),
         authenticated.accessToken,
       ),
     });
   });
 
-  api.put("/v1/imports/:importId/issues", async (context) => {
+  api.put('/v1/imports/:importId/issues', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
       verifySession,
     );
     if (authenticated instanceof Response) return authenticated;
-    const body = await context.req.json().catch(() => null);
+    const body = await readOptionalJsonRequest(
+      context.req.raw,
+      MAX_JSON_BODY_BYTES,
+    );
     try {
       const repository =
         importIssueRepository ?? createImportIssueRepository(context.env);
       return context.json(
         {
           resolution: await repository.save(
-            context.req.param("importId"),
+            context.req.param('importId'),
             authenticated.accessToken,
             body,
           ),
@@ -889,17 +948,13 @@ export function createApi(dependencies: ApiDependencies = {}) {
         201,
       );
     } catch (error) {
-      return context.json(
-        {
-          error:
-            error instanceof Error ? error.message : "invalid_issue_resolution",
-        },
-        400,
-      );
+      // Repository/parser details can contain implementation or provider
+      // information. Keep the public contract stable and safe.
+      return context.json({ error: 'invalid_issue_resolution' }, 400);
     }
   });
 
-  api.post("/v1/imports/:importId/discard", async (context) => {
+  api.post('/v1/imports/:importId/discard', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
@@ -908,15 +963,15 @@ export function createApi(dependencies: ApiDependencies = {}) {
     if (authenticated instanceof Response) return authenticated;
     const imports = importsRepository ?? createImportsRepository(context.env);
     const importRecord = await imports.discard(
-      context.req.param("importId"),
+      context.req.param('importId'),
       authenticated.accessToken,
     );
     if (!importRecord)
-      return context.json({ error: "not_found_or_not_discardable" }, 404);
+      return context.json({ error: 'not_found_or_not_discardable' }, 404);
     return context.json({ import: importRecord });
   });
 
-  api.post("/v1/imports/:importId/commit", async (context) => {
+  api.post('/v1/imports/:importId/commit', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
@@ -927,20 +982,20 @@ export function createApi(dependencies: ApiDependencies = {}) {
     let importRecord;
     try {
       importRecord = await imports.commit(
-        context.req.param("importId"),
+        context.req.param('importId'),
         authenticated.accessToken,
       );
     } catch (error) {
       if (error instanceof ImportOperationRejectedError)
-        return context.json({ error: "review_issues_must_be_resolved" }, 409);
+        return context.json({ error: 'review_issues_must_be_resolved' }, 409);
       throw error;
     }
     if (!importRecord)
-      return context.json({ error: "not_found_or_not_committable" }, 404);
+      return context.json({ error: 'not_found_or_not_committable' }, 404);
     return context.json({ import: importRecord });
   });
 
-  api.post("/v1/imports/:importId/undo", async (context) => {
+  api.post('/v1/imports/:importId/undo', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,
       context.env,
@@ -951,19 +1006,19 @@ export function createApi(dependencies: ApiDependencies = {}) {
     let importRecord;
     try {
       importRecord = await imports.undo(
-        context.req.param("importId"),
+        context.req.param('importId'),
         authenticated.accessToken,
       );
     } catch (error) {
       if (error instanceof ImportOperationRejectedError)
         return context.json(
-          { error: "only_the_latest_committed_import_can_be_undone" },
+          { error: 'only_the_latest_committed_import_can_be_undone' },
           409,
         );
       throw error;
     }
     if (!importRecord)
-      return context.json({ error: "not_found_or_not_undoable" }, 404);
+      return context.json({ error: 'not_found_or_not_undoable' }, 404);
     return context.json({ import: importRecord });
   });
 
@@ -987,7 +1042,7 @@ async function readAllActivityForExport(
   accountId: string,
   accessToken: string,
 ) {
-  const items: ActivityPage["items"] = [];
+  const items: ActivityPage['items'] = [];
   let offset = 0;
   while (true) {
     const page = await repository.list(accountId, accessToken, {
@@ -995,10 +1050,10 @@ async function readAllActivityForExport(
       offset,
     });
     if (page.items.length === 0 && page.hasMore)
-      throw new Error("Activity export pagination made no progress.");
+      throw new Error('Activity export pagination made no progress.');
     if (items.length + page.items.length > MAX_ACTIVITY_EXPORT_ROWS)
       throw new Error(
-        "Activity export exceeds the maximum supported row count.",
+        'Activity export exceeds the maximum supported row count.',
       );
     items.push(...page.items);
     if (!page.hasMore) return items;
@@ -1019,13 +1074,13 @@ async function requireSession(
   try {
     const accessToken = readBearerToken(request);
     if (!accessToken)
-      return Response.json({ error: "unauthorized" }, { status: 401 });
+      return Response.json({ error: 'unauthorized' }, { status: 401 });
     const user = await verifySession(request, bindings);
-    if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
+    if (!user) return Response.json({ error: 'unauthorized' }, { status: 401 });
     return { user, accessToken };
   } catch (error) {
     if (error instanceof SessionConfigurationError)
-      return Response.json({ error: "service_unavailable" }, { status: 503 });
+      return Response.json({ error: 'service_unavailable' }, { status: 503 });
     throw error;
   }
 }
@@ -1146,7 +1201,7 @@ async function requireBillingAccess(
   return {
     status: 402,
     body: {
-      error: "entitlement_required",
+      error: 'entitlement_required',
       reason: access.reason,
       trialEndsAt: access.trialEndsAt?.toISOString() ?? null,
     },
@@ -1156,11 +1211,11 @@ async function requireBillingAccess(
 function parseIntegerQuery(value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
   if (!/^\d+$/.test(value))
-    throw new Error("Pagination values must be non-negative integers.");
+    throw new Error('Pagination values must be non-negative integers.');
   return Number(value);
 }
 
 function readBearerToken(request: Request): string | undefined {
-  const match = request.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i);
+  const match = request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i);
   return match?.[1]?.trim() || undefined;
 }
