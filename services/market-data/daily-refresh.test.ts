@@ -51,4 +51,12 @@ describe('daily price refresh preparation', () => {
     expect(sleep).toHaveBeenCalledWith(25);
     expect(provider.getDailyPrices).toHaveBeenCalledTimes(2);
   });
+
+  it('emits attempt, failure, and persistence telemetry', async () => {
+    const provider: DailyPriceProvider = { getDailyPrices: vi.fn().mockRejectedValueOnce(new Error('temporary')).mockResolvedValueOnce([price('AAPL')]) };
+    const persistence = { persist: vi.fn().mockResolvedValue({ upserted: 1 }) };
+    const telemetry = { record: vi.fn() };
+    await runDailyPriceRefreshWithRetry(new Date('2026-07-06T22:00:00.000Z'), ['AAPL'], provider, persistence, { sleep: vi.fn().mockResolvedValue(undefined) }, telemetry);
+    expect(telemetry.record.mock.calls.map(([event]) => event.type)).toEqual(['attempt', 'failed', 'attempt', 'persisted']);
+  });
 });

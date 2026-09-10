@@ -15,6 +15,12 @@ export type DailyRefreshJobResult =
   | { status: 'persisted'; tradingDate: IsoDate; requestedSymbols: string[]; upserted: number };
 
 export type DailyRefreshRetryOptions = { maxAttempts?: number; baseDelayMs?: number; sleep?: (milliseconds: number) => Promise<void> };
+export type DailyRefreshEvent =
+  | { type: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' }
+  | { type: 'attempt'; attempt: number; maxAttempts: number; symbolCount: number }
+  | { type: 'failed'; attempt: number; maxAttempts: number; message: string }
+  | { type: 'persisted'; tradingDate: IsoDate; symbolCount: number; upserted: number };
+export type DailyRefreshTelemetry = { record: (event: DailyRefreshEvent) => void };
 
 /**
  * Coordinates one shared EOD request for all active symbols. Persistence and
@@ -57,6 +63,7 @@ export async function runDailyPriceRefreshWithRetry(
   provider: DailyPriceProvider,
   persistence: DailyPricePersistence,
   options: DailyRefreshRetryOptions = {},
+  telemetry?: DailyRefreshTelemetry,
 ): Promise<DailyRefreshJobResult> {
   const maxAttempts = options.maxAttempts ?? 3;
   const baseDelayMs = options.baseDelayMs ?? 1_000;
@@ -66,9 +73,15 @@ export async function runDailyPriceRefreshWithRetry(
   let attempt = 0;
   while (attempt < maxAttempts) {
     attempt += 1;
+    telemetry?.record({ type: 'attempt', attempt, maxAttempts, symbolCount: new Set(activeSymbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean)).size });
     try {
-      return await runDailyPriceRefresh(now, activeSymbols, provider, persistence);
+      const result = await runDailyPriceRefresh(now, activeSymbols, provider, persistence);
+      if (result.status === 'skipped') telemetry?.record({ type: 'skipped', reason: result.reason });
+      else telemetry?.record({ type: 'persisted', tradingDate: result.tradingDate, symbolCount: result.requestedSymbols.length, upserted: result.upserted });
+      return result;
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Daily refresh failed.';
+      telemetry?.record({ type: 'failed', attempt, maxAttempts, message });
       if (attempt >= maxAttempts) throw error;
       await sleep(baseDelayMs * 2 ** (attempt - 1));
     }
