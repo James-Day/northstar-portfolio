@@ -19,7 +19,7 @@ export type DailyRefreshJobResult =
 
 export type DailyRefreshRetryOptions = { maxAttempts?: number; baseDelayMs?: number; sleep?: (milliseconds: number) => Promise<void> };
 export type DailyRefreshEvent =
-  | { type: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'quota_exhausted' | 'provider_data_pending' }
+  | { type: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'quota_exhausted' | 'provider_data_pending'; symbolCount?: number }
   | { type: 'attempt'; attempt: number; maxAttempts: number; symbolCount: number }
   /** Emitted only immediately before a provider call, after all skip guards pass. */
   | { type: 'requested'; symbolCount: number }
@@ -157,7 +157,7 @@ export async function runDailyPriceRefreshWithRetry(
       return result;
     } catch (error) {
       if (error instanceof DailyPricePublicationPendingError) {
-        telemetry?.record({ type: 'skipped', reason: 'provider_data_pending' });
+        telemetry?.record({ type: 'skipped', reason: 'provider_data_pending', symbolCount: error.missingSymbols.length });
         return { status: 'skipped', reason: 'provider_data_pending' };
       }
       const message = error instanceof Error ? error.message : 'Daily refresh failed.';

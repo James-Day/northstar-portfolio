@@ -9,6 +9,7 @@ export type DailyRefreshMetricsSnapshot = {
   skippedRuns: number;
   requestedSymbols: number;
   persistedRows: number;
+  publicationPendingSymbols: number;
 };
 
 export type QuotaAlert = {
@@ -88,6 +89,7 @@ export class RefreshMetricsCollector implements DailyRefreshTelemetry {
     skippedRuns: 0,
     requestedSymbols: 0,
     persistedRows: 0,
+    publicationPendingSymbols: 0,
   };
 
   record(event: DailyRefreshEvent) {
@@ -99,7 +101,10 @@ export class RefreshMetricsCollector implements DailyRefreshTelemetry {
       // guard must not inflate durable usage.
       this.snapshot.requestedSymbols += event.symbolCount;
     } else if (event.type === "failed") this.snapshot.failedAttempts += 1;
-    else if (event.type === "skipped") this.snapshot.skippedRuns += 1;
+    else if (event.type === "skipped") {
+      this.snapshot.skippedRuns += 1;
+      if (event.reason === "provider_data_pending") this.snapshot.publicationPendingSymbols += event.symbolCount ?? 0;
+    }
     else if (event.type === "persisted")
       this.snapshot.persistedRows += event.upserted;
   }

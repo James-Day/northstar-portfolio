@@ -39,6 +39,7 @@ describe("daily refresh metrics", () => {
       skippedRuns: 0,
       requestedSymbols: 4,
       persistedRows: 4,
+      publicationPendingSymbols: 0,
     });
   });
 
@@ -55,7 +56,14 @@ describe("daily refresh metrics", () => {
       attempts: 1,
       skippedRuns: 1,
       requestedSymbols: 0,
+      publicationPendingSymbols: 0,
     });
+  });
+
+  it("counts symbols waiting for delayed publication", () => {
+    const metrics = new RefreshMetricsCollector();
+    metrics.record({ type: "skipped", reason: "provider_data_pending", symbolCount: 3 });
+    expect(metrics.getSnapshot().publicationPendingSymbols).toBe(3);
   });
 
   it("alerts when the configured reserve would be consumed", () => {
