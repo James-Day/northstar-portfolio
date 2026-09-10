@@ -7,7 +7,7 @@ import {
 import { validateCreatePortfolioAccount, type AccountsRepository } from '@/services/accounts/accounts';
 import { SupabaseAccountsRepository } from '@/services/supabase/accounts-repository';
 import { stageRobinhoodImport, toPersistableImportStage } from '@/services/ingestion/staging';
-import { ImportCommitRejectedError, SupabaseImportsRepository, type ImportsRepository } from '@/services/supabase/imports-repository';
+import { ImportOperationRejectedError, SupabaseImportsRepository, type ImportsRepository } from '@/services/supabase/imports-repository';
 
 export type ApiBindings = {
   APP_ENV?: 'development' | 'staging' | 'production';
@@ -138,10 +138,25 @@ export function createApi(dependencies: ApiDependencies = {}) {
     try {
       importRecord = await imports.commit(context.req.param('importId'), authenticated.accessToken);
     } catch (error) {
-      if (error instanceof ImportCommitRejectedError) return context.json({ error: 'review_issues_must_be_resolved' }, 409);
+      if (error instanceof ImportOperationRejectedError) return context.json({ error: 'review_issues_must_be_resolved' }, 409);
       throw error;
     }
     if (!importRecord) return context.json({ error: 'not_found_or_not_committable' }, 404);
+    return context.json({ import: importRecord });
+  });
+
+  api.post('/v1/imports/:importId/undo', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    const imports = importsRepository ?? createImportsRepository(context.env);
+    let importRecord;
+    try {
+      importRecord = await imports.undo(context.req.param('importId'), authenticated.accessToken);
+    } catch (error) {
+      if (error instanceof ImportOperationRejectedError) return context.json({ error: 'only_the_latest_committed_import_can_be_undone' }, 409);
+      throw error;
+    }
+    if (!importRecord) return context.json({ error: 'not_found_or_not_undoable' }, 404);
     return context.json({ import: importRecord });
   });
 

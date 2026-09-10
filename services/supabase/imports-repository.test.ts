@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ImportCommitRejectedError, SupabaseImportsRepository } from '@/services/supabase/imports-repository';
+import { ImportOperationRejectedError, SupabaseImportsRepository } from '@/services/supabase/imports-repository';
 import { stageRobinhoodImport, toPersistableImportStage } from '@/services/ingestion/staging';
 
 describe('Supabase imports repository', () => {
@@ -68,6 +68,21 @@ describe('Supabase imports repository', () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ message: 'Resolve invalid rows.' }), { status: 400 }));
     const repository = new SupabaseImportsRepository({ supabaseUrl: 'https://project.supabase.co', supabaseAnonKey: 'anon-key', fetcher });
 
-    await expect(repository.commit('import-id', 'user-token')).rejects.toBeInstanceOf(ImportCommitRejectedError);
+    await expect(repository.commit('import-id', 'user-token')).rejects.toBeInstanceOf(ImportOperationRejectedError);
+  });
+
+  it('uses the undo RPC, then returns the RLS-scoped undone import summary', async () => {
+    const undoneSummary = { ...summary, status: 'undone' };
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify('import-id')))
+      .mockResolvedValueOnce(new Response(JSON.stringify([undoneSummary])))
+      .mockResolvedValueOnce(new Response(JSON.stringify([])));
+    const repository = new SupabaseImportsRepository({ supabaseUrl: 'https://project.supabase.co', supabaseAnonKey: 'anon-key', fetcher });
+
+    await expect(repository.undo('import-id', 'user-token')).resolves.toMatchObject({ id: 'import-id', status: 'undone' });
+    const [url, init] = fetcher.mock.calls[0];
+    expect(url.pathname).toBe('/rest/v1/rpc/undo_import');
+    expect(init.headers).toMatchObject({ authorization: 'Bearer user-token' });
+    expect(JSON.parse(init.body)).toEqual({ p_import_id: 'import-id' });
   });
 });

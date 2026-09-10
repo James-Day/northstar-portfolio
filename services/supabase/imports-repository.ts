@@ -33,6 +33,7 @@ export type ImportsRepository = {
   get(importId: string, accessToken: string): Promise<ImportReviewDetail | undefined>;
   discard(importId: string, accessToken: string): Promise<ImportSummary | undefined>;
   commit(importId: string, accessToken: string): Promise<ImportSummary | undefined>;
+  undo(importId: string, accessToken: string): Promise<ImportSummary | undefined>;
 };
 
 export type SupabaseImportsRepositoryOptions = {
@@ -42,10 +43,10 @@ export type SupabaseImportsRepositoryOptions = {
 };
 
 /** A review-ready import can still be rejected atomically when its stored rows are invalid. */
-export class ImportCommitRejectedError extends Error {
+export class ImportOperationRejectedError extends Error {
   constructor() {
-    super('This import cannot be committed until its review issues are resolved.');
-    this.name = 'ImportCommitRejectedError';
+    super('This import operation cannot proceed until its review issues are resolved.');
+    this.name = 'ImportOperationRejectedError';
   }
 }
 
@@ -160,11 +161,26 @@ export class SupabaseImportsRepository implements ImportsRepository {
       body: JSON.stringify({ p_import_id: importId }),
     });
     if (response.status === 403 || response.status === 404) return undefined;
-    if (response.status === 400 || response.status === 409) throw new ImportCommitRejectedError();
+    if (response.status === 400 || response.status === 409) throw new ImportOperationRejectedError();
     if (!response.ok) throw new Error(`Supabase import commit failed with HTTP ${response.status}.`);
     const committedId: unknown = await response.json();
     if (typeof committedId !== 'string') throw new Error('Supabase import commit returned an invalid import ID.');
     return this.get(committedId, accessToken).then((detail) => detail?.import);
+  }
+
+  async undo(importId: string, accessToken: string): Promise<ImportSummary | undefined> {
+    const rpcUrl = new URL('/rest/v1/rpc/undo_import', this.baseUrl);
+    const response = await this.fetcher(rpcUrl, {
+      method: 'POST',
+      headers: { apikey: this.options.supabaseAnonKey, authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ p_import_id: importId }),
+    });
+    if (response.status === 403 || response.status === 404) return undefined;
+    if (response.status === 400 || response.status === 409) throw new ImportOperationRejectedError();
+    if (!response.ok) throw new Error(`Supabase import undo failed with HTTP ${response.status}.`);
+    const undoneId: unknown = await response.json();
+    if (typeof undoneId !== 'string') throw new Error('Supabase import undo returned an invalid import ID.');
+    return this.get(undoneId, accessToken).then((detail) => detail?.import);
   }
 }
 
