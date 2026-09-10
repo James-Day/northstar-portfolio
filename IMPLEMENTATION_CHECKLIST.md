@@ -13,7 +13,7 @@ This file is the current implementation plan. Work through the numbered steps in
 - Keep commits large and coherent. Record meaningful milestone evidence rather than a log entry for every small UI change.
 - Never commit secrets. Configure credentials through local ignored environment files or the service's secret interface.
 
-**Current count: 102 tasks — 48 checked, 54 unchecked, across 13 ordered steps.**
+**Current count: 102 tasks — 50 checked, 52 unchecked, across 13 ordered steps.**
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -93,9 +93,9 @@ Owner: platform/ingestion. Depends on step 04; queue consumers must use the corr
 - [x] **05.01** Private bucket policies and owned-account signed-upload API/repository exist. Evidence: initial migration, `services/supabase/signed-upload-repository.ts`.
 - [x] **05.02** Typed import/report/price jobs and retry-aware dispatcher exist. Evidence: `services/queues/`. Worker has no `queue` export or durable handlers yet.
 - [x] **05.03** Upload the actual object, bind verified object metadata/hash to its import, enforce streamed request limits and validate ownership/size/content server-side before processing. Evidence: authenticated object-binding endpoint, private Storage download, exact byte/hash verification, ownership checks, and RLS-backed binding RPC in commit `1c8f694`.
-- [ ] **05.04** Wire Cloudflare queue entrypoint and durable import handler; persist processing/progress/failure state and let browser review poll durable results.
+- [x] **05.04** Wire Cloudflare queue entrypoint and durable import handler; persist processing/progress/failure state and let browser review poll durable results. Evidence: import queue handler, Supabase claim/progress/complete/fail RPCs, Worker queue binding and durable import repository in commit `b77c092`.
 - [x] **05.05** Dispatch the transactional outbox with claim/retry/idempotency semantics. The dispatcher claims with `FOR UPDATE SKIP LOCKED`, translates `import.committed`/`import.undone` to typed report jobs, verifies ownership, and records retry/failure state.
-- [ ] **05.06** Persist rejected-job/error evidence before acknowledgment; implement dead-letter inspection and safe replay.
+- [x] **05.06** Persist rejected-job/error evidence before acknowledgment; implement dead-letter inspection and safe replay. Evidence: queue failure recorder, RLS/service-only rejection repository, durable rejection/replay RPCs and queue integration in commit `b77c092`.
 - [ ] **05.07** Gate: real storage isolation and queued import tests pass; retry/crash never loses an upload, commits twice or silently drops failed work.
 
 ## 06 — Reconcile persisted accounting and opening history
@@ -253,6 +253,7 @@ Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/sh
 | 2026-09-10 | 09.06 — Consolidated report composition | Commit `01afe90`; consolidated inputs cancel only proven linked internal transfers, preserve external flows/incentives for return calculations, retain unresolved links, and carry incomplete valuation/unknown-basis states. Eight focused tests and typecheck passed. | Live Supabase execution, snapshot publication and end-to-end authenticated verification remain open. |
 | 2026-09-10 | 07.05 — Resumable historical seed job | Commit `8b4bb54`; DoltHub seed processing now persists a cursor only after idempotent price/quarantine writes, records symbol mappings and source revisions, and supports bounded restart/retry. Focused tests and typecheck passed. | No bounded live DoltHub/Supabase seed has been executed; licensing and operator review remain open. |
 | 2026-09-10 | 11.04 — Durable Stripe webhook handler | Commit `368c349`; verified raw events dispatch through recognized lifecycle handlers, preserve full payloads for replay/audit, resolve ownership from server-controlled customer mappings, and fail unresolved events for retry. Eight focused tests and typecheck passed. | Live Stripe/Supabase execution and staging webhook replay remain open. |
+| 2026-09-10 | 05.04/05.06 — Durable import queue and failure evidence | Commit `b77c092`; Cloudflare import jobs now claim and checkpoint processing through service-role RPCs, retry transient failures, persist poison/error evidence before acknowledgment, and expose safe replay primitives. Full validation: 79 test files / 274 tests and typecheck passed. | Live queue binding, Supabase migration execution and deployed import processing remain open. |
 | 2026-09-10 | 05.03 — Verified private statement object binding | Commit `1c8f694`; authenticated object-binding verifies account ownership, private Storage access, 10 MB/byte-size limits and SHA-256 before persisting import metadata through an RLS-backed RPC. Focused tests (38) and typecheck passed. | Live Supabase Storage/RLS execution and queued import processing remain open. |
 | 2026-09-10 | 09.05 — Report outbox-to-queue wiring (partial) | Commit `ff69ddb`; scheduled transactional outbox dispatch claims report events, publishes typed jobs to `REPORT_QUEUE`, uses `waitUntil` for cron work, and retries safely. Queue tests (9) and typecheck passed. | Durable report input loaders, all import/undo/price-correction triggers, live queue bindings and end-to-end snapshot execution remain open. |
 
