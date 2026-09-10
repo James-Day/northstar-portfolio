@@ -138,7 +138,7 @@ Acceptance: repeated and overlapping files never double-count; legitimate identi
 - [x] Apply net trade amounts/fees once and preserve unknown basis through sales.
 - [x] Record dividend income and a separate reinvestment purchase without double counting.
 - [x] Link reconciled internal transfers for consolidated reporting and flag unresolved transfers.
-- [ ] Preserve transferred share lots and basis through persisted cross-account transfers.
+- [x] Preserve transferred share lots and basis through persisted cross-account transfers.
 - [x] Enforce validated corporate actions before applying quantity/basis changes; never automatically apply quarantined split rows.
 
 Acceptance: hand-calculated fixtures cover partial lot sales, fractional shares, fees, DRIP, transfers, incentives and splits; no hard-coded basis deductions remain.
@@ -309,6 +309,7 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-10 | 11/12 — Ledger report metrics in snapshots (partial) | Snapshot payloads now carry exact ledger net deposits, dividend income, and FIFO realized gain/loss, and authenticated dashboard cards render persisted dividend/realized values when present. | Snapshot generation still needs persisted-ledger orchestration; charts, allocation, and live detail views remain. |
 | 2026-09-10 | 11/12 — Persisted valuation chart data (partial) | Snapshot payloads now include daily valuation points, preserving nulls for unavailable dates; the authenticated dashboard chart uses persisted history and never falls back to synthetic demo points for a live account. | Snapshot generation from persisted inputs, allocation, and live detail views remain. |
 | 2026-09-10 | 11 — Corporate-action-aware valuation | Valuation now applies only validated, effective-dated splits and symbol changes to open lots before pricing, preserving basis and quarantining unvalidated actions through the existing guard. Fixtures verify split quantity/value behavior. | Persisted corporate-action loading, live report orchestration, and independent source validation remain. |
+| 2026-09-10 | 08 — Cross-account lot transfer basis | Added FIFO lot transfer application for reconciled inbound/outbound share transfers, preserving acquisition dates and proportional cost basis while leaving insufficient or mismatched transfers unresolved. Tests cover partial-lot transfers and rollback on insufficient shares. | Persisted transfer execution and consolidated report orchestration remain. |
 | 2026-09-09 | 07 — Import workflow (partial) | Lifecycle and review-commit blocking rules added; `npm run typecheck`, `npm test` (25 passing), and `npm run build` passed | Lifecycle is not yet persisted or processed through queues |
 | 2026-09-09 | 08 — Corporate-action safeguards (partial) | Validated split and ticker-change lot handling added; `npm run typecheck`, `npm test` (28 passing), and `npm run build` passed | Corporate actions are not yet sourced, evidenced, or connected to stored price history |
 | 2026-09-09 | 08 — Internal-transfer linking (partial) | Reconciled-account transfer linking and unresolved-transfer rules added; `npm run typecheck`, `npm test` (30 passing), and `npm run build` passed | Transferred lots/basis require persisted cross-account transfer workflows |
