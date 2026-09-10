@@ -6,6 +6,8 @@ import { isUsEquityTradingDay } from '@/services/market-data/us-equity-calendar'
 
 export type HistoricalPriceUpsert = {
   instrumentId: InstrumentId;
+  /** Original source ticker retained for mapping and operator evidence. */
+  sourceSymbol?: string;
   tradingDate: IsoDate;
   close: DoltHubDailyClose['close'];
   source: 'dolthub';
@@ -121,7 +123,7 @@ export function prepareHistoricalPriceIngestion(
     try {
       const instrumentId = resolveInstrumentAlias(aliases, record.symbol, record.tradingDate);
       if (!instrumentId) throw new Error(`No effective instrument alias for ${record.symbol} on ${record.tradingDate}.`);
-      accepted.push({ instrumentId, tradingDate: record.tradingDate, close: record.close, source: 'dolthub', sourceRevision });
+      accepted.push({ instrumentId, sourceSymbol: record.symbol, tradingDate: record.tradingDate, close: record.close, source: 'dolthub', sourceRevision });
     } catch (error) {
       quarantined.push({ record, reason: error instanceof Error ? error.message : 'Instrument alias resolution failed.' });
     }
