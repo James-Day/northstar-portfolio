@@ -2,6 +2,7 @@ import type { IsoDate } from '@/lib/domain/types';
 import type { DailyPrice, DailyPriceProvider } from '@/services/market-data/types';
 import { eligibleEodTradingDate } from '@/services/market-data/us-equity-calendar';
 import { RefreshMetricsCollector } from '@/services/market-data/refresh-metrics';
+import type { MarketDataQuotaLedger, QuotaReservation } from '@/services/market-data/quota';
 
 export type DailyRefreshResult =
   | { status: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'quota_exhausted' }
@@ -26,7 +27,17 @@ export type DailyRefreshEvent =
   | { type: 'persisted'; tradingDate: IsoDate; symbolCount: number; upserted: number };
 export type DailyRefreshTelemetry = { record: (event: DailyRefreshEvent) => void };
 export type DailyRefreshRunRecorder = { record(run: { tradingDate: IsoDate | null; status: 'persisted' | 'skipped' | 'failed'; attempts: number; failedAttempts: number; requestedSymbols: number; persistedRows: number; quotaUnits: number; errorMessage?: string | null }): Promise<string> };
-export type DailyQuotaGuard = { getUsedUnits(now: Date): Promise<number>; monthlyCap: number };
+/**
+ * The legacy read-only guard is retained for local callers. Scheduled
+ * production jobs should provide `ledger`, which atomically reserves capacity
+ * before each provider attempt and reconciles it afterwards.
+ */
+export type DailyQuotaGuard = {
+  monthlyCap: number;
+  getUsedUnits?: (now: Date) => Promise<number>;
+  ledger?: MarketDataQuotaLedger;
+  idempotencyKeyPrefix?: string;
+};
 
 /** Optional durable cache lookup used to avoid re-requesting a completed EOD close. */
 export type DailyPriceCache = { getMissingSymbols(symbols: string[], tradingDate: IsoDate): Promise<string[]> };
@@ -42,18 +53,44 @@ export async function prepareDailyPriceRefresh(
   provider: DailyPriceProvider,
   quota?: DailyQuotaGuard,
   telemetry?: DailyRefreshTelemetry,
+  reservationKey?: string,
 ): Promise<DailyRefreshResult> {
   const tradingDate = eligibleEodTradingDate(now);
   if (!tradingDate) return { status: 'skipped', reason: 'before_close_or_non_trading_day' };
 
   const requestedSymbols = normalizeSymbols(activeSymbols);
   if (requestedSymbols.length === 0) return { status: 'skipped', reason: 'no_active_symbols' };
-  if (quota && await quota.getUsedUnits(now) + requestedSymbols.length > quota.monthlyCap) return { status: 'skipped', reason: 'quota_exhausted' };
+  let reservation: QuotaReservation | undefined;
+  if (quota?.ledger) {
+    try {
+      reservation = await quota.ledger.reserve({
+        now,
+        units: requestedSymbols.length,
+        monthlyCap: quota.monthlyCap,
+        idempotencyKey: reservationKey ?? makeReservationKey(now, tradingDate, requestedSymbols, quota.idempotencyKeyPrefix),
+      });
+    } catch (error) {
+      if (isQuotaExhausted(error)) return { status: 'skipped', reason: 'quota_exhausted' };
+      throw error;
+    }
+    if (reservation.units !== requestedSymbols.length) throw new Error('Quota ledger returned a reservation with an unexpected unit count.');
+  } else if (quota?.getUsedUnits && await quota.getUsedUnits(now) + requestedSymbols.length > quota.monthlyCap) {
+    return { status: 'skipped', reason: 'quota_exhausted' };
+  }
 
   // This is the quota-bearing event. Skip paths and preflight failures must not
   // be included in the durable provider usage counter.
   telemetry?.record({ type: 'requested', symbolCount: requestedSymbols.length });
-  const prices = await provider.getDailyPrices(requestedSymbols, tradingDate);
+  let prices: DailyPrice[];
+  try {
+    prices = await provider.getDailyPrices(requestedSymbols, tradingDate);
+  } catch (error) {
+    await reconcileReservation(quota, reservation, requestedSymbols.length);
+    throw error;
+  }
+  // A request that reached the provider consumes one unit per requested
+  // symbol even when its response is malformed or incomplete.
+  await reconcileReservation(quota, reservation, requestedSymbols.length);
   validateProviderResponse(prices, requestedSymbols, tradingDate);
   return { status: 'ready_to_persist', tradingDate, requestedSymbols, prices };
 }
@@ -66,13 +103,14 @@ export async function runDailyPriceRefresh(
   persistence: DailyPricePersistence,
   quota?: DailyQuotaGuard,
   telemetry?: DailyRefreshTelemetry,
+  reservationKey?: string,
 ): Promise<DailyRefreshJobResult> {
   const tradingDate = eligibleEodTradingDate(now);
   const requestedSymbols = normalizeSymbols(activeSymbols);
   const missingSymbols = tradingDate && 'getMissingSymbols' in persistence && typeof persistence.getMissingSymbols === 'function'
     ? await persistence.getMissingSymbols(requestedSymbols, tradingDate)
     : requestedSymbols;
-  const prepared = await prepareDailyPriceRefresh(now, missingSymbols, provider, quota, telemetry);
+  const prepared = await prepareDailyPriceRefresh(now, missingSymbols, provider, quota, telemetry, reservationKey);
   if (prepared.status === 'skipped' && prepared.reason === 'no_active_symbols' && requestedSymbols.length > 0 && missingSymbols.length === 0) {
     return { status: 'skipped', reason: 'already_fetched' };
   }
@@ -101,7 +139,7 @@ export async function runDailyPriceRefreshWithRetry(
     attempt += 1;
     telemetry?.record({ type: 'attempt', attempt, maxAttempts, symbolCount: new Set(activeSymbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean)).size });
     try {
-      const result = await runDailyPriceRefresh(now, activeSymbols, provider, persistence, quota, telemetry);
+      const result = await runDailyPriceRefresh(now, activeSymbols, provider, persistence, quota, telemetry, makeAttemptReservationKey(now, activeSymbols, attempt, quota));
       if (result.status === 'skipped') telemetry?.record({ type: 'skipped', reason: result.reason });
       else telemetry?.record({ type: 'persisted', tradingDate: result.tradingDate, symbolCount: result.requestedSymbols.length, upserted: result.upserted });
       return result;
@@ -140,6 +178,24 @@ export async function runAndRecordDailyPriceRefresh(
 
 function normalizeSymbols(symbols: string[]): string[] {
   return [...new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))].sort();
+}
+
+function makeReservationKey(now: Date, tradingDate: IsoDate, symbols: string[], prefix = 'daily-refresh'): string {
+  return `${prefix}:${now.toISOString()}:${tradingDate}:${normalizeSymbols(symbols).join(',')}`;
+}
+
+function makeAttemptReservationKey(now: Date, symbols: string[], attempt: number, quota?: DailyQuotaGuard): string {
+  const tradingDate = eligibleEodTradingDate(now) ?? now.toISOString().slice(0, 10) as IsoDate;
+  return `${quota?.idempotencyKeyPrefix ?? 'daily-refresh'}:${tradingDate}:attempt-${attempt}:${normalizeSymbols(symbols).join(',')}`;
+}
+
+async function reconcileReservation(quota: DailyQuotaGuard | undefined, reservation: QuotaReservation | undefined, consumedUnits: number): Promise<void> {
+  if (!reservation || !quota?.ledger) return;
+  await quota.ledger.reconcile({ reservationId: reservation.reservationId, consumedUnits });
+}
+
+function isQuotaExhausted(error: unknown): boolean {
+  return error instanceof Error && /quota(?:[- ]| monthly )?exhausted/i.test(error.message);
 }
 
 function validateProviderResponse(prices: DailyPrice[], requestedSymbols: string[], tradingDate: IsoDate) {

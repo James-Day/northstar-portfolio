@@ -33,6 +33,35 @@ describe('daily price refresh preparation', () => {
     expect(getDailyPrices).not.toHaveBeenCalled();
   });
 
+  it('atomically reserves before a provider call and reconciles after success', async () => {
+    const ledger = { reserve: vi.fn().mockResolvedValue({ reservationId: 'reservation-1', units: 2 }), reconcile: vi.fn().mockResolvedValue({ reservationId: 'reservation-1', reservedUnits: 2, consumedUnits: 2, releasedUnits: 0 }) };
+    const getDailyPrices = vi.fn().mockResolvedValue([price('AAPL'), price('VTI')]);
+    const provider: DailyPriceProvider = { getDailyPrices };
+    const order: string[] = [];
+    ledger.reserve.mockImplementation(async () => { order.push('reserve'); return { reservationId: 'reservation-1', units: 2 }; });
+    getDailyPrices.mockImplementation(async () => { order.push('provider'); return [price('AAPL'), price('VTI')]; });
+    ledger.reconcile.mockImplementation(async () => { order.push('reconcile'); return { reservationId: 'reservation-1', reservedUnits: 2, consumedUnits: 2, releasedUnits: 0 }; });
+    await expect(prepareDailyPriceRefresh(new Date('2026-07-06T22:00:00.000Z'), ['AAPL', 'VTI'], provider, { monthlyCap: 100, ledger })).resolves.toMatchObject({ status: 'ready_to_persist' });
+    expect(order).toEqual(['reserve', 'provider', 'reconcile']);
+    expect(ledger.reserve).toHaveBeenCalledWith(expect.objectContaining({ units: 2, monthlyCap: 100 }));
+    expect(ledger.reconcile).toHaveBeenCalledWith({ reservationId: 'reservation-1', consumedUnits: 2 });
+  });
+
+  it('reconciles all reserved units when the provider fails', async () => {
+    const ledger = { reserve: vi.fn().mockResolvedValue({ reservationId: 'reservation-2', units: 1 }), reconcile: vi.fn().mockResolvedValue({ reservationId: 'reservation-2', reservedUnits: 1, consumedUnits: 1, releasedUnits: 0 }) };
+    const provider: DailyPriceProvider = { getDailyPrices: vi.fn().mockRejectedValue(new Error('provider unavailable')) };
+    await expect(prepareDailyPriceRefresh(new Date('2026-07-06T22:00:00.000Z'), ['AAPL'], provider, { monthlyCap: 100, ledger })).rejects.toThrow('provider unavailable');
+    expect(ledger.reconcile).toHaveBeenCalledWith({ reservationId: 'reservation-2', consumedUnits: 1 });
+  });
+
+  it('turns an atomic quota exhaustion into a refresh skip without calling the provider', async () => {
+    const ledger = { reserve: vi.fn().mockRejectedValue(new Error('Market-data monthly quota exhausted.')), reconcile: vi.fn() };
+    const provider: DailyPriceProvider = { getDailyPrices: vi.fn() };
+    await expect(prepareDailyPriceRefresh(new Date('2026-07-06T22:00:00.000Z'), ['AAPL'], provider, { monthlyCap: 100, ledger })).resolves.toEqual({ status: 'skipped', reason: 'quota_exhausted' });
+    expect(provider.getDailyPrices).not.toHaveBeenCalled();
+    expect(ledger.reconcile).not.toHaveBeenCalled();
+  });
+
   it('rejects incomplete, duplicate, off-date, and unrequested provider results', async () => {
     const provider: DailyPriceProvider = { getDailyPrices: vi.fn().mockResolvedValue([price('AAPL')]) };
     await expect(prepareDailyPriceRefresh(new Date('2026-07-06T22:00:00.000Z'), ['AAPL', 'VTI'], provider)).rejects.toThrow('VTI');
