@@ -862,7 +862,7 @@ function Overview({
               value={liveRealized == null ? (showDemo ? precise.format(summary.realized) : "—") : precise.format(Number(liveRealized))}
             />
             <Metric label="Cash balance" value={liveCash != null ? precise.format(Number(liveCash)) : showDemo ? precise.format(summary.cash) : "—"} />
-            <Metric label="Price source" value="Not connected" small />
+            <Metric label="Price source" value={showDemo ? "Not connected" : "Stored daily closes"} small />
           </div>
         </section>
       </div>
