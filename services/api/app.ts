@@ -14,6 +14,9 @@ export type ApiBindings = {
   APP_ORIGIN?: string;
   SUPABASE_URL?: string;
   SUPABASE_ANON_KEY?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
+  MARKETSTACK_API_KEY?: string;
+  MARKETSTACK_MONTHLY_CAP?: string;
 };
 
 export type ApiDependencies = {
