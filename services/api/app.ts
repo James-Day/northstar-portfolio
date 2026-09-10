@@ -53,6 +53,13 @@ import { toCsv } from "@/services/privacy/export";
 import { resolveEntitlementAccess } from "@/services/billing/entitlements";
 import type { BillingPersistence } from "@/services/billing/persistence";
 import { SupabaseBillingRepository } from "@/services/supabase/billing-repository";
+import {
+  MemoryRateLimitStore,
+  requestClientKey,
+  requestId,
+  requestRateLimit,
+  type RateLimitStore,
+} from "@/services/security/request-security";
 
 const ACTIVITY_EXPORT_PAGE_SIZE = 100;
 const MAX_ACTIVITY_EXPORT_ROWS = 100_000;
@@ -102,6 +109,8 @@ export type ApiDependencies = {
   };
   billing?: StripeBillingHttpDependencies;
   billingPersistence?: BillingPersistence;
+  rateLimitStore?: RateLimitStore;
+  now?: () => number;
 };
 
 export function createApi(dependencies: ApiDependencies = {}) {
@@ -124,8 +133,24 @@ export function createApi(dependencies: ApiDependencies = {}) {
   const deletionRequestRepository = dependencies.deletionRequestRepository;
   const billing = dependencies.billing;
   const billingPersistence = dependencies.billingPersistence;
+  const rateLimitStore = dependencies.rateLimitStore ?? new MemoryRateLimitStore();
+  const now = dependencies.now ?? Date.now;
 
   api.use("*", async (context, next) => {
+    const request = context.req.raw;
+    const id = requestId(request);
+    context.header("x-request-id", id);
+    if (request.method !== "OPTIONS") {
+      const policy = requestRateLimit(new URL(request.url).pathname, request.method);
+      const bucket = request.method === "POST" || request.method === "PUT" || request.method === "DELETE" ? "write" : "read";
+      const decision = rateLimitStore.consume(`${requestClientKey(request)}:${bucket}`, now(), policy.limit, policy.windowMs);
+      context.header("x-ratelimit-limit", String(decision.limit));
+      context.header("x-ratelimit-remaining", String(decision.remaining));
+      if (!decision.allowed) {
+        context.header("retry-after", String(decision.retryAfterSeconds));
+        return context.json({ error: "rate_limited", requestId: id }, 429);
+      }
+    }
     const origin = context.req.header("origin");
     const bindings = context.env ?? {};
     const allowedOrigin =
@@ -148,7 +173,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
     context.json({
       status: "ok",
       service: "northstar-api",
-      environment: context.env.APP_ENV ?? "development",
+      environment: (context.env ?? {}).APP_ENV ?? "development",
     }),
   );
 

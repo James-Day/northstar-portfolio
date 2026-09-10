@@ -3,9 +3,22 @@ import { createApi } from '@/services/api/app';
 import { ImportOperationRejectedError } from '@/services/supabase/imports-repository';
 import { parseOpeningHistory } from '@/services/accounts/opening-history';
 import type { Entitlement } from '@/services/billing/entitlements';
+import { MemoryRateLimitStore } from '@/services/security/request-security';
 
 describe('standalone API', () => {
   const trialEntitlement = (status: Entitlement['status'] = 'trialing'): Entitlement => ({ status, trialStartedAt: new Date('2026-01-01T00:00:00Z'), trialEndsAt: new Date('2099-01-15T00:00:00Z'), processedWebhookIds: [], lastWebhookCreatedAt: null, lastWebhookId: null });
+
+  it('enforces the API rate-limit boundary before route work and returns safe headers', async () => {
+    const store = new MemoryRateLimitStore();
+    const app = createApi({ rateLimitStore: store, now: () => 0 });
+    const first = await app.request('http://api.test/health');
+    expect(first.status).toBe(200);
+    const limitedStore = { consume: () => ({ allowed: false, limit: 1, remaining: 0, retryAfterSeconds: 12 }) };
+    const limited = await createApi({ rateLimitStore: limitedStore }).request('http://api.test/health');
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('retry-after')).toBe('12');
+    await expect(limited.json()).resolves.toMatchObject({ error: 'rate_limited', requestId: expect.any(String) });
+  });
 
   it('returns a truthful authenticated billing status', async () => {
     const app = createApi({ verifySession: async () => ({ id: 'user-123' }), billingPersistence: { getEntitlement: async () => trialEntitlement(), startTrialAfterCommittedImport: async () => trialEntitlement(), applyVerifiedWebhook: async () => trialEntitlement() } });
