@@ -32,7 +32,7 @@ The frontend uses React/TypeScript/Tailwind with **Vinext/Vite and Sites**. A se
 | Prices | DoltHub ingestion/writers; Marketstack cron composition, retry and metrics code | Verified seed, daily fetch deduplication, accurate durable quota accounting, live execution |
 | Reports | Valuation/return functions, snapshot publisher/read API, snapshot-backed UI | Database input loader, outbox-to-report execution, consolidated/detail reports |
 | Billing/privacy | Pure entitlement, trial, retention and deletion rules; authenticated activity/report exports; idempotent deletion-plan persistence | Durable effects, Stripe HTTP integration, enforcement, export/deletion UI |
-| Tests | Typecheck and 220 tests across 64 files pass in the current audit | Real database, storage and authenticated browser regression suites |
+| Tests | Typecheck and 231 tests across 67 files pass in the current audit | Real database, storage and authenticated browser regression suites |
 
 No hosted services, price datasets, provider credentials, or commercial licensing were reverified in this documentation audit. Previous local Supabase integration evidence is retained in [the historical log](docs/IMPLEMENTATION_HISTORY.md); it is not a fresh live test.
 
