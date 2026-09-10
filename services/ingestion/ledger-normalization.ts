@@ -25,6 +25,11 @@ export function normalizeRobinhoodRowsForLedger(
   instrumentIdBySymbol: ReadonlyMap<string, string>,
 ): LedgerEntryDraft[] {
   const entries: LedgerEntryDraft[] = [];
+  const explicitDividendKeys = new Set(
+    rows.flatMap((row) => row.status === 'supported' && row.activity?.type === 'dividend' && row.activity.symbol
+      ? [`${row.activity.effectiveDate}|${row.activity.symbol}|${new Decimal(row.activity.amount).abs().toFixed()}`]
+      : []),
+  );
   for (const row of rows) {
     if (row.status !== 'supported' || !row.activity) continue;
     const activity = row.activity;
@@ -43,7 +48,8 @@ export function normalizeRobinhoodRowsForLedger(
     };
     if (activity.type === 'drip_buy') {
       const dividendAmount = decimalString(new Decimal(activity.amount).abs().toFixed());
-      entries.push({ ...base, entryType: 'dividend', quantity: null, unitPrice: null, cashAmount: dividendAmount, externalFlow: false, description: `${activity.description} (reinvested dividend income)` });
+      const dividendKey = activity.symbol ? `${activity.effectiveDate}|${activity.symbol}|${dividendAmount}` : '';
+      if (!explicitDividendKeys.has(dividendKey)) entries.push({ ...base, entryType: 'dividend', quantity: null, unitPrice: null, cashAmount: dividendAmount, externalFlow: false, description: `${activity.description} (reinvested dividend income)` });
       entries.push({ ...base, entryType: 'drip_buy', cashAmount: decimalString(new Decimal(activity.amount).abs().negated().toFixed()), externalFlow: false });
       continue;
     }

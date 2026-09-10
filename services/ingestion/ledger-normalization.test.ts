@@ -42,6 +42,17 @@ describe('Robinhood ledger normalization', () => {
     ]);
   });
 
+  it('does not duplicate income when Robinhood reports both dividend and DRIP rows', () => {
+    const rows = parseRobinhoodActivityCsv([
+      'Activity Date,Trans Code,Instrument,Quantity,Price,Amount,Description',
+      '2026-01-02,CDIV,VTI,,,($2),Cash dividend',
+      '2026-01-02,Dividend Reinvestment,VTI,0.01,$200,($2),Reinvested dividend',
+    ].join('\n'));
+    const entries = normalizeRobinhoodRowsForLedger(rows, new Map([['VTI', 'instrument-vti']]));
+    expect(entries.filter((entry) => entry.entryType === 'dividend')).toHaveLength(1);
+    expect(entries.filter((entry) => entry.entryType === 'drip_buy')).toHaveLength(1);
+  });
+
   it('preserves signs for cash activity and marks only deposits and withdrawals as external flows', () => {
     const rows = parseRobinhoodActivityCsv('Activity Date,Trans Code,Amount\n2026-01-02,ACH Deposit,$100\n2026-01-03,IRA Incentive,$10\n2026-01-04,ACH Withdrawal,$5\n2026-01-05,Fee,$1');
     expect(normalizeRobinhoodRowsForLedger(rows, new Map())).toEqual([
