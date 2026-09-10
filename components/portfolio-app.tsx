@@ -21,6 +21,7 @@ import {
   Landmark,
   Menu,
   Plus,
+  PieChart,
   Upload,
   WalletCards,
 } from "lucide-react";
@@ -48,6 +49,7 @@ import type { AccountActivity, ActivityPage } from "@/services/supabase/activity
 import { filterReportHistory, reportPeriodDescription, reportPeriodOptions, type ReportPeriod } from "@/services/reporting/period-filter";
 import { SettingsPanel } from "@/components/settings-panel";
 import type { OpeningHistory } from "@/services/accounts/opening-history";
+import { buildAllocationRows } from "@/lib/report-details";
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
 type PublicApiConfig = { baseUrl: string };
@@ -96,7 +98,8 @@ type LiveImportSummary = {
 };
 type LiveFreshnessReport = { expectedDate: string; rows: Array<{ symbol: string; expectedDate: string; latestDate: string | null; status: 'current' | 'stale' | 'missing' }> };
 type LiveReportHolding = { instrumentId: string; displayName?: string; quantity: string; close: string | null; value: string | null };
-type LiveReportSnapshot = { asOfDate: string; payload: { totalValue: string | null; cash: string | null; timeWeightedReturn: string | null; netDeposits?: string | null; dividendIncome?: string | null; realizedGainLoss?: string | null; valueHistory?: Array<{ date: string; value: string | null }>; activityCoveredThrough: string | null; pricesThrough: string | null; holdings: LiveReportHolding[] } };
+type LiveRealizedSale = { eventId: string; date: string; instrumentId: string; quantity: string; proceeds: string; matchedCostBasis: string | null; gainLoss: string | null; basisKnown: boolean };
+type LiveReportSnapshot = { asOfDate: string; payload: { totalValue: string | null; cash: string | null; timeWeightedReturn: string | null; netDeposits?: string | null; dividendIncome?: string | null; realizedGainLoss?: string | null; realizedSales?: LiveRealizedSale[]; valueHistory?: Array<{ date: string; value: string | null }>; activityCoveredThrough: string | null; pricesThrough: string | null; holdings: LiveReportHolding[] } };
 type LiveActivityPage = ActivityPage;
 
 const fmt = new Intl.NumberFormat("en-US", {
@@ -909,6 +912,7 @@ function Overview({
   const liveReturn = reportSnapshot?.payload.timeWeightedReturn;
   const liveDividends = reportSnapshot?.payload.dividendIncome;
   const liveRealized = reportSnapshot?.payload.realizedGainLoss;
+  const liveNetDeposits = reportSnapshot?.payload.netDeposits;
   const hasLiveReport = Boolean(reportSnapshot);
   const showDemo = !isLiveAccount;
   const chartData = hasLiveReport
@@ -1039,8 +1043,31 @@ function Overview({
           </p>
         </section>
       </div>
+      <ReportDetails isLiveAccount={isLiveAccount} totalValue={liveValue ?? null} cash={liveCash ?? null} netDeposits={liveNetDeposits ?? null} holdings={reportSnapshot?.payload.holdings} realizedSales={reportSnapshot?.payload.realizedSales} />
     </>
   );
+}
+
+function ReportDetails({ isLiveAccount, totalValue, cash, netDeposits, holdings, realizedSales }: { isLiveAccount: boolean; totalValue: string | null; cash: string | null; netDeposits: string | null; holdings?: LiveReportHolding[]; realizedSales?: LiveRealizedSale[] }) {
+  const rows = buildAllocationRows(holdings ?? [], cash, totalValue);
+  const hasReport = totalValue !== null || holdings !== undefined;
+  const sales = realizedSales ?? [];
+  return <div className="mt-6 grid gap-6 xl:grid-cols-2">
+    <section aria-label="Capital and allocation" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-5 flex items-center justify-between gap-3"><div><h2 className="text-lg font-bold">Capital & allocation</h2><p className="mt-0.5 text-sm text-slate-500">Portfolio composition from the latest stored valuation.</p></div><PieChart size={20} className="text-[#185da8]" /></div>
+      <div className="mb-6 grid grid-cols-2 gap-4"><Metric label="Net deposits" value={netDeposits === null ? (isLiveAccount ? "—" : "Unavailable") : precise.format(Number(netDeposits))} /><Metric label="Invested value" value={totalValue === null ? (isLiveAccount ? "—" : "Unavailable") : precise.format(Math.max(0, Number(totalValue) - Number(cash ?? 0)))} /></div>
+      {!hasReport && isLiveAccount && <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">Allocation becomes available after a report snapshot is published.</p>}
+      {hasReport && rows.length === 0 && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Allocation is unavailable because the latest valuation is incomplete.</p>}
+      {rows.length > 0 && <ul aria-label="Portfolio allocation" className="space-y-4">{rows.map((row) => <li key={row.key}><div className="mb-1 flex items-center justify-between gap-3 text-sm"><span className="font-semibold text-slate-700">{row.label}</span><span className="font-bold text-slate-800">{row.unavailable ? "Unavailable" : `${row.percentage.toFixed(1)}%`}</span></div>{!row.unavailable && <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#4f8ac9]" style={{ width: `${Math.min(100, Math.max(0, row.percentage))}%` }} /></div>}</li>)}</ul>}
+    </section>
+    <section aria-label="Realized lot detail" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-5"><h2 className="text-lg font-bold">Realized lot detail</h2><p className="mt-0.5 text-sm text-slate-500">FIFO analytical matches for completed sales. Not tax reporting.</p></div>
+      {isLiveAccount && realizedSales === undefined && <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">Lot matches will appear after a report with realized sale detail is published.</p>}
+      {isLiveAccount && realizedSales !== undefined && sales.length === 0 && <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">No completed sales in the latest report.</p>}
+      {!isLiveAccount && <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">Realized lot detail is unavailable in the synthetic example.</p>}
+      {sales.length > 0 && <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left"><thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400"><tr><th className="pb-3">Date</th><th className="pb-3">Instrument</th><th className="pb-3 text-right">Qty</th><th className="pb-3 text-right">Gain / loss</th></tr></thead><tbody>{sales.map((sale) => <tr key={sale.eventId} className="border-b border-slate-50 last:border-0"><td className="py-3 text-sm text-slate-500">{sale.date}</td><td className="py-3 text-sm font-bold">{sale.instrumentId}</td><td className="py-3 text-right text-sm">{sale.quantity}</td><td className={`py-3 text-right text-sm font-bold ${sale.gainLoss === null ? "text-slate-500" : Number(sale.gainLoss) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{sale.gainLoss === null ? "Basis unavailable" : precise.format(Number(sale.gainLoss))}</td></tr>)}</tbody></table></div>}
+    </section>
+  </div>;
 }
 
 function Holdings({ liveHoldings, isLiveAccount }: { liveHoldings?: LiveReportHolding[]; isLiveAccount: boolean }) {

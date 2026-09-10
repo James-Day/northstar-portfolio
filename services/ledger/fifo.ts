@@ -20,6 +20,9 @@ export type OpenLot = LotInput & { remainingQuantity: DecimalString };
 
 export type RealizedSale = {
   eventId: string;
+  date: IsoDate;
+  instrumentId: string;
+  quantity: DecimalString;
   proceeds: DecimalString;
   matchedCostBasis: DecimalString | null;
   gainLoss: DecimalString | null;
@@ -105,7 +108,7 @@ export function applyFifoLedger(events: LedgerEvent[], openingLots: LotInput[] =
         const realized = basisKnown ? proceeds.minus(matchedBasis) : null;
         if (realized === null) hasUnknownRealizedBasis = true;
         else knownRealized = knownRealized.plus(realized);
-        sales.push({ eventId: event.id, proceeds: asString(proceeds), matchedCostBasis: basisKnown ? asString(matchedBasis) : null, gainLoss: realized === null ? null : asString(realized), basisKnown });
+        sales.push({ eventId: event.id, date: event.date, instrumentId: event.instrumentId, quantity: event.quantity, proceeds: asString(proceeds), matchedCostBasis: basisKnown ? asString(matchedBasis) : null, gainLoss: realized === null ? null : asString(realized), basisKnown });
         break;
       }
       case 'dividend':
