@@ -4,6 +4,7 @@ import { handleScheduledRefresh } from '@/workers/scheduled-refresh';
 import { SupabaseActiveSymbolsRepository } from '@/services/supabase/active-symbols-repository';
 import { SupabaseDailyPricesRepository } from '@/services/supabase/daily-prices-repository';
 import { SupabaseMarketDataJobRunsRepository } from '@/services/supabase/market-data-job-runs-repository';
+import { createCloudflareQueueHandler } from '@/services/queues/cloudflare';
 
 function scheduledDependencies(environment: ApiBindings) {
   if (!environment.SUPABASE_URL || !environment.SUPABASE_SERVICE_ROLE_KEY || !environment.MARKETSTACK_API_KEY) throw new Error('Scheduled pricing requires SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and MARKETSTACK_API_KEY secrets.');
@@ -26,3 +27,11 @@ export default {
     handleScheduledRefresh(event, context, scheduledDependencies(environment));
   },
 };
+
+/**
+ * Cloudflare Queue entrypoint. Durable business handlers are intentionally not
+ * enabled until their repository dependencies and idempotency guarantees are
+ * complete; recognized jobs therefore retry through the configured queue
+ * policy instead of being acknowledged and lost.
+ */
+export const queue = createCloudflareQueueHandler<ApiBindings>(() => ({}));
