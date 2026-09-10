@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import {
   Area,
   AreaChart,
@@ -9,7 +9,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from "recharts";
+} from 'recharts';
 import {
   ArrowUpRight,
   ChartNoAxesCombined,
@@ -24,9 +24,9 @@ import {
   PieChart,
   Upload,
   WalletCards,
-} from "lucide-react";
-import { BrandMark } from "@/components/brand-mark";
-import { Button } from "@/components/ui/button";
+} from 'lucide-react';
+import { BrandMark } from '@/components/brand-mark';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -34,8 +34,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import {
   Activity,
   calculateSummary,
@@ -43,26 +43,26 @@ import {
   demoHoldings,
   demoPrices,
   parseRobinhoodCsv,
-} from "@/lib/portfolio";
-import { createPublicSupabaseClient } from "@/services/supabase/client";
+} from '@/lib/portfolio';
+import { createPublicSupabaseClient } from '@/services/supabase/client';
 import type {
   AccountActivity,
   ActivityPage,
-} from "@/services/supabase/activity-repository";
+} from '@/services/supabase/activity-repository';
 import {
   filterReportHistory,
   reportPeriodDescription,
   reportPeriodOptions,
   type ReportPeriod,
-} from "@/services/reporting/period-filter";
-import { SettingsPanel } from "@/components/settings-panel";
-import type { OpeningHistory } from "@/services/accounts/opening-history";
-import { buildAllocationRows } from "@/lib/report-details";
-import { clearPrivateWorkspaceState } from "@/lib/auth/private-workspace";
+} from '@/services/reporting/period-filter';
+import { SettingsPanel } from '@/components/settings-panel';
+import type { OpeningHistory } from '@/services/accounts/opening-history';
+import { buildAllocationRows } from '@/lib/report-details';
+import { clearPrivateWorkspaceState } from '@/lib/auth/private-workspace';
 import {
   getDashboardWarnings,
   type DashboardWarning,
-} from "@/lib/dashboard-warnings";
+} from '@/lib/dashboard-warnings';
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
 type PublicApiConfig = { baseUrl: string };
@@ -90,8 +90,8 @@ function SessionLoadingState() {
 type LiveAccount = {
   id: string;
   name: string;
-  account_type: "individual" | "traditional_ira" | "roth_ira";
-  brokerage: "robinhood";
+  account_type: 'individual' | 'traditional_ira' | 'roth_ira';
+  brokerage: 'robinhood';
   created_at: string;
 };
 type LiveOpeningHistory = OpeningHistory;
@@ -110,20 +110,20 @@ type LiveImportPreview = {
 type LiveImportRow = {
   id: string;
   rowNumber: number;
-  status: "supported" | "unsupported" | "invalid" | "duplicate";
+  status: 'supported' | 'unsupported' | 'invalid' | 'duplicate';
   message: string | null;
   normalizedPayload: Record<string, unknown> | null;
 };
 type LiveImportSummary = {
   id: string;
   status:
-    | "ready_for_review"
-    | "committed"
-    | "discarded"
-    | "undone"
-    | "failed"
-    | "staged"
-    | "processing";
+    | 'ready_for_review'
+    | 'committed'
+    | 'discarded'
+    | 'undone'
+    | 'failed'
+    | 'staged'
+    | 'processing';
   fileName: string;
   sourceRowCount: number;
   warningCount: number;
@@ -136,7 +136,7 @@ type LiveFreshnessReport = {
     symbol: string;
     expectedDate: string;
     latestDate: string | null;
-    status: "current" | "stale" | "missing";
+    status: 'current' | 'stale' | 'missing';
   }>;
 };
 type LiveReportHolding = {
@@ -181,47 +181,47 @@ type LiveReportSnapshot = {
 };
 type LiveActivityPage = ActivityPage;
 type LiveBillingStatus = {
-  status: "inactive" | "trialing" | "active" | "past_due" | "canceled";
+  status: 'inactive' | 'trialing' | 'active' | 'past_due' | 'canceled';
   allowed: boolean;
   reason:
-    | "active"
-    | "trialing"
-    | "trial_expired"
-    | "past_due"
-    | "canceled"
-    | "inactive";
+    | 'active'
+    | 'trialing'
+    | 'trial_expired'
+    | 'past_due'
+    | 'canceled'
+    | 'inactive';
   trialEndsAt: string | null;
 };
 
-const fmt = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
+const fmt = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
   maximumFractionDigits: 0,
 });
-const precise = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
+const precise = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
   minimumFractionDigits: 2,
 });
 const nav = [
-  ["Overview", ChartNoAxesCombined],
-  ["Accounts", WalletCards],
-  ["Activity", Clock3],
-  ["Documents", FileUp],
-  ["Settings", Landmark],
+  ['Overview', ChartNoAxesCombined],
+  ['Accounts', WalletCards],
+  ['Activity', Clock3],
+  ['Documents', FileUp],
+  ['Settings', Landmark],
 ] as const;
 
 function Pill({
   children,
-  tone = "slate",
+  tone = 'slate',
 }: {
   children: React.ReactNode;
-  tone?: "slate" | "green" | "gold";
+  tone?: 'slate' | 'green' | 'gold';
 }) {
   const tones = {
-    slate: "bg-slate-100 text-slate-600",
-    green: "bg-emerald-500/10 text-emerald-700",
-    gold: "bg-amber-400/15 text-amber-800",
+    slate: 'bg-slate-100 text-slate-600',
+    green: 'bg-emerald-500/10 text-emerald-700',
+    gold: 'bg-amber-400/15 text-amber-800',
   };
   return (
     <span
@@ -239,14 +239,27 @@ export function PortfolioApp({
   supabaseConfig?: PublicSupabaseConfig;
   apiConfig?: PublicApiConfig;
 }) {
-  const [active, setActive] = useState("Overview");
+  const [active, setActive] = useState('Overview');
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMenuOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [menuOpen]);
   const [stagedActivities, setStagedActivities] = useState<Activity[] | null>(
     null,
   );
-  const [stagedFileName, setStagedFileName] = useState("");
+  const [stagedFileName, setStagedFileName] = useState('');
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [uploadError, setUploadError] = useState("");
+  const [uploadError, setUploadError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const summary = useMemo(() => calculateSummary(demoActivities), []);
   const client = useMemo(
@@ -281,16 +294,16 @@ export function PortfolioApp({
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string>();
   const [reportRequestVersion, setReportRequestVersion] = useState(0);
-  const [reportPeriod, setReportPeriod] = useState<ReportPeriod>("all");
-  const [reportScope, setReportScope] = useState<"account" | "consolidated">(
-    "account",
+  const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('all');
+  const [reportScope, setReportScope] = useState<'account' | 'consolidated'>(
+    'account',
   );
   const [activityPage, setActivityPage] = useState<LiveActivityPage>();
   const [activityOffset, setActivityOffset] = useState(0);
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityError, setActivityError] = useState<string>();
   const [activityRequestVersion, setActivityRequestVersion] = useState(0);
-  const [activityFilter, setActivityFilter] = useState("");
+  const [activityFilter, setActivityFilter] = useState('');
   const [billingStatus, setBillingStatus] = useState<LiveBillingStatus>();
   const authGeneration = useRef(0);
 
@@ -332,10 +345,10 @@ export function PortfolioApp({
     setReportError(undefined);
     setActivityError(undefined);
     setStageMessage(undefined);
-    setActive("Overview");
+    setActive('Overview');
     setMenuOpen(false);
     setReviewOpen(false);
-    if (fileRef.current) fileRef.current.value = "";
+    if (fileRef.current) fileRef.current.value = '';
   }
 
   useEffect(() => {
@@ -397,24 +410,24 @@ export function PortfolioApp({
       const trialEndsAt = payload?.entitlement?.trialEndsAt;
       if (
         !active ||
-        (status !== "inactive" &&
-          status !== "trialing" &&
-          status !== "active" &&
-          status !== "past_due" &&
-          status !== "canceled") ||
-        (reason !== "active" &&
-          reason !== "trialing" &&
-          reason !== "trial_expired" &&
-          reason !== "past_due" &&
-          reason !== "canceled" &&
-          reason !== "inactive")
+        (status !== 'inactive' &&
+          status !== 'trialing' &&
+          status !== 'active' &&
+          status !== 'past_due' &&
+          status !== 'canceled') ||
+        (reason !== 'active' &&
+          reason !== 'trialing' &&
+          reason !== 'trial_expired' &&
+          reason !== 'past_due' &&
+          reason !== 'canceled' &&
+          reason !== 'inactive')
       )
         return;
       setBillingStatus({
         status,
         allowed: payload?.access?.allowed === true,
         reason,
-        trialEndsAt: typeof trialEndsAt === "string" ? trialEndsAt : null,
+        trialEndsAt: typeof trialEndsAt === 'string' ? trialEndsAt : null,
       });
     });
     return () => {
@@ -431,14 +444,14 @@ export function PortfolioApp({
     setAccountsLoading(true);
     setAccountsError(undefined);
     void client
-      .from("accounts")
-      .select("id,name,account_type,brokerage,created_at")
-      .order("created_at", { ascending: true })
+      .from('accounts')
+      .select('id,name,account_type,brokerage,created_at')
+      .order('created_at', { ascending: true })
       .then(({ data, error }) => {
         if (!active) return;
         setAccountsLoading(false);
         if (error) {
-          setAccountsError(error.message || "We could not load your accounts.");
+          setAccountsError(error.message || 'We could not load your accounts.');
           return;
         }
         setAccounts((data ?? []) as LiveAccount[]);
@@ -473,12 +486,12 @@ export function PortfolioApp({
           { headers: { authorization: `Bearer ${data.session.access_token}` } },
         );
         const payload: unknown = await response.json();
-        if (!response.ok) throw new Error("Opening history is unavailable.");
+        if (!response.ok) throw new Error('Opening history is unavailable.');
         if (
           active &&
           payload &&
-          typeof payload === "object" &&
-          "history" in payload
+          typeof payload === 'object' &&
+          'history' in payload
         )
           setOpeningHistory(
             (payload as { history: LiveOpeningHistory | null }).history ??
@@ -498,17 +511,17 @@ export function PortfolioApp({
 
   async function saveOpeningHistory(history: OpeningHistory) {
     if (!client || !apiConfig || !selectedAccountId)
-      throw new Error("Select an account first.");
+      throw new Error('Select an account first.');
     const { data } = await client.auth.getSession();
     if (!data.session?.access_token)
-      throw new Error("Your sign-in session has expired.");
+      throw new Error('Your sign-in session has expired.');
     const response = await fetch(
       `${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/opening-history`,
       {
-        method: "PUT",
+        method: 'PUT',
         headers: {
           authorization: `Bearer ${data.session.access_token}`,
-          "content-type": "application/json",
+          'content-type': 'application/json',
         },
         body: JSON.stringify(history),
       },
@@ -517,13 +530,13 @@ export function PortfolioApp({
     if (
       !response.ok ||
       !payload ||
-      typeof payload !== "object" ||
-      !("history" in payload)
+      typeof payload !== 'object' ||
+      !('history' in payload)
     )
       throw new Error(
-        payload && typeof payload === "object" && "error" in payload
+        payload && typeof payload === 'object' && 'error' in payload
           ? String(payload.error)
-          : "Opening history could not be saved.",
+          : 'Opening history could not be saved.',
       );
     setOpeningHistory((payload as { history: LiveOpeningHistory }).history);
   }
@@ -548,8 +561,8 @@ export function PortfolioApp({
           active &&
           response.ok &&
           payload &&
-          typeof payload === "object" &&
-          "imports" in payload &&
+          typeof payload === 'object' &&
+          'imports' in payload &&
           Array.isArray(payload.imports)
         )
           setImportHistory(payload.imports as LiveImportSummary[]);
@@ -575,7 +588,7 @@ export function PortfolioApp({
       .getSession()
       .then(async ({ data }) => {
         if (!data.session?.access_token)
-          throw new Error("Your sign-in session has expired.");
+          throw new Error('Your sign-in session has expired.');
         const response = await fetch(
           `${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/price-freshness`,
           { headers: { authorization: `Bearer ${data.session.access_token}` } },
@@ -583,15 +596,15 @@ export function PortfolioApp({
         const payload: unknown = await response.json();
         if (!response.ok)
           throw new Error(
-            payload && typeof payload === "object" && "error" in payload
-              ? String(payload.error).replaceAll("_", " ")
-              : "Freshness data is unavailable.",
+            payload && typeof payload === 'object' && 'error' in payload
+              ? String(payload.error).replaceAll('_', ' ')
+              : 'Freshness data is unavailable.',
           );
         if (
           active &&
           payload &&
-          typeof payload === "object" &&
-          "report" in payload
+          typeof payload === 'object' &&
+          'report' in payload
         )
           setFreshnessReport(
             (payload as { report: LiveFreshnessReport }).report,
@@ -602,7 +615,7 @@ export function PortfolioApp({
           setFreshnessError(
             error instanceof Error
               ? error.message
-              : "Freshness data is unavailable.",
+              : 'Freshness data is unavailable.',
           );
       })
       .finally(() => {
@@ -637,10 +650,10 @@ export function PortfolioApp({
         if (
           !response.ok ||
           !payload ||
-          typeof payload !== "object" ||
-          !("snapshot" in payload)
+          typeof payload !== 'object' ||
+          !('snapshot' in payload)
         )
-          throw new Error("The persisted report is unavailable.");
+          throw new Error('The persisted report is unavailable.');
         if (active)
           setReportSnapshot(
             (payload as { snapshot: LiveReportSnapshot }).snapshot,
@@ -652,7 +665,7 @@ export function PortfolioApp({
           setReportError(
             error instanceof Error
               ? error.message
-              : "The persisted report is unavailable.",
+              : 'The persisted report is unavailable.',
           );
         }
       })
@@ -679,24 +692,24 @@ export function PortfolioApp({
       .getSession()
       .then(async ({ data }) => {
         if (!data.session?.access_token)
-          throw new Error("Your sign-in session has expired.");
+          throw new Error('Your sign-in session has expired.');
         const url = new URL(
           `${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/activity`,
         );
-        url.searchParams.set("limit", "25");
-        url.searchParams.set("offset", String(activityOffset));
+        url.searchParams.set('limit', '25');
+        url.searchParams.set('offset', String(activityOffset));
         const response = await fetch(url, {
           headers: { authorization: `Bearer ${data.session.access_token}` },
         });
         const payload: unknown = await response.json();
         if (!response.ok)
           throw new Error(
-            payload && typeof payload === "object" && "error" in payload
-              ? String(payload.error).replaceAll("_", " ")
-              : "Activity data is unavailable.",
+            payload && typeof payload === 'object' && 'error' in payload
+              ? String(payload.error).replaceAll('_', ' ')
+              : 'Activity data is unavailable.',
           );
-        if (!payload || typeof payload !== "object" || !("activity" in payload))
-          throw new Error("Activity data is unavailable.");
+        if (!payload || typeof payload !== 'object' || !('activity' in payload))
+          throw new Error('Activity data is unavailable.');
         if (active)
           setActivityPage((payload as { activity: LiveActivityPage }).activity);
       })
@@ -706,7 +719,7 @@ export function PortfolioApp({
           setActivityError(
             error instanceof Error
               ? error.message
-              : "Activity data is unavailable.",
+              : 'Activity data is unavailable.',
           );
         }
       })
@@ -727,20 +740,20 @@ export function PortfolioApp({
 
   async function createAccount(input: {
     name: string;
-    accountType: LiveAccount["account_type"];
+    accountType: LiveAccount['account_type'];
   }) {
     if (!client || !userId)
-      throw new Error("Sign in before creating an account.");
+      throw new Error('Sign in before creating an account.');
     const { data, error } = await client
-      .from("accounts")
+      .from('accounts')
       .insert({
         user_id: userId,
-        brokerage: "robinhood",
+        brokerage: 'robinhood',
         account_type: input.accountType,
         name: input.name.trim(),
-        currency: "USD",
+        currency: 'USD',
       })
-      .select("id,name,account_type,brokerage,created_at")
+      .select('id,name,account_type,brokerage,created_at')
       .single();
     if (error) throw new Error(error.message);
     setAccounts((current) => [...current, data as LiveAccount]);
@@ -748,18 +761,18 @@ export function PortfolioApp({
   }
 
   async function signOut() {
-    await client?.auth.signOut({ scope: "global" });
+    await client?.auth.signOut({ scope: 'global' });
     clearSessionWorkspaceState();
-    window.location.assign("/");
+    window.location.assign('/');
   }
 
-  async function downloadLiveExport(kind: "activity" | "report") {
+  async function downloadLiveExport(kind: 'activity' | 'report') {
     if (!client || !apiConfig || !selectedAccountId)
-      throw new Error("Select an account before exporting.");
+      throw new Error('Select an account before exporting.');
     const { data } = await client.auth.getSession();
     if (!data.session?.access_token)
       throw new Error(
-        "Your sign-in session has expired. Sign in again before exporting.",
+        'Your sign-in session has expired. Sign in again before exporting.',
       );
     const response = await fetch(
       `${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/${kind}.csv`,
@@ -768,18 +781,18 @@ export function PortfolioApp({
     if (!response.ok) {
       const payload: unknown = await response.json().catch(() => undefined);
       throw new Error(
-        payload && typeof payload === "object" && "error" in payload
-          ? String(payload.error).replaceAll("_", " ")
-          : "This export is not available yet.",
+        payload && typeof payload === 'object' && 'error' in payload
+          ? String(payload.error).replaceAll('_', ' ')
+          : 'This export is not available yet.',
       );
     }
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
+    const link = document.createElement('a');
     link.href = url;
     link.download =
       response.headers
-        .get("content-disposition")
+        .get('content-disposition')
         ?.match(/filename="([^"]+)"/)?.[1] ?? `northstar-${kind}.csv`;
     document.body.appendChild(link);
     link.click();
@@ -789,94 +802,94 @@ export function PortfolioApp({
 
   async function openBillingPortal() {
     if (!client || !apiConfig)
-      throw new Error("Billing is not configured for this environment.");
+      throw new Error('Billing is not configured for this environment.');
     const { data } = await client.auth.getSession();
     if (!data.session?.access_token)
       throw new Error(
-        "Your sign-in session has expired. Sign in again before managing billing.",
+        'Your sign-in session has expired. Sign in again before managing billing.',
       );
     const response = await fetch(`${apiConfig.baseUrl}/v1/billing/portal`, {
-      method: "POST",
+      method: 'POST',
       headers: { authorization: `Bearer ${data.session.access_token}` },
     });
     const payload: unknown = await response.json();
     if (
       !response.ok ||
       !payload ||
-      typeof payload !== "object" ||
-      !("url" in payload)
+      typeof payload !== 'object' ||
+      !('url' in payload)
     )
-      throw new Error("Billing is not available yet.");
+      throw new Error('Billing is not available yet.');
     window.location.assign(String(payload.url));
   }
 
   async function requestDeletion() {
     if (!client || !apiConfig)
       throw new Error(
-        "Account deletion is not configured for this environment.",
+        'Account deletion is not configured for this environment.',
       );
     const { data } = await client.auth.getSession();
     if (!data.session?.access_token)
       throw new Error(
-        "Your sign-in session has expired. Sign in again before requesting deletion.",
+        'Your sign-in session has expired. Sign in again before requesting deletion.',
       );
     const response = await fetch(
       `${apiConfig.baseUrl}/v1/me/deletion-request`,
       {
-        method: "POST",
+        method: 'POST',
         headers: { authorization: `Bearer ${data.session.access_token}` },
       },
     );
     const payload: unknown = await response.json().catch(() => undefined);
     if (!response.ok)
       throw new Error(
-        payload && typeof payload === "object" && "error" in payload
-          ? String(payload.error).replaceAll("_", " ")
-          : "Account deletion is not available yet.",
+        payload && typeof payload === 'object' && 'error' in payload
+          ? String(payload.error).replaceAll('_', ' ')
+          : 'Account deletion is not available yet.',
       );
   }
 
   function clearStaging() {
     setReviewOpen(false);
     setStagedActivities(null);
-    setStagedFileName("");
+    setStagedFileName('');
     setLivePreview(undefined);
     setStagedCsv(undefined);
     setStageMessage(undefined);
     setStagedImportId(undefined);
     setLiveRows([]);
-    if (fileRef.current) fileRef.current.value = "";
+    if (fileRef.current) fileRef.current.value = '';
   }
 
   function stageFile(file?: File) {
     if (!file) return;
-    setUploadError("");
+    setUploadError('');
     if (file.size > 10 * 1024 * 1024) {
       setUploadError(
-        "Choose a CSV smaller than 10 MB. This browser preview does not upload or save the file.",
+        'Choose a CSV smaller than 10 MB. This browser preview does not upload or save the file.',
       );
       return;
     }
     const reader = new FileReader();
     reader.onload = async () => {
       try {
-        if (typeof reader.result !== "string")
-          throw new Error("We could not read that CSV as text.");
+        if (typeof reader.result !== 'string')
+          throw new Error('We could not read that CSV as text.');
         if (client && userId && selectedAccountId && apiConfig) {
           setIsStagingImport(true);
           const { data } = await client.auth.getSession();
           if (!data.session?.access_token)
             throw new Error(
-              "Your sign-in session has expired. Sign in again before importing.",
+              'Your sign-in session has expired. Sign in again before importing.',
             );
           const response = await fetch(
             `${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/import-preview`,
             {
-              method: "POST",
+              method: 'POST',
               headers: {
                 authorization: `Bearer ${data.session.access_token}`,
-                "content-type": "text/csv",
-                "x-file-name": file.name,
+                'content-type': 'text/csv',
+                'x-file-name': file.name,
               },
               body: reader.result,
             },
@@ -885,10 +898,10 @@ export function PortfolioApp({
           if (
             !response.ok ||
             !payload ||
-            typeof payload !== "object" ||
-            !("import" in payload)
+            typeof payload !== 'object' ||
+            !('import' in payload)
           )
-            throw new Error("The server could not preview this CSV.");
+            throw new Error('The server could not preview this CSV.');
           const preview = (payload as { import: LiveImportPreview }).import;
           setLivePreview(preview);
           setStagedCsv(reader.result);
@@ -903,7 +916,7 @@ export function PortfolioApp({
         setUploadError(
           error instanceof Error
             ? error.message
-            : "We could not read that CSV.",
+            : 'We could not read that CSV.',
         );
       } finally {
         setIsStagingImport(false);
@@ -929,16 +942,16 @@ export function PortfolioApp({
       const { data } = await client.auth.getSession();
       if (!data.session?.access_token)
         throw new Error(
-          "Your sign-in session has expired. Sign in again before importing.",
+          'Your sign-in session has expired. Sign in again before importing.',
         );
       const response = await fetch(
         `${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/imports`,
         {
-          method: "POST",
+          method: 'POST',
           headers: {
             authorization: `Bearer ${data.session.access_token}`,
-            "content-type": "text/csv",
-            "x-file-name": stagedFileName,
+            'content-type': 'text/csv',
+            'x-file-name': stagedFileName,
           },
           body: stagedCsv,
         },
@@ -947,13 +960,13 @@ export function PortfolioApp({
       if (
         !response.ok ||
         !payload ||
-        typeof payload !== "object" ||
-        !("import" in payload)
+        typeof payload !== 'object' ||
+        !('import' in payload)
       )
         throw new Error(
-          payload && typeof payload === "object" && "error" in payload
+          payload && typeof payload === 'object' && 'error' in payload
             ? String(payload.error)
-            : "The server could not stage this CSV.",
+            : 'The server could not stage this CSV.',
         );
       const importId = (payload as { import: { id: string } }).import.id;
       const detailResponse = await fetch(
@@ -964,22 +977,22 @@ export function PortfolioApp({
       if (
         !detailResponse.ok ||
         !detail ||
-        typeof detail !== "object" ||
-        !("sourceRows" in detail) ||
+        typeof detail !== 'object' ||
+        !('sourceRows' in detail) ||
         !Array.isArray(detail.sourceRows)
       )
         throw new Error(
-          "The CSV was saved, but its review rows could not be loaded.",
+          'The CSV was saved, but its review rows could not be loaded.',
         );
       setStagedImportId(importId);
       setLiveRows(detail.sourceRows as LiveImportRow[]);
       setHistoryVersion((current) => current + 1);
       setStageMessage(
-        "Saved for review. This import has not changed your portfolio yet.",
+        'Saved for review. This import has not changed your portfolio yet.',
       );
     } catch (error) {
       setStageMessage(
-        error instanceof Error ? error.message : "We could not stage this CSV.",
+        error instanceof Error ? error.message : 'We could not stage this CSV.',
       );
     } finally {
       setIsStagingImport(false);
@@ -994,33 +1007,33 @@ export function PortfolioApp({
       const { data } = await client.auth.getSession();
       if (!data.session?.access_token)
         throw new Error(
-          "Your sign-in session has expired. Sign in again before committing.",
+          'Your sign-in session has expired. Sign in again before committing.',
         );
       const response = await fetch(
         `${apiConfig.baseUrl}/v1/imports/${stagedImportId}/commit`,
         {
-          method: "POST",
+          method: 'POST',
           headers: { authorization: `Bearer ${data.session.access_token}` },
         },
       );
       const payload: unknown = await response.json();
       if (!response.ok)
         throw new Error(
-          payload && typeof payload === "object" && "error" in payload
-            ? String(payload.error).replaceAll("_", " ")
-            : "The server could not commit this import.",
+          payload && typeof payload === 'object' && 'error' in payload
+            ? String(payload.error).replaceAll('_', ' ')
+            : 'The server could not commit this import.',
         );
       setHistoryVersion((current) => current + 1);
       setActivityRequestVersion((current) => current + 1);
       setStagedImportId(undefined);
       setStageMessage(
-        "Import committed. Your reporting data will update after price and report processing are connected.",
+        'Import committed. Your reporting data will update after price and report processing are connected.',
       );
     } catch (error) {
       setStageMessage(
         error instanceof Error
           ? error.message
-          : "We could not commit this import.",
+          : 'We could not commit this import.',
       );
     } finally {
       setIsStagingImport(false);
@@ -1029,16 +1042,16 @@ export function PortfolioApp({
 
   async function undoLiveImport(importId: string) {
     if (!client || !apiConfig)
-      throw new Error("Sign in before undoing an import.");
+      throw new Error('Sign in before undoing an import.');
     const { data } = await client.auth.getSession();
     if (!data.session?.access_token)
       throw new Error(
-        "Your sign-in session has expired. Sign in again before undoing an import.",
+        'Your sign-in session has expired. Sign in again before undoing an import.',
       );
     const response = await fetch(
       `${apiConfig.baseUrl}/v1/imports/${importId}/undo`,
       {
-        method: "POST",
+        method: 'POST',
         headers: { authorization: `Bearer ${data.session.access_token}` },
       },
     );
@@ -1046,13 +1059,13 @@ export function PortfolioApp({
     if (
       !response.ok ||
       !payload ||
-      typeof payload !== "object" ||
-      !("import" in payload)
+      typeof payload !== 'object' ||
+      !('import' in payload)
     )
       throw new Error(
-        payload && typeof payload === "object" && "error" in payload
-          ? String(payload.error).replaceAll("_", " ")
-          : "This import could not be undone.",
+        payload && typeof payload === 'object' && 'error' in payload
+          ? String(payload.error).replaceAll('_', ' ')
+          : 'This import could not be undone.',
       );
     setHistoryVersion((current) => current + 1);
     setActivityRequestVersion((current) => current + 1);
@@ -1069,21 +1082,21 @@ export function PortfolioApp({
       const { data } = await client.auth.getSession();
       if (!data.session?.access_token)
         throw new Error(
-          "Your sign-in session has expired. Sign in again before discarding this import.",
+          'Your sign-in session has expired. Sign in again before discarding this import.',
         );
       const response = await fetch(
-        apiConfig.baseUrl + "/v1/imports/" + stagedImportId + "/discard",
+        apiConfig.baseUrl + '/v1/imports/' + stagedImportId + '/discard',
         {
-          method: "POST",
-          headers: { authorization: "Bearer " + data.session.access_token },
+          method: 'POST',
+          headers: { authorization: 'Bearer ' + data.session.access_token },
         },
       );
       const payload: unknown = await response.json();
       if (!response.ok)
         throw new Error(
-          payload && typeof payload === "object" && "error" in payload
-            ? String(payload.error).replaceAll("_", " ")
-            : "This review import could not be discarded.",
+          payload && typeof payload === 'object' && 'error' in payload
+            ? String(payload.error).replaceAll('_', ' ')
+            : 'This review import could not be discarded.',
         );
       setHistoryVersion((current) => current + 1);
       clearStaging();
@@ -1091,7 +1104,7 @@ export function PortfolioApp({
       setStageMessage(
         error instanceof Error
           ? error.message
-          : "This review import could not be discarded.",
+          : 'This review import could not be discarded.',
       );
     } finally {
       setIsStagingImport(false);
@@ -1138,7 +1151,9 @@ export function PortfolioApp({
       </header>
       <div className="mx-auto flex max-w-[1440px]">
         <aside
-          className={`fixed inset-y-16 left-0 z-10 w-64 border-r border-slate-200 bg-white px-4 py-6 transition-transform md:sticky md:top-16 md:h-[calc(100vh-4rem)] md:translate-x-0 ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}
+          id="portfolio-navigation"
+          aria-label="Portfolio navigation"
+          className={`fixed inset-y-16 left-0 z-10 w-64 border-r border-slate-200 bg-white px-4 py-6 transition-transform md:sticky md:top-16 md:h-[calc(100vh-4rem)] md:translate-x-0 ${menuOpen ? 'translate-x-0' : '-translate-x-full'}`}
         >
           <p className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
             Demo workspace
@@ -1151,8 +1166,8 @@ export function PortfolioApp({
                   setActive(label);
                   setMenuOpen(false);
                 }}
-                aria-current={active === label ? "page" : undefined}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold ${active === label ? "bg-[#eaf2ff] text-[#1d4a7d]" : "text-slate-500 hover:bg-slate-50"}`}
+                aria-current={active === label ? 'page' : undefined}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold ${active === label ? 'bg-[#eaf2ff] text-[#1d4a7d]' : 'text-slate-500 hover:bg-slate-50'}`}
               >
                 <Icon size={18} />
                 {label}
@@ -1171,19 +1186,31 @@ export function PortfolioApp({
             Settings coming later
           </span>
         </aside>
+        {menuOpen && (
+          <button
+            type="button"
+            aria-label="Close navigation"
+            className="fixed inset-0 top-16 z-[5] bg-slate-900/20 md:hidden"
+            onClick={() => setMenuOpen(false)}
+          />
+        )}
         <section id="top" className="min-w-0 flex-1 px-4 py-7 md:px-8 md:py-10">
           <button
+            ref={menuButtonRef}
+            type="button"
             onClick={() => setMenuOpen(true)}
             className="mb-5 grid h-9 w-9 place-items-center rounded-lg border border-slate-200 bg-white md:hidden"
             aria-label="Open navigation"
+            aria-controls="portfolio-navigation"
+            aria-expanded={menuOpen}
           >
             <Menu size={18} />
           </button>
-          {active === "Overview" && (
+          {active === 'Overview' && (
             <Overview
               summary={summary}
               onUpload={openFileChooser}
-              onOpenAccounts={() => setActive("Accounts")}
+              onOpenAccounts={() => setActive('Accounts')}
               freshnessReport={freshnessReport}
               freshnessLoading={freshnessLoading}
               freshnessError={freshnessError}
@@ -1207,7 +1234,7 @@ export function PortfolioApp({
               isLiveAccount={Boolean(client && userId && selectedAccountId)}
             />
           )}
-          {active === "Activity" && (
+          {active === 'Activity' && (
             <ActivityPanel
               onUpload={openFileChooser}
               isLiveAccount={Boolean(client && userId && selectedAccountId)}
@@ -1223,7 +1250,7 @@ export function PortfolioApp({
               onFilterChange={setActivityFilter}
             />
           )}
-          {active === "Accounts" && (
+          {active === 'Accounts' && (
             <Accounts
               summary={summary}
               accounts={accounts}
@@ -1238,7 +1265,7 @@ export function PortfolioApp({
               onSaveOpeningHistory={saveOpeningHistory}
             />
           )}
-          {active === "Documents" && (
+          {active === 'Documents' && (
             <Documents
               onUpload={openFileChooser}
               uploadError={uploadError}
@@ -1254,14 +1281,14 @@ export function PortfolioApp({
               onUndo={undoLiveImport}
             />
           )}
-          {active === "Settings" && (
+          {active === 'Settings' && (
             <SettingsPanel
               email={email}
               accounts={accounts}
               selectedAccountId={selectedAccountId}
               onSelectAccount={setSelectedAccountId}
-              onExportActivity={() => downloadLiveExport("activity")}
-              onExportReport={() => downloadLiveExport("report")}
+              onExportActivity={() => downloadLiveExport('activity')}
+              onExportReport={() => downloadLiveExport('report')}
               onOpenBilling={openBillingPortal}
               onRequestDeletion={requestDeletion}
               billingStatus={billingStatus}
@@ -1332,8 +1359,8 @@ function Overview({
   onSelectAccount: (accountId: string) => void;
   reportPeriod: ReportPeriod;
   onSelectReportPeriod: (period: ReportPeriod) => void;
-  reportScope: "account" | "consolidated";
-  onSelectReportScope: (scope: "account" | "consolidated") => void;
+  reportScope: 'account' | 'consolidated';
+  onSelectReportScope: (scope: 'account' | 'consolidated') => void;
   openingHistory?: OpeningHistory;
   isLiveAccount: boolean;
 }) {
@@ -1379,24 +1406,24 @@ function Overview({
     <>
       <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <Pill tone={hasLiveReport ? "green" : "gold"}>
+          <Pill tone={hasLiveReport ? 'green' : 'gold'}>
             {hasLiveReport
-              ? "Your account"
+              ? 'Your account'
               : showDemo
-                ? "Demo data"
-                : "Awaiting report"}
+                ? 'Demo data'
+                : 'Awaiting report'}
           </Pill>
           <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
             {hasLiveReport || isLiveAccount
-              ? "Portfolio overview"
-              : "Portfolio example"}
+              ? 'Portfolio overview'
+              : 'Portfolio example'}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
             {hasLiveReport
               ? `As of ${reportSnapshot?.asOfDate}. Values come from your persisted report snapshot.`
               : showDemo
-                ? "A fictional long-term portfolio used to preview the product."
-                : "No persisted report is available for this account yet."}
+                ? 'A fictional long-term portfolio used to preview the product.'
+                : 'No persisted report is available for this account yet.'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -1425,7 +1452,7 @@ function Overview({
                 value={reportScope}
                 onChange={(event) =>
                   onSelectReportScope(
-                    event.target.value as "account" | "consolidated",
+                    event.target.value as 'account' | 'consolidated',
                   )
                 }
                 className="ml-2 h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm outline-none focus:border-[#185da8] focus:ring-2 focus:ring-[#185da8]/20"
@@ -1471,7 +1498,7 @@ function Overview({
             <div>
               <p className="text-sm font-bold">Stored price freshness</p>
               <p className="mt-1 text-xs text-slate-500">
-                Expected through {freshnessReport?.expectedDate ?? "—"}
+                Expected through {freshnessReport?.expectedDate ?? '—'}
               </p>
             </div>
             {freshnessLoading && <Pill>Checking…</Pill>}
@@ -1481,24 +1508,24 @@ function Overview({
                 <Pill tone="green">
                   {
                     freshnessReport.rows.filter(
-                      (row) => row.status === "current",
+                      (row) => row.status === 'current',
                     ).length
-                  }{" "}
+                  }{' '}
                   current
                 </Pill>
                 <Pill tone="gold">
                   {
-                    freshnessReport.rows.filter((row) => row.status === "stale")
+                    freshnessReport.rows.filter((row) => row.status === 'stale')
                       .length
-                  }{" "}
+                  }{' '}
                   stale
                 </Pill>
                 <Pill>
                   {
                     freshnessReport.rows.filter(
-                      (row) => row.status === "missing",
+                      (row) => row.status === 'missing',
                     ).length
-                  }{" "}
+                  }{' '}
                   missing
                 </Pill>
               </div>
@@ -1529,18 +1556,18 @@ function Overview({
                   <span className="font-bold text-slate-700">{row.symbol}</span>
                   <span
                     className={
-                      row.status === "current"
-                        ? "font-semibold text-emerald-700"
-                        : row.status === "stale"
-                          ? "font-semibold text-amber-700"
-                          : "font-semibold text-slate-500"
+                      row.status === 'current'
+                        ? 'font-semibold text-emerald-700'
+                        : row.status === 'stale'
+                          ? 'font-semibold text-amber-700'
+                          : 'font-semibold text-slate-500'
                     }
                   >
-                    {row.status === "current"
+                    {row.status === 'current'
                       ? `Current · ${row.latestDate}`
-                      : row.status === "stale"
-                        ? `Stale · ${row.latestDate ?? "no close"}`
-                        : "Missing · no close"}
+                      : row.status === 'stale'
+                        ? `Stale · ${row.latestDate ?? 'no close'}`
+                        : 'Missing · no close'}
                   </span>
                 </li>
               ))}
@@ -1586,7 +1613,7 @@ function Overview({
               Activity covered through
             </p>
             <p className="mt-1 text-sm font-semibold text-slate-700">
-              {reportSnapshot?.payload.activityCoveredThrough ?? "Unavailable"}
+              {reportSnapshot?.payload.activityCoveredThrough ?? 'Unavailable'}
             </p>
           </div>
           <div>
@@ -1594,7 +1621,7 @@ function Overview({
               Prices through
             </p>
             <p className="mt-1 text-sm font-semibold text-slate-700">
-              {reportSnapshot?.payload.pricesThrough ?? "Unavailable"}
+              {reportSnapshot?.payload.pricesThrough ?? 'Unavailable'}
             </p>
           </div>
         </section>
@@ -1607,7 +1634,7 @@ function Overview({
           <p className="font-bold">How these figures are calculated</p>
           <p className="mt-2 leading-6">
             {reportSnapshot?.payload.methodology?.disclosure ??
-              "Daily returns use Modified Dietz intervals. External cash flows are approximated at the midpoint of their day, missing valuation periods remain unavailable, and returns are not annualized."}
+              'Daily returns use Modified Dietz intervals. External cash flows are approximated at the midpoint of their day, missing valuation periods remain unavailable, and returns are not annualized.'}
           </p>
           <p className="mt-2 text-xs font-semibold text-sky-800">
             Realized gains/losses are analytical FIFO estimates and are not tax
@@ -1621,7 +1648,7 @@ function Overview({
             <div>
               <p className="mb-3 text-sm font-semibold text-slate-300">
                 {showDemo
-                  ? "Example portfolio value"
+                  ? 'Example portfolio value'
                   : `Portfolio value · ${reportPeriodDescription(reportPeriod)}`}
               </p>
               <h2 className="text-4xl font-semibold tracking-tight md:text-5xl">
@@ -1629,7 +1656,7 @@ function Overview({
                   ? precise.format(Number(liveValue))
                   : showDemo
                     ? fmt.format(summary.value)
-                    : "—"}
+                    : '—'}
               </h2>
               <p className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-emerald-300">
                 <ArrowUpRight size={17} />
@@ -1637,11 +1664,11 @@ function Overview({
                   ? `${(Number(liveReturn) * 100).toFixed(1)}% stored return`
                   : showDemo
                     ? `${precise.format(summary.gain)} (${summary.returnPercent.toFixed(1)}%) in this example`
-                    : "Return unavailable until a report is published"}
+                    : 'Return unavailable until a report is published'}
               </p>
             </div>
-            <Pill tone={hasLiveReport ? "green" : "gold"}>
-              {hasLiveReport ? "Persisted" : "Synthetic"}
+            <Pill tone={hasLiveReport ? 'green' : 'gold'}>
+              {hasLiveReport ? 'Persisted' : 'Synthetic'}
             </Pill>
           </div>
           {hasLiveReport && (
@@ -1670,16 +1697,16 @@ function Overview({
                   dataKey="date"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: "#93a9c2", fontSize: 12 }}
+                  tick={{ fill: '#93a9c2', fontSize: 12 }}
                 />
-                <YAxis hide domain={["dataMin - 400", "dataMax + 300"]} />
+                <YAxis hide domain={['dataMin - 400', 'dataMax + 300']} />
                 <Tooltip
                   formatter={(value) => fmt.format(Number(value))}
                   contentStyle={{
                     borderRadius: 12,
-                    border: "none",
-                    background: "#fff",
-                    color: "#13233a",
+                    border: 'none',
+                    background: '#fff',
+                    color: '#13233a',
                   }}
                 />
               </AreaChart>
@@ -1693,14 +1720,14 @@ function Overview({
         </section>
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-sm font-semibold text-slate-500">
-            {showDemo ? "Example return" : "Your return"}
+            {showDemo ? 'Example return' : 'Your return'}
           </p>
           <p className="mt-2 text-3xl font-bold tracking-tight text-emerald-600">
             {liveReturn != null
               ? `${(Number(liveReturn) * 100).toFixed(1)}%`
               : showDemo
                 ? `+${summary.returnPercent.toFixed(1)}%`
-                : "—"}
+                : '—'}
           </p>
           <div className="my-6 border-t border-slate-100" />
           <div className="grid grid-cols-2 gap-5">
@@ -1710,7 +1737,7 @@ function Overview({
                 liveDividends == null
                   ? showDemo
                     ? precise.format(summary.dividends)
-                    : "—"
+                    : '—'
                   : precise.format(Number(liveDividends))
               }
             />
@@ -1720,7 +1747,7 @@ function Overview({
                 liveRealized == null
                   ? showDemo
                     ? precise.format(summary.realized)
-                    : "—"
+                    : '—'
                   : precise.format(Number(liveRealized))
               }
             />
@@ -1731,12 +1758,12 @@ function Overview({
                   ? precise.format(Number(liveCash))
                   : showDemo
                     ? precise.format(summary.cash)
-                    : "—"
+                    : '—'
               }
             />
             <Metric
               label="Price source"
-              value={showDemo ? "Not connected" : "Stored daily closes"}
+              value={showDemo ? 'Not connected' : 'Stored daily closes'}
               small
             />
           </div>
@@ -1750,7 +1777,7 @@ function Overview({
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-lg font-bold">
-              {showDemo ? "Example income" : "Dividend income"}
+              {showDemo ? 'Example income' : 'Dividend income'}
             </h2>
             <HandCoins size={20} className="text-[#185da8]" />
           </div>
@@ -1758,15 +1785,15 @@ function Overview({
             {liveDividends == null
               ? showDemo
                 ? precise.format(summary.dividends)
-                : "—"
+                : '—'
               : precise.format(Number(liveDividends))}
           </p>
           <p className="mt-1 text-sm text-slate-500">
             {liveDividends == null
               ? showDemo
-                ? "Synthetic dividends in this scenario"
-                : "No persisted dividend report yet"
-              : "Income recorded from your imported activity"}
+                ? 'Synthetic dividends in this scenario'
+                : 'No persisted dividend report yet'
+              : 'Income recorded from your imported activity'}
           </p>
         </section>
       </div>
@@ -1798,7 +1825,7 @@ function DashboardWarningList({
       {warnings.map((warning) => (
         <article
           key={warning.kind}
-          role={warning.kind === "unavailable_prices" ? "alert" : undefined}
+          role={warning.kind === 'unavailable_prices' ? 'alert' : undefined}
           className={`rounded-3xl border p-5 text-sm shadow-sm ${warningClass(warning.kind)}`}
         >
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1809,19 +1836,19 @@ function DashboardWarningList({
             <button
               type="button"
               onClick={
-                warning.action === "import"
+                warning.action === 'import'
                   ? onUpload
-                  : warning.action === "accounts"
+                  : warning.action === 'accounts'
                     ? onOpenAccounts
                     : onRetryReport
               }
               className="shrink-0 font-bold underline underline-offset-2"
             >
-              {warning.action === "import"
-                ? "Import activity"
-                : warning.action === "accounts"
-                  ? "Review opening history"
-                  : "Check again"}
+              {warning.action === 'import'
+                ? 'Import activity'
+                : warning.action === 'accounts'
+                  ? 'Review opening history'
+                  : 'Check again'}
             </button>
           </div>
         </article>
@@ -1830,16 +1857,16 @@ function DashboardWarningList({
   );
 }
 
-function warningClass(kind: DashboardWarning["kind"]) {
-  if (kind === "unavailable_prices")
-    return "border-amber-200 bg-amber-50 text-amber-950";
-  if (kind === "stale_report")
-    return "border-amber-200 bg-amber-50 text-amber-900";
-  if (kind === "partial_history")
-    return "border-sky-200 bg-sky-50 text-sky-950";
-  if (kind === "no_holdings")
-    return "border-slate-200 bg-slate-50 text-slate-800";
-  return "border-blue-200 bg-blue-50 text-blue-950";
+function warningClass(kind: DashboardWarning['kind']) {
+  if (kind === 'unavailable_prices')
+    return 'border-amber-200 bg-amber-50 text-amber-950';
+  if (kind === 'stale_report')
+    return 'border-amber-200 bg-amber-50 text-amber-900';
+  if (kind === 'partial_history')
+    return 'border-sky-200 bg-sky-50 text-sky-950';
+  if (kind === 'no_holdings')
+    return 'border-slate-200 bg-slate-50 text-slate-800';
+  return 'border-blue-200 bg-blue-50 text-blue-950';
 }
 
 function ReportDetails({
@@ -1881,8 +1908,8 @@ function ReportDetails({
             value={
               netDeposits === null
                 ? isLiveAccount
-                  ? "—"
-                  : "Unavailable"
+                  ? '—'
+                  : 'Unavailable'
                 : precise.format(Number(netDeposits))
             }
           />
@@ -1891,8 +1918,8 @@ function ReportDetails({
             value={
               totalValue === null
                 ? isLiveAccount
-                  ? "—"
-                  : "Unavailable"
+                  ? '—'
+                  : 'Unavailable'
                 : precise.format(
                     Math.max(0, Number(totalValue) - Number(cash ?? 0)),
                   )
@@ -1920,7 +1947,7 @@ function ReportDetails({
                   </span>
                   <span className="font-bold text-slate-800">
                     {row.unavailable
-                      ? "Unavailable"
+                      ? 'Unavailable'
                       : `${row.percentage.toFixed(1)}%`}
                   </span>
                 </div>
@@ -1968,12 +1995,23 @@ function ReportDetails({
         {sales.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[520px] text-left">
+              <caption className="sr-only">
+                Realized sales and FIFO gain or loss
+              </caption>
               <thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400">
                 <tr>
-                  <th className="pb-3">Date</th>
-                  <th className="pb-3">Instrument</th>
-                  <th className="pb-3 text-right">Qty</th>
-                  <th className="pb-3 text-right">Gain / loss</th>
+                  <th scope="col" className="pb-3">
+                    Date
+                  </th>
+                  <th scope="col" className="pb-3">
+                    Instrument
+                  </th>
+                  <th scope="col" className="pb-3 text-right">
+                    Qty
+                  </th>
+                  <th scope="col" className="pb-3 text-right">
+                    Gain / loss
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -1988,10 +2026,10 @@ function ReportDetails({
                     </td>
                     <td className="py-3 text-right text-sm">{sale.quantity}</td>
                     <td
-                      className={`py-3 text-right text-sm font-bold ${sale.gainLoss === null ? "text-slate-500" : Number(sale.gainLoss) >= 0 ? "text-emerald-600" : "text-rose-600"}`}
+                      className={`py-3 text-right text-sm font-bold ${sale.gainLoss === null ? 'text-slate-500' : Number(sale.gainLoss) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
                     >
                       {sale.gainLoss === null
-                        ? "Basis unavailable"
+                        ? 'Basis unavailable'
                         : precise.format(Number(sale.gainLoss))}
                     </td>
                   </tr>
@@ -2030,12 +2068,23 @@ function Holdings({
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[610px] text-left">
+            <caption className="sr-only">
+              Current holdings and stored valuations
+            </caption>
             <thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400">
               <tr>
-                <th className="pb-3">Instrument</th>
-                <th className="pb-3">Shares</th>
-                <th className="pb-3">Stored close</th>
-                <th className="pb-3 text-right">Stored value</th>
+                <th scope="col" className="pb-3">
+                  Instrument
+                </th>
+                <th scope="col" className="pb-3">
+                  Shares
+                </th>
+                <th scope="col" className="pb-3">
+                  Stored close
+                </th>
+                <th scope="col" className="pb-3 text-right">
+                  Stored value
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -2057,12 +2106,12 @@ function Holdings({
                   </td>
                   <td className="py-4 text-sm font-semibold">
                     {holding.close === null
-                      ? "Missing"
+                      ? 'Missing'
                       : precise.format(Number(holding.close))}
                   </td>
                   <td className="py-4 text-right text-sm font-bold">
                     {holding.value === null
-                      ? "Unavailable"
+                      ? 'Unavailable'
                       : precise.format(Number(holding.value))}
                   </td>
                 </tr>
@@ -2082,12 +2131,23 @@ function Holdings({
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[610px] text-left">
+          <caption className="sr-only">
+            Example holdings and synthetic valuations
+          </caption>
           <thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400">
             <tr>
-              <th className="pb-3">Holding</th>
-              <th className="pb-3">Shares</th>
-              <th className="pb-3">Example price</th>
-              <th className="pb-3 text-right">Example value</th>
+              <th scope="col" className="pb-3">
+                Holding
+              </th>
+              <th scope="col" className="pb-3">
+                Shares
+              </th>
+              <th scope="col" className="pb-3">
+                Example price
+              </th>
+              <th scope="col" className="pb-3 text-right">
+                Example value
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -2204,7 +2264,7 @@ function ActivityPanel({
             </div>
           ) : activityPage &&
             activityPage.items.filter((item) =>
-              `${item.entryType} ${item.instrumentId ?? ""} ${item.description}`
+              `${item.entryType} ${item.instrumentId ?? ''} ${item.description}`
                 .toLowerCase()
                 .includes(filter.trim().toLowerCase()),
             ).length > 0 ? (
@@ -2213,7 +2273,7 @@ function ActivityPanel({
                 <p className="text-sm text-slate-500">
                   Showing entries {activityPage.offset + 1}–
                   {activityPage.offset + activityPage.items.length}
-                  {isLoading ? " · Updating…" : ""}
+                  {isLoading ? ' · Updating…' : ''}
                 </p>
                 <p className="text-xs text-slate-400">
                   Source rows remain available for review
@@ -2221,20 +2281,35 @@ function ActivityPanel({
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[720px] text-left">
+                  <caption className="sr-only">
+                    Imported account activity
+                  </caption>
                   <thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400">
                     <tr>
-                      <th className="pb-3">Date</th>
-                      <th className="pb-3">Activity</th>
-                      <th className="pb-3">Instrument</th>
-                      <th className="pb-3">Details</th>
-                      <th className="pb-3">Source</th>
-                      <th className="pb-3 text-right">Amount</th>
+                      <th scope="col" className="pb-3">
+                        Date
+                      </th>
+                      <th scope="col" className="pb-3">
+                        Activity
+                      </th>
+                      <th scope="col" className="pb-3">
+                        Instrument
+                      </th>
+                      <th scope="col" className="pb-3">
+                        Details
+                      </th>
+                      <th scope="col" className="pb-3">
+                        Source
+                      </th>
+                      <th scope="col" className="pb-3 text-right">
+                        Amount
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {activityPage.items
                       .filter((item) =>
-                        `${item.entryType} ${item.instrumentId ?? ""} ${item.description}`
+                        `${item.entryType} ${item.instrumentId ?? ''} ${item.description}`
                           .toLowerCase()
                           .includes(filter.trim().toLowerCase()),
                       )
@@ -2253,7 +2328,7 @@ function ActivityPanel({
                   Previous
                 </Button>
                 <span className="text-xs font-semibold text-slate-400">
-                  Page{" "}
+                  Page{' '}
                   {Math.floor(activityPage.offset / activityPage.limit) + 1}
                 </span>
                 <Button
@@ -2271,13 +2346,13 @@ function ActivityPanel({
                 <Clock3 className="mx-auto text-[#185da8]" size={28} />
                 <h2 className="mt-5 text-xl font-bold">
                   {filter.trim()
-                    ? "No matching activity"
-                    : "No imported activity yet"}
+                    ? 'No matching activity'
+                    : 'No imported activity yet'}
                 </h2>
                 <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
                   {filter.trim()
-                    ? "Try a different type, symbol, or description."
-                    : "Import a Robinhood activity CSV to populate this account’s ledger."}
+                    ? 'Try a different type, symbol, or description.'
+                    : 'Import a Robinhood activity CSV to populate this account’s ledger.'}
                 </p>
                 {!filter.trim() && (
                   <Button
@@ -2318,13 +2393,24 @@ function ActivityPanel({
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[660px] text-left">
+            <caption className="sr-only">Synthetic example activity</caption>
             <thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400">
               <tr>
-                <th className="pb-3">Date</th>
-                <th className="pb-3">Activity</th>
-                <th className="pb-3">Symbol</th>
-                <th className="pb-3">Details</th>
-                <th className="pb-3 text-right">Amount</th>
+                <th scope="col" className="pb-3">
+                  Date
+                </th>
+                <th scope="col" className="pb-3">
+                  Activity
+                </th>
+                <th scope="col" className="pb-3">
+                  Symbol
+                </th>
+                <th scope="col" className="pb-3">
+                  Details
+                </th>
+                <th scope="col" className="pb-3 text-right">
+                  Amount
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -2338,20 +2424,20 @@ function ActivityPanel({
                   >
                     <td className="py-4 text-sm text-slate-500">{item.date}</td>
                     <td className="py-4">
-                      <Pill tone={item.kind === "dividend" ? "green" : "slate"}>
-                        {item.kind.replace("_", " ")}
+                      <Pill tone={item.kind === 'dividend' ? 'green' : 'slate'}>
+                        {item.kind.replace('_', ' ')}
                       </Pill>
                     </td>
                     <td className="py-4 text-sm font-bold">
-                      {item.symbol ?? "—"}
+                      {item.symbol ?? '—'}
                     </td>
                     <td className="py-4 text-sm text-slate-500">
                       {item.description}
                     </td>
                     <td
-                      className={`py-4 text-right text-sm font-bold ${item.amount >= 0 ? "text-emerald-600" : ""}`}
+                      className={`py-4 text-right text-sm font-bold ${item.amount >= 0 ? 'text-emerald-600' : ''}`}
                     >
-                      {item.amount >= 0 ? "+" : ""}
+                      {item.amount >= 0 ? '+' : ''}
                       {precise.format(item.amount)}
                     </td>
                   </tr>
@@ -2366,26 +2452,26 @@ function ActivityPanel({
 
 function LiveActivityRow({ item }: { item: AccountActivity }) {
   const amount = Number(item.cashAmount);
-  const entryType = item.entryType.replaceAll("_", " ");
+  const entryType = item.entryType.replaceAll('_', ' ');
   return (
     <tr className="border-b border-slate-50 last:border-0">
       <td className="py-4 text-sm text-slate-500">{item.effectiveDate}</td>
       <td className="py-4">
-        <Pill tone={item.entryType === "dividend" ? "green" : "slate"}>
+        <Pill tone={item.entryType === 'dividend' ? 'green' : 'slate'}>
           {entryType}
         </Pill>
       </td>
       <td className="py-4 text-sm font-semibold">
-        {item.instrumentId ? `${item.instrumentId.slice(0, 8)}…` : "Cash"}
+        {item.instrumentId ? `${item.instrumentId.slice(0, 8)}…` : 'Cash'}
       </td>
       <td className="py-4 text-sm text-slate-500">{item.description}</td>
       <td className="py-4 text-xs text-slate-400">
-        {item.sourceRow ? `Row ${item.sourceRow.rowNumber}` : "System entry"}
+        {item.sourceRow ? `Row ${item.sourceRow.rowNumber}` : 'System entry'}
       </td>
       <td
-        className={`py-4 text-right text-sm font-bold ${amount >= 0 ? "text-emerald-600" : "text-slate-700"}`}
+        className={`py-4 text-right text-sm font-bold ${amount >= 0 ? 'text-emerald-600' : 'text-slate-700'}`}
       >
-        {amount >= 0 ? "+" : ""}
+        {amount >= 0 ? '+' : ''}
         {precise.format(amount)}
       </td>
     </tr>
@@ -2413,7 +2499,7 @@ function Accounts({
   canCreate: boolean;
   onCreate: (input: {
     name: string;
-    accountType: LiveAccount["account_type"];
+    accountType: LiveAccount['account_type'];
   }) => Promise<void>;
   selectedAccountId?: string;
   openingHistory?: OpeningHistory;
@@ -2421,29 +2507,29 @@ function Accounts({
   onSaveOpeningHistory: (history: OpeningHistory) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
+  const [name, setName] = useState('');
   const [accountType, setAccountType] =
-    useState<LiveAccount["account_type"]>("individual");
+    useState<LiveAccount['account_type']>('individual');
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
 
   async function submit() {
     if (!name.trim()) {
-      setError("Give this account a name.");
+      setError('Give this account a name.');
       return;
     }
     setSaving(true);
     setError(undefined);
     try {
       await onCreate({ name, accountType });
-      setName("");
-      setAccountType("individual");
+      setName('');
+      setAccountType('individual');
       setOpen(false);
     } catch (reason) {
       setError(
         reason instanceof Error
           ? reason.message
-          : "We could not create that account.",
+          : 'We could not create that account.',
       );
     } finally {
       setSaving(false);
@@ -2599,7 +2685,7 @@ function Accounts({
                 value={accountType}
                 onChange={(event) =>
                   setAccountType(
-                    event.target.value as LiveAccount["account_type"],
+                    event.target.value as LiveAccount['account_type'],
                   )
                 }
                 className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-[#185da8] focus:ring-2 focus:ring-[#185da8]/20"
@@ -2624,7 +2710,7 @@ function Accounts({
               onClick={submit}
               className="rounded-xl bg-[#185da8] text-white"
             >
-              {saving ? "Creating…" : "Create account"}
+              {saving ? 'Creating…' : 'Create account'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2642,19 +2728,19 @@ function OpeningHistoryEditor({
   loading: boolean;
   onSave: (history: OpeningHistory) => Promise<void>;
 }) {
-  const [cash, setCash] = useState(history?.openingCash ?? "0");
+  const [cash, setCash] = useState(history?.openingCash ?? '0');
   const [coveredFrom, setCoveredFrom] = useState(
-    history?.activityCoveredFrom ?? "",
+    history?.activityCoveredFrom ?? '',
   );
-  const [reason, setReason] = useState(history?.incompleteReason ?? "");
+  const [reason, setReason] = useState(history?.incompleteReason ?? '');
   const [positions, setPositions] = useState(
     JSON.stringify(history?.positions ?? [], null, 2),
   );
   const [message, setMessage] = useState<string>();
   useEffect(() => {
-    setCash(history?.openingCash ?? "0");
-    setCoveredFrom(history?.activityCoveredFrom ?? "");
-    setReason(history?.incompleteReason ?? "");
+    setCash(history?.openingCash ?? '0');
+    setCoveredFrom(history?.activityCoveredFrom ?? '');
+    setReason(history?.incompleteReason ?? '');
     setPositions(JSON.stringify(history?.positions ?? [], null, 2));
   }, [history]);
   async function submit() {
@@ -2662,19 +2748,19 @@ function OpeningHistoryEditor({
       setMessage(undefined);
       const parsed = JSON.parse(positions);
       await onSave({
-        openingCash: cash as OpeningHistory["openingCash"],
+        openingCash: cash as OpeningHistory['openingCash'],
         activityCoveredFrom: coveredFrom
-          ? (coveredFrom as OpeningHistory["activityCoveredFrom"])
+          ? (coveredFrom as OpeningHistory['activityCoveredFrom'])
           : null,
         incompleteReason: reason || null,
         positions: parsed,
       });
-      setMessage("Opening history saved.");
+      setMessage('Opening history saved.');
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
-          : "Opening history could not be saved.",
+          : 'Opening history could not be saved.',
       );
     }
   }
@@ -2754,11 +2840,11 @@ function OpeningHistoryEditor({
   );
 }
 
-function accountTypeLabel(accountType: LiveAccount["account_type"]) {
+function accountTypeLabel(accountType: LiveAccount['account_type']) {
   return {
-    individual: "Individual brokerage",
-    traditional_ira: "Traditional IRA",
-    roth_ira: "Roth IRA",
+    individual: 'Individual brokerage',
+    traditional_ira: 'Traditional IRA',
+    roth_ira: 'Roth IRA',
   }[accountType];
 }
 
@@ -2789,9 +2875,9 @@ function Documents({
   const [undoError, setUndoError] = useState<string>();
   const [undoing, setUndoing] = useState<string>();
   const latestCommittedId = importHistory
-    .filter((item) => item.status === "committed")
+    .filter((item) => item.status === 'committed')
     .sort((left, right) =>
-      (right.committedAt ?? "").localeCompare(left.committedAt ?? ""),
+      (right.committedAt ?? '').localeCompare(left.committedAt ?? ''),
     )[0]?.id;
   async function undo(importId: string) {
     setUndoing(importId);
@@ -2802,7 +2888,7 @@ function Documents({
       setUndoError(
         error instanceof Error
           ? error.message
-          : "This import could not be undone.",
+          : 'This import could not be undone.',
       );
     } finally {
       setUndoing(undefined);
@@ -2811,11 +2897,11 @@ function Documents({
   return (
     <>
       <div className="mb-8">
-        <Pill tone={live ? "green" : "gold"}>
-          {live ? "Secure staged import" : "Local preview only"}
+        <Pill tone={live ? 'green' : 'gold'}>
+          {live ? 'Secure staged import' : 'Local preview only'}
         </Pill>
         <h1 className="mt-3 text-3xl font-bold tracking-tight">
-          {live ? "Import activity" : "CSV preview"}
+          {live ? 'Import activity' : 'CSV preview'}
         </h1>
       </div>
       <section className="grid min-h-80 place-items-center rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center">
@@ -2825,8 +2911,8 @@ function Documents({
           </span>
           <h2 className="mt-5 text-xl font-bold">
             {live
-              ? "Review a Robinhood activity CSV"
-              : "Preview a Robinhood activity CSV"}
+              ? 'Review a Robinhood activity CSV'
+              : 'Preview a Robinhood activity CSV'}
           </h2>
           {live ? (
             <>
@@ -2838,7 +2924,7 @@ function Documents({
               <label className="mx-auto mt-5 block max-w-sm text-left text-sm font-semibold text-slate-700">
                 Account
                 <select
-                  value={selectedAccountId ?? ""}
+                  value={selectedAccountId ?? ''}
                   onChange={(event) => onSelectAccount(event.target.value)}
                   className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
                 >
@@ -2866,7 +2952,7 @@ function Documents({
             className="mt-6 rounded-xl bg-[#185da8] text-white"
           >
             <Upload size={16} />
-            {isStaging ? "Reading CSV…" : "Choose CSV"}
+            {isStaging ? 'Reading CSV…' : 'Choose CSV'}
           </Button>
           {uploadError && (
             <p
@@ -2877,10 +2963,10 @@ function Documents({
             </p>
           )}
           <p className="mt-4 text-xs text-slate-400">
-            CSV only · Up to 10 MB ·{" "}
+            CSV only · Up to 10 MB ·{' '}
             {live
-              ? "Server-side validation and review"
-              : "Temporary browser preview"}
+              ? 'Server-side validation and review'
+              : 'Temporary browser preview'}
           </p>
         </div>
       </section>
@@ -2921,14 +3007,14 @@ function Documents({
                   </div>
                   <Pill
                     tone={
-                      item.status === "committed"
-                        ? "green"
-                        : item.status === "ready_for_review"
-                          ? "gold"
-                          : "slate"
+                      item.status === 'committed'
+                        ? 'green'
+                        : item.status === 'ready_for_review'
+                          ? 'gold'
+                          : 'slate'
                     }
                   >
-                    {item.status.replaceAll("_", " ")}
+                    {item.status.replaceAll('_', ' ')}
                   </Pill>
                   {item.id === latestCommittedId && (
                     <Button
@@ -2936,7 +3022,7 @@ function Documents({
                       onClick={() => void undo(item.id)}
                       className="rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200"
                     >
-                      {undoing === item.id ? "Undoing…" : "Undo"}
+                      {undoing === item.id ? 'Undoing…' : 'Undo'}
                     </Button>
                   )}
                 </div>
@@ -2997,16 +3083,16 @@ function ImportReview({
     >
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-auto rounded-3xl bg-white p-6 shadow-2xl md:p-8">
         <DialogHeader>
-          <Pill tone={livePreview ? "green" : "gold"}>
-            {livePreview ? "Server-side review" : "Temporary browser preview"}
+          <Pill tone={livePreview ? 'green' : 'gold'}>
+            {livePreview ? 'Server-side review' : 'Temporary browser preview'}
           </Pill>
           <DialogTitle className="mt-3 text-2xl font-bold">
             Review parsed rows
           </DialogTitle>
           <DialogDescription className="text-sm text-slate-500">
             {livePreview
-              ? `${fileName || "Selected CSV"} has been parsed securely but is not yet committed to your portfolio.`
-              : `${fileName || "Selected CSV"} was not uploaded or saved. These rows cannot affect the demo portfolio.`}
+              ? `${fileName || 'Selected CSV'} has been parsed securely but is not yet committed to your portfolio.`
+              : `${fileName || 'Selected CSV'} was not uploaded or saved. These rows cannot affect the demo portfolio.`}
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-3 gap-3">
@@ -3073,17 +3159,17 @@ function ImportReview({
                     <td className="p-3">{row.rowNumber}</td>
                     <td className="p-3">
                       <Pill
-                        tone={row.status === "supported" ? "green" : "gold"}
+                        tone={row.status === 'supported' ? 'green' : 'gold'}
                       >
                         {row.status}
                       </Pill>
                     </td>
                     <td className="p-3">
-                      {typeof row.normalizedPayload?.type === "string"
+                      {typeof row.normalizedPayload?.type === 'string'
                         ? row.normalizedPayload.type
-                        : "—"}
+                        : '—'}
                     </td>
-                    <td className="p-3 text-slate-500">{row.message ?? "—"}</td>
+                    <td className="p-3 text-slate-500">{row.message ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -3112,7 +3198,7 @@ function ImportReview({
                   <tr key={item.id} className="border-t border-slate-100">
                     <td className="p-3">{item.date}</td>
                     <td className="p-3">{item.kind}</td>
-                    <td className="p-3">{item.symbol ?? "—"}</td>
+                    <td className="p-3">{item.symbol ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -3134,7 +3220,7 @@ function ImportReview({
               onClick={() => void onStage()}
               className="rounded-xl bg-[#185da8] text-white"
             >
-              {isStaging ? "Saving…" : "Save for review"}{" "}
+              {isStaging ? 'Saving…' : 'Save for review'}{' '}
               <ChevronRight size={16} />
             </Button>
           )}
@@ -3144,7 +3230,7 @@ function ImportReview({
               onClick={() => void onCommit()}
               className="rounded-xl bg-[#185da8] text-white"
             >
-              {isStaging ? "Committing…" : "Commit import"}{" "}
+              {isStaging ? 'Committing…' : 'Commit import'}{' '}
               <ChevronRight size={16} />
             </Button>
           )}
@@ -3153,7 +3239,7 @@ function ImportReview({
             onClick={() => void onDiscard()}
             className="rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200"
           >
-            {stageMessage ? "Done" : "Discard preview"}
+            {stageMessage ? 'Done' : 'Discard preview'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -3173,7 +3259,7 @@ function Metric({
   return (
     <div>
       <p className="text-xs font-semibold text-slate-500">{label}</p>
-      <p className={`mt-1 font-bold ${small ? "text-base" : "text-lg"}`}>
+      <p className={`mt-1 font-bold ${small ? 'text-base' : 'text-lg'}`}>
         {value}
       </p>
     </div>

@@ -13,7 +13,7 @@ This file is the current implementation plan. Work through the numbered steps in
 - Keep commits large and coherent. Record meaningful milestone evidence rather than a log entry for every small UI change.
 - Never commit secrets. Configure credentials through local ignored environment files or the service's secret interface.
 
-**Current count: 102 tasks — 56 checked, 46 unchecked, across 13 ordered steps.**
+**Current count: 102 tasks — 63 checked, 39 unchecked, across 13 ordered steps.**
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -264,5 +264,6 @@ Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/sh
 | 2026-09-10 | 13.04/13.08 — Launch readiness preflight (partial) | Commit `3e6fe6b`; `npm run preflight:launch` now checks required public/server configuration without printing secrets, Supabase URL consistency, bounded Marketstack caps, Worker queue/DLQ and rollback artifacts, and production Stripe/provider-plan requirements. Five focused tests passed. | Hosted deployments, live secrets, migration/RLS/storage checks and full launch evidence remain open. |
 | 2026-09-10 | 05.03 — Verified private statement object binding | Commit `1c8f694`; authenticated object-binding verifies account ownership, private Storage access, 10 MB/byte-size limits and SHA-256 before persisting import metadata through an RLS-backed RPC. Focused tests (38) and typecheck passed. | Live Supabase Storage/RLS execution and queued import processing remain open. |
 | 2026-09-10 | 09.05 — Report outbox-to-queue wiring (partial) | Commit `ff69ddb`; scheduled transactional outbox dispatch claims report events, publishes typed jobs to `REPORT_QUEUE`, uses `waitUntil` for cron work, and retries safely. Queue tests (9) and typecheck passed. | Durable report input loaders, all import/undo/price-correction triggers, live queue bindings and end-to-end snapshot execution remain open. |
+| 2026-09-10 | 10.07 — Workspace accessibility hardening (partial) | Added captions and column scopes to authenticated and synthetic data tables, keyboard Escape dismissal with focus restoration for mobile navigation, a labeled navigation relationship, and a dismissible mobile backdrop. Accessibility contract tests cover table semantics and navigation behavior; focused tests and typecheck passed. | Live authenticated keyboard/screen-reader traversal and 200% enlargement verification remain open. |
 
 Earlier implementation history is preserved in [docs/IMPLEMENTATION_HISTORY.md](docs/IMPLEMENTATION_HISTORY.md). Its old checkmarks/limits are historical, not current status. For each future milestone, record stable task IDs, commit, tests and remaining limits here; update counts only for this file's task lines.
