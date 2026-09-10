@@ -736,6 +736,37 @@ export function createApi(dependencies: ApiDependencies = {}) {
     return context.body(csv);
   });
 
+  api.get('/v1/reports/consolidated.csv', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    const reader = reportSnapshotReader ?? createReportSnapshotReader(context.env);
+    if (!reader?.getLatestConsolidated) return context.json({ error: 'reporting_unavailable' }, 503);
+    const snapshot = await reader.getLatestConsolidated(authenticated.accessToken);
+    if (!snapshot) return context.json({ error: 'not_found' }, 404);
+    const payload = snapshot.payload as {
+      totalValue?: unknown; cash?: unknown; timeWeightedReturn?: unknown;
+      netDeposits?: unknown; dividendIncome?: unknown; realizedGainLoss?: unknown;
+      activityCoveredThrough?: unknown; pricesThrough?: unknown;
+      holdings?: Array<{ instrumentId: unknown; displayName?: unknown; quantity: unknown; close?: unknown; value?: unknown }>;
+    };
+    const rows: unknown[][] = [
+      ['snapshot', 'as_of_date', snapshot.asOfDate, '', '', ''],
+      ['summary', 'total_value', payload.totalValue ?? '', '', '', ''],
+      ['summary', 'cash', payload.cash ?? '', '', '', ''],
+      ['summary', 'time_weighted_return', payload.timeWeightedReturn ?? '', '', '', ''],
+      ['summary', 'net_deposits', payload.netDeposits ?? '', '', '', ''],
+      ['summary', 'dividend_income', payload.dividendIncome ?? '', '', '', ''],
+      ['summary', 'realized_gain_loss', payload.realizedGainLoss ?? '', '', '', ''],
+      ['coverage', 'activity_covered_through', payload.activityCoveredThrough ?? '', '', '', ''],
+      ['coverage', 'prices_through', payload.pricesThrough ?? '', '', '', ''],
+    ];
+    for (const holding of payload.holdings ?? []) rows.push(['holding', holding.instrumentId, holding.displayName ?? '', holding.quantity, holding.close ?? '', holding.value ?? '']);
+    const csv = toCsv(['section', 'field_or_symbol', 'value_or_name', 'quantity', 'close', 'value'], rows);
+    context.header('content-type', 'text/csv; charset=utf-8');
+    context.header('content-disposition', 'attachment; filename="portfolio-report-consolidated.csv"');
+    return context.body(csv);
+  });
+
   api.post('/v1/accounts/:accountId/import-preview', async (context) => {
     const authenticated = await requireSession(
       context.req.raw,

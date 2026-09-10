@@ -39,6 +39,27 @@ describe('standalone API', () => {
     expect(reader.getLatestConsolidated).toHaveBeenCalledWith('session-token');
   });
 
+  it('exports a consolidated snapshot without an entitlement lookup', async () => {
+    const reader = {
+      getLatest: vi.fn(),
+      getLatestConsolidated: vi.fn().mockResolvedValue({
+        asOfDate: '2026-01-05',
+        payload: { totalValue: '200', holdings: [] },
+      }),
+    };
+    const billingPersistence = {
+      getEntitlement: vi.fn().mockRejectedValue(new Error('should not be called')),
+      startTrialAfterCommittedImport: vi.fn(),
+      applyVerifiedWebhook: vi.fn(),
+    };
+    const app = createApi({ verifySession: async () => ({ id: 'user-123' }), reportSnapshotReader: reader as never, billingPersistence });
+    const response = await app.request('http://api.test/v1/reports/consolidated.csv', { headers: { authorization: 'Bearer session-token' } });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('text/csv');
+    expect(await response.text()).toContain('total_value');
+    expect(billingPersistence.getEntitlement).not.toHaveBeenCalled();
+  });
+
   it('enforces the API rate-limit boundary before route work and returns safe headers', async () => {
     const store = new MemoryRateLimitStore();
     const app = createApi({ rateLimitStore: store, now: () => 0 });
