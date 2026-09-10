@@ -9,7 +9,7 @@ const close = (symbol: string, date: string, value: string) => ({ symbol, tradin
 describe('historical price ingestion preparation', () => {
   it('maps effective aliases, preserves revision metadata, and deduplicates retries', () => {
     const result = prepareHistoricalPriceIngestion([close('aapl', '2024-01-02', '185.64'), close('AAPL', '2024-01-02', '185.6400')], [alias('AAPL', 'instrument-a')], 'rev-1');
-    expect(result.accepted).toEqual([{ instrumentId: 'instrument-a', tradingDate: '2024-01-02', close: '185.64', source: 'dolthub', sourceRevision: 'rev-1' }]);
+    expect(result.accepted).toEqual([{ instrumentId: 'instrument-a', sourceSymbol: 'AAPL', tradingDate: '2024-01-02', close: '185.64', source: 'dolthub', sourceRevision: 'rev-1' }]);
     expect(result.quarantined).toHaveLength(0);
   });
 

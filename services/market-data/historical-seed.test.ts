@@ -23,7 +23,7 @@ describe('runHistoricalSeedJob', () => {
   it('persists each page before advancing the durable cursor and finishes', async () => {
     const jobs = memory();
     const pages = [[close('AAPL', '2024-01-02', '100')], [close('AAPL', '2024-01-03', '101')]];
-    const getDailyClosePage = vi.fn(async ({ cursor }: { cursor?: { tradingDate: string; symbol: string } }): Promise<Awaited<ReturnType<HistoricalPageSource['getDailyClosePage']>>> => ({ records: pages[cursor ? 1 : 0] ?? [], sourceRevision: 'rev-1', nextCursor: cursor ? null : { tradingDate: isoDate('2024-01-02'), symbol: 'AAPL' } }));
+    const getDailyClosePage = vi.fn<HistoricalPageSource['getDailyClosePage']>().mockImplementation(async ({ cursor }) => ({ records: pages[cursor ? 1 : 0] ?? [], sourceRevision: 'rev-1', nextCursor: cursor ? null : { tradingDate: isoDate('2024-01-02'), symbol: 'AAPL' } }));
     const result = await runHistoricalSeedJob({ source: { getDailyClosePage }, persistence: { persistDoltHubPage: async ({ records }) => ({ revisionId: 'r', upserted: records.length }) }, jobs, aliases: [alias('AAPL', 'instrument-a')], symbols: ['AAPL'], from: isoDate('2024-01-01'), through: isoDate('2024-01-03'), pageLimit: 2 });
     expect(result).toMatchObject({ status: 'completed', sourceRevision: 'rev-1', pages: 2, upserted: 2 });
     expect(jobs.state.cursor).toBeNull();
@@ -33,11 +33,12 @@ describe('runHistoricalSeedJob', () => {
   it('records failure after a persisted page and resumes from the saved cursor', async () => {
     const jobs = memory();
     let attempts = 0;
-    const source: HistoricalPageSource = { getDailyClosePage: vi.fn(async ({ cursor }: { cursor?: { tradingDate: string; symbol: string } }): Promise<Awaited<ReturnType<HistoricalPageSource['getDailyClosePage']>>> => {
+    const getDailyClosePage = vi.fn<HistoricalPageSource['getDailyClosePage']>().mockImplementation(async ({ cursor }) => {
       attempts += 1;
       if (attempts === 2) throw new Error('temporary outage');
       return { records: [close('AAPL', '2024-01-02', '100')], sourceRevision: 'rev-1', nextCursor: { tradingDate: isoDate('2024-01-02'), symbol: 'AAPL' } };
-    }) };
+    });
+    const source = { getDailyClosePage };
     await expect(runHistoricalSeedJob({ source, persistence: { persistDoltHubPage: async ({ records }) => ({ revisionId: 'r', upserted: records.length }) }, jobs, aliases: [alias('AAPL', 'instrument-a')], symbols: ['AAPL'], from: isoDate('2024-01-01'), through: isoDate('2024-01-03'), pageLimit: 2 })).rejects.toThrow('temporary outage');
     expect(jobs.state.status).toBe('failed');
     source.getDailyClosePage.mockImplementationOnce(async () => ({ records: [close('AAPL', '2024-01-03', '101')], sourceRevision: 'rev-1', nextCursor: null }));
