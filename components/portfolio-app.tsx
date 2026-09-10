@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ArrowUpRight, ChartNoAxesCombined, ChevronRight, CircleDollarSign, Clock3, FileUp, HandCoins, Landmark, Menu, Plus, Upload, WalletCards } from 'lucide-react';
@@ -9,6 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Activity, calculateSummary, demoActivities, demoHoldings, demoPrices, parseRobinhoodCsv } from '@/lib/portfolio';
+import { createPublicSupabaseClient } from '@/services/supabase/client';
+
+type PublicSupabaseConfig = { url: string; anonKey: string };
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const precise = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
@@ -19,7 +22,7 @@ function Pill({ children, tone = 'slate' }: { children: React.ReactNode; tone?: 
   return <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${tones[tone]}`}>{children}</span>;
 }
 
-export function PortfolioApp() {
+export function PortfolioApp({ supabaseConfig }: { supabaseConfig?: PublicSupabaseConfig }) {
   const [active, setActive] = useState('Overview');
   const [menuOpen, setMenuOpen] = useState(false);
   const [stagedActivities, setStagedActivities] = useState<Activity[] | null>(null);
@@ -28,6 +31,26 @@ export function PortfolioApp() {
   const [uploadError, setUploadError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const summary = useMemo(() => calculateSummary(demoActivities), []);
+  const client = useMemo(() => supabaseConfig ? createPublicSupabaseClient(supabaseConfig) : undefined, [supabaseConfig]);
+  const [email, setEmail] = useState<string>();
+
+  useEffect(() => {
+    if (!client) return;
+    let active = true;
+    void client.auth.getUser().then(({ data }) => {
+      if (active) setEmail(data.user?.email);
+    });
+    const { data: listener } = client.auth.onAuthStateChange((_event, session) => setEmail(session?.user.email));
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, [client]);
+
+  async function signOut() {
+    await client?.auth.signOut();
+    window.location.assign('/');
+  }
 
   function clearStaging() {
     setReviewOpen(false);
@@ -63,7 +86,7 @@ export function PortfolioApp() {
     <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-[#f5f7fb]/90 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-4 md:px-8">
         <Link className="flex items-center gap-2.5 font-bold tracking-tight" href="/"><BrandMark size={32} /><span>northstar</span></Link>
-        <Pill tone="gold">Synthetic demo · no account connected</Pill>
+        {email ? <div className="flex items-center gap-3"><Pill tone="gold">Synthetic demo · your portfolio is separate</Pill><button onClick={signOut} className="text-sm font-bold text-[#185da8] hover:text-[#154f8e]">Sign out</button></div> : <div className="flex items-center gap-3"><Pill tone="gold">Synthetic demo · no account connected</Pill>{client && <Link href="/sign-in" className="text-sm font-bold text-[#185da8] hover:text-[#154f8e]">Sign in</Link>}</div>}
       </div>
     </header>
     <div className="mx-auto flex max-w-[1440px]">
