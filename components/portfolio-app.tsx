@@ -659,7 +659,7 @@ export function PortfolioApp({
             <Menu size={18} />
           </button>
           {active === "Overview" && (
-            <Overview summary={summary} onUpload={openFileChooser} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} reportSnapshot={reportSnapshot} reportLoading={reportLoading} reportError={reportError} />
+            <Overview summary={summary} onUpload={openFileChooser} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} reportSnapshot={reportSnapshot} reportLoading={reportLoading} reportError={reportError} accounts={accounts} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} />
           )}
           {active === "Activity" && (
             <ActivityPanel onUpload={openFileChooser} />
@@ -725,6 +725,9 @@ function Overview({
   reportSnapshot,
   reportLoading,
   reportError,
+  accounts,
+  selectedAccountId,
+  onSelectAccount,
 }: {
   summary: ReturnType<typeof calculateSummary>;
   onUpload: () => void;
@@ -734,6 +737,9 @@ function Overview({
   reportSnapshot?: LiveReportSnapshot;
   reportLoading: boolean;
   reportError?: string;
+  accounts: LiveAccount[];
+  selectedAccountId?: string;
+  onSelectAccount: (accountId: string) => void;
 }) {
   const liveValue = reportSnapshot?.payload.totalValue;
   const liveCash = reportSnapshot?.payload.cash;
@@ -756,13 +762,10 @@ function Overview({
             {hasLiveReport ? `As of ${reportSnapshot?.asOfDate}. Values come from your persisted report snapshot.` : "A fictional long-term portfolio used to preview the product."}
           </p>
         </div>
-        <Button
-          onClick={onUpload}
-          className="h-11 rounded-xl bg-[#185da8] px-5 text-white hover:bg-[#154f8e]"
-        >
-          <Upload size={17} />
-          Preview a CSV
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          {accounts.length > 0 && <label className="text-xs font-semibold text-slate-500">Account<select aria-label="Select account for report" value={selectedAccountId ?? accounts[0].id} onChange={(event) => onSelectAccount(event.target.value)} className="ml-2 h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm outline-none focus:border-[#185da8] focus:ring-2 focus:ring-[#185da8]/20">{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>}
+          <Button onClick={onUpload} className="h-11 rounded-xl bg-[#185da8] px-5 text-white hover:bg-[#154f8e]"><Upload size={17} />Preview a CSV</Button>
+        </div>
       </div>
       {(freshnessLoading || freshnessError || freshnessReport) && (
         <section className="mb-7 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
