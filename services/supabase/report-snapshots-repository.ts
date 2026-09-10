@@ -18,7 +18,8 @@ export class SupabaseReportSnapshotsRepository {
   async publish(input: ReportSnapshotInput): Promise<string> {
     if (!input.importStateRevision.trim()) throw new Error('Report snapshots require an import-state revision.');
     const url = new URL('/rest/v1/report_snapshots', this.baseUrl);
-    const response = await this.fetcher(url, { method: 'POST', headers: { apikey: this.options.serviceRoleKey, authorization: `Bearer ${this.options.serviceRoleKey}`, 'content-type': 'application/json', prefer: 'return=representation' }, body: JSON.stringify({ user_id: input.userId, account_id: input.accountId ?? null, report_type: input.reportType, as_of_date: input.asOfDate, import_state_revision: input.importStateRevision, price_revision_id: input.priceRevisionId ?? null, payload: input.payload }) });
+    url.searchParams.set('on_conflict', 'publication_key');
+    const response = await this.fetcher(url, { method: 'POST', headers: { apikey: this.options.serviceRoleKey, authorization: `Bearer ${this.options.serviceRoleKey}`, 'content-type': 'application/json', prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify({ user_id: input.userId, account_id: input.accountId ?? null, report_type: input.reportType, as_of_date: input.asOfDate, import_state_revision: input.importStateRevision, price_revision_id: input.priceRevisionId ?? null, payload: input.payload }) });
     if (!response.ok) throw new Error(`Supabase report snapshot write failed with HTTP ${response.status}.`);
     const rows = z.array(snapshotSchema).parse(await response.json());
     if (!rows[0]) throw new Error('Supabase did not return a report snapshot ID.');
