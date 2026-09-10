@@ -1381,19 +1381,20 @@ function Accounts({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <label className="block text-sm font-semibold text-slate-700">
+            <label htmlFor="account-name" className="block text-sm font-semibold text-slate-700">
               Account name
               <Input
+                id="account-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="Taxable brokerage"
                 className="mt-1.5 h-11 rounded-xl"
-                autoFocus
               />
             </label>
-            <label className="block text-sm font-semibold text-slate-700">
+            <label htmlFor="account-type" className="block text-sm font-semibold text-slate-700">
               Account type
               <select
+                id="account-type"
                 value={accountType}
                 onChange={(event) =>
                   setAccountType(
@@ -1703,25 +1704,26 @@ function ImportReview({
           />
         </div>
         {livePreview?.duplicateFile && (
-          <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+          <p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
             This exact file was already imported for this account.
           </p>
         )}
         {(liveWarnings > 0 || warnings > 0) && (
-          <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+          <p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
             Some rows need review. They remain visible and cannot silently
             change reports.
           </p>
         )}
         {liveRows.length > 0 && (
-          <div className="max-h-52 overflow-auto rounded-xl border border-slate-200">
-            <table className="w-full text-left text-sm">
+          <div aria-live="polite" className="max-h-52 overflow-auto rounded-xl border border-slate-200">
+            <table className="min-w-[38rem] w-full text-left text-sm">
+              <caption className="sr-only">Imported activity rows and validation results</caption>
               <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
-                  <th className="p-3">Row</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3">Activity</th>
-                  <th className="p-3">Message</th>
+                  <th scope="col" className="p-3">Row</th>
+                  <th scope="col" className="p-3">Status</th>
+                  <th scope="col" className="p-3">Activity</th>
+                  <th scope="col" className="p-3">Message</th>
                 </tr>
               </thead>
               <tbody>
@@ -1749,12 +1751,13 @@ function ImportReview({
         )}
         {!livePreview && (
           <div className="max-h-52 overflow-auto rounded-xl border border-slate-200">
-            <table className="w-full text-left text-sm">
+            <table className="min-w-[24rem] w-full text-left text-sm">
+              <caption className="sr-only">Parsed activity preview</caption>
               <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
-                  <th className="p-3">Date</th>
-                  <th className="p-3">Type</th>
-                  <th className="p-3">Symbol</th>
+                  <th scope="col" className="p-3">Date</th>
+                  <th scope="col" className="p-3">Type</th>
+                  <th scope="col" className="p-3">Symbol</th>
                 </tr>
               </thead>
               <tbody>
@@ -1770,12 +1773,12 @@ function ImportReview({
           </div>
         )}
         {stageMessage && (
-          <p
-            role="status"
+          <output
+            aria-live="polite"
             className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800"
           >
             {stageMessage}
-          </p>
+          </output>
         )}
         <DialogFooter className="mt-3 rounded-b-2xl">
           {livePreview && !stagedImportId && (
