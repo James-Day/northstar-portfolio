@@ -51,6 +51,7 @@ import { SettingsPanel } from "@/components/settings-panel";
 import type { OpeningHistory } from "@/services/accounts/opening-history";
 import { buildAllocationRows } from "@/lib/report-details";
 import { clearPrivateWorkspaceState } from "@/lib/auth/private-workspace";
+import { getDashboardWarnings, type DashboardWarning } from "@/lib/dashboard-warnings";
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
 type PublicApiConfig = { baseUrl: string };
@@ -858,7 +859,7 @@ export function PortfolioApp({
             <Menu size={18} />
           </button>
           {active === "Overview" && (
-            <Overview summary={summary} onUpload={openFileChooser} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} onRetryFreshness={() => setFreshnessRequestVersion((value) => value + 1)} reportSnapshot={reportSnapshot} reportLoading={reportLoading} reportError={reportError} onRetryReport={() => setReportRequestVersion((value) => value + 1)} accounts={accounts} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} reportPeriod={reportPeriod} onSelectReportPeriod={setReportPeriod} reportScope={reportScope} onSelectReportScope={setReportScope} isLiveAccount={Boolean(client && userId && selectedAccountId)} />
+            <Overview summary={summary} onUpload={openFileChooser} onOpenAccounts={() => setActive("Accounts")} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} onRetryFreshness={() => setFreshnessRequestVersion((value) => value + 1)} reportSnapshot={reportSnapshot} reportLoading={reportLoading} reportError={reportError} onRetryReport={() => setReportRequestVersion((value) => value + 1)} accounts={accounts} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} reportPeriod={reportPeriod} onSelectReportPeriod={setReportPeriod} reportScope={reportScope} onSelectReportScope={setReportScope} openingHistory={openingHistory} isLiveAccount={Boolean(client && userId && selectedAccountId)} />
           )}
           {active === "Activity" && (
             <ActivityPanel
@@ -948,6 +949,7 @@ export function PortfolioApp({
 function Overview({
   summary,
   onUpload,
+  onOpenAccounts,
   freshnessReport,
   freshnessLoading,
   freshnessError,
@@ -963,10 +965,12 @@ function Overview({
   onSelectReportPeriod,
   reportScope,
   onSelectReportScope,
+  openingHistory,
   isLiveAccount,
 }: {
   summary: ReturnType<typeof calculateSummary>;
   onUpload: () => void;
+  onOpenAccounts: () => void;
   freshnessReport?: LiveFreshnessReport;
   freshnessLoading: boolean;
   freshnessError?: string;
@@ -982,6 +986,7 @@ function Overview({
   onSelectReportPeriod: (period: ReportPeriod) => void;
   reportScope: "account" | "consolidated";
   onSelectReportScope: (scope: "account" | "consolidated") => void;
+  openingHistory?: OpeningHistory;
   isLiveAccount: boolean;
 }) {
   const liveValue = reportSnapshot?.payload.totalValue;
@@ -995,6 +1000,14 @@ function Overview({
   const chartData = hasLiveReport
     ? filterReportHistory(reportSnapshot?.payload.valueHistory ?? [], reportPeriod).map((point) => ({ date: point.date, value: point.value === null ? null : Number(point.value) }))
     : showDemo ? demoPrices : [];
+  const dashboardWarnings = getDashboardWarnings({
+    isLiveAccount,
+    reportLoading,
+    reportError,
+    report: reportSnapshot ? { asOfDate: reportSnapshot.asOfDate, totalValue: reportSnapshot.payload.totalValue, holdings: reportSnapshot.payload.holdings } : undefined,
+    freshness: freshnessReport ? { expectedDate: freshnessReport.expectedDate, rows: freshnessReport.rows } : undefined,
+    openingHistory,
+  });
   return (
     <>
       <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
@@ -1028,7 +1041,7 @@ function Overview({
       )}
       {reportLoading && <section className="mb-7 rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-500 shadow-sm">Loading your persisted report…</section>}
       {reportError && <section role="alert" className="mb-7 flex flex-wrap items-center gap-3 rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800"><span>{reportError}</span><button type="button" onClick={onRetryReport} className="font-bold underline underline-offset-2">Retry</button></section>}
-      {!reportLoading && !reportError && hasLiveReport && reportSnapshot?.payload.totalValue === null && <section className="mb-7 rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">Your report has incomplete price coverage, so portfolio value is temporarily unavailable.</section>}
+      {dashboardWarnings.length > 0 && <DashboardWarningList warnings={dashboardWarnings} onUpload={onUpload} onOpenAccounts={onOpenAccounts} onRetryReport={onRetryReport} />}
       {hasLiveReport && <section aria-label="Report coverage" className="mb-7 grid gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2"><div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Activity covered through</p><p className="mt-1 text-sm font-semibold text-slate-700">{reportSnapshot?.payload.activityCoveredThrough ?? "Unavailable"}</p></div><div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Prices through</p><p className="mt-1 text-sm font-semibold text-slate-700">{reportSnapshot?.payload.pricesThrough ?? "Unavailable"}</p></div></section>}
       {hasLiveReport && <section aria-label="Report methodology" className="mb-7 rounded-3xl border border-sky-200 bg-sky-50 p-5 text-sm text-sky-950 shadow-sm"><p className="font-bold">How these figures are calculated</p><p className="mt-2 leading-6">{reportSnapshot?.payload.methodology?.disclosure ?? "Daily returns use Modified Dietz intervals. External cash flows are approximated at the midpoint of their day, missing valuation periods remain unavailable, and returns are not annualized."}</p><p className="mt-2 text-xs font-semibold text-sky-800">Realized gains/losses are analytical FIFO estimates and are not tax reporting.</p></section>}
       <div className="mb-7 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,.85fr)]">
@@ -1124,6 +1137,22 @@ function Overview({
       <ReportDetails isLiveAccount={isLiveAccount} totalValue={liveValue ?? null} cash={liveCash ?? null} netDeposits={liveNetDeposits ?? null} holdings={reportSnapshot?.payload.holdings} realizedSales={reportSnapshot?.payload.realizedSales} />
     </>
   );
+}
+
+function DashboardWarningList({ warnings, onUpload, onOpenAccounts, onRetryReport }: { warnings: DashboardWarning[]; onUpload: () => void; onOpenAccounts: () => void; onRetryReport: () => void }) {
+  return <section aria-label="Portfolio notices" className="mb-7 space-y-3">
+    {warnings.map((warning) => <article key={warning.kind} role={warning.kind === 'unavailable_prices' ? 'alert' : undefined} className={`rounded-3xl border p-5 text-sm shadow-sm ${warningClass(warning.kind)}`}>
+      <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="font-bold">{warning.title}</p><p className="mt-1 max-w-3xl leading-6">{warning.message}</p></div><button type="button" onClick={warning.action === 'import' ? onUpload : warning.action === 'accounts' ? onOpenAccounts : onRetryReport} className="shrink-0 font-bold underline underline-offset-2">{warning.action === 'import' ? 'Import activity' : warning.action === 'accounts' ? 'Review opening history' : 'Check again'}</button></div>
+    </article>)}
+  </section>;
+}
+
+function warningClass(kind: DashboardWarning['kind']) {
+  if (kind === 'unavailable_prices') return 'border-amber-200 bg-amber-50 text-amber-950';
+  if (kind === 'stale_report') return 'border-amber-200 bg-amber-50 text-amber-900';
+  if (kind === 'partial_history') return 'border-sky-200 bg-sky-50 text-sky-950';
+  if (kind === 'no_holdings') return 'border-slate-200 bg-slate-50 text-slate-800';
+  return 'border-blue-200 bg-blue-50 text-blue-950';
 }
 
 function ReportDetails({ isLiveAccount, totalValue, cash, netDeposits, holdings, realizedSales }: { isLiveAccount: boolean; totalValue: string | null; cash: string | null; netDeposits: string | null; holdings?: LiveReportHolding[]; realizedSales?: LiveRealizedSale[] }) {
