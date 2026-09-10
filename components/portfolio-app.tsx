@@ -350,6 +350,7 @@ export function PortfolioApp({
     setFreshnessError(undefined);
     setReportError(undefined);
     setActivityError(undefined);
+    setReportScope('account');
     setStageMessage(undefined);
     setActive('Overview');
     setMenuOpen(false);
