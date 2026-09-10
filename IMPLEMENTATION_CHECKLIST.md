@@ -13,7 +13,7 @@ This file is the current implementation plan. Work through the numbered steps in
 - Keep commits large and coherent. Record meaningful milestone evidence rather than a log entry for every small UI change.
 - Never commit secrets. Configure credentials through local ignored environment files or the service's secret interface.
 
-**Current count: 102 tasks — 36 checked, 66 unchecked, across 13 ordered steps.**
+**Current count: 102 tasks — 37 checked, 65 unchecked, across 13 ordered steps.**
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -92,7 +92,7 @@ Owner: platform/ingestion. Depends on step 04; queue consumers must use the corr
 
 - [x] **05.01** Private bucket policies and owned-account signed-upload API/repository exist. Evidence: initial migration, `services/supabase/signed-upload-repository.ts`.
 - [x] **05.02** Typed import/report/price jobs and retry-aware dispatcher exist. Evidence: `services/queues/`. Worker has no `queue` export or durable handlers yet.
-- [ ] **05.03** Upload the actual object, bind verified object metadata/hash to its import, enforce streamed request limits and validate ownership/size/content server-side before processing.
+- [x] **05.03** Upload the actual object, bind verified object metadata/hash to its import, enforce streamed request limits and validate ownership/size/content server-side before processing. Evidence: authenticated object-binding endpoint, private Storage download, exact byte/hash verification, ownership checks, and RLS-backed binding RPC in commit `1c8f694`.
 - [ ] **05.04** Wire Cloudflare queue entrypoint and durable import handler; persist processing/progress/failure state and let browser review poll durable results.
 - [x] **05.05** Dispatch the transactional outbox with claim/retry/idempotency semantics. The dispatcher claims with `FOR UPDATE SKIP LOCKED`, translates `import.committed`/`import.undone` to typed report jobs, verifies ownership, and records retry/failure state.
 - [ ] **05.06** Persist rejected-job/error evidence before acknowledgment; implement dead-letter inspection and safe replay.
@@ -246,5 +246,7 @@ Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/sh
 | 2026-09-10 | 08.05 — Daily refresh quota integration | Commit `17a953e`; daily refresh now reserves normalized symbols before provider calls, reconciles successful/failed attempts, uses idempotency keys for retries, and maps exhausted reservations to explicit skips. Focused refresh tests and typecheck passed. | Live Supabase/provider execution and the 08.09 end-to-end gate remain open. |
 | 2026-09-10 | 06.04 — Persisted opening history | Commit `ffe0c12`; account-owned opening cash, coverage date, explanation and known/unknown lots are validated, persisted through RLS-backed APIs, and editable in the Accounts UI. Focused domain/API tests and typecheck passed. | Live database execution and full report replay from opening history remain open. |
 | 2026-09-10 | 09.02 — Snapshot publication dependency integrity | Commit `37433b1`; snapshot retries read back the exact immutable dependency tuple, validate account/report identifiers and dates, and order reader ties deterministically. Four focused repository tests passed. | Live snapshot execution and report queue deployment remain open. |
+| 2026-09-10 | 05.03 — Verified private statement object binding | Commit `1c8f694`; authenticated object-binding verifies account ownership, private Storage access, 10 MB/byte-size limits and SHA-256 before persisting import metadata through an RLS-backed RPC. Focused tests (38) and typecheck passed. | Live Supabase Storage/RLS execution and queued import processing remain open. |
+| 2026-09-10 | 09.05 — Report outbox-to-queue wiring (partial) | Commit `ff69ddb`; scheduled transactional outbox dispatch claims report events, publishes typed jobs to `REPORT_QUEUE`, uses `waitUntil` for cron work, and retries safely. Queue tests (9) and typecheck passed. | Durable report input loaders, all import/undo/price-correction triggers, live queue bindings and end-to-end snapshot execution remain open. |
 
 Earlier implementation history is preserved in [docs/IMPLEMENTATION_HISTORY.md](docs/IMPLEMENTATION_HISTORY.md). Its old checkmarks/limits are historical, not current status. For each future milestone, record stable task IDs, commit, tests and remaining limits here; update counts only for this file's task lines.
