@@ -18,3 +18,5 @@ jobs:
       - run: npm test
       - run: npm run test:security
       - run: npm run build
+      - run: npm run test:e2e:install
+      - run: npm run test:e2e
