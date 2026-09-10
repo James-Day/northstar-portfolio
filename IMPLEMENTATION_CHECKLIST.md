@@ -13,7 +13,7 @@ This file is the current implementation plan. Work through the numbered steps in
 - Keep commits large and coherent. Record meaningful milestone evidence rather than a log entry for every small UI change.
 - Never commit secrets. Configure credentials through local ignored environment files or the service's secret interface.
 
-**Current count: 102 tasks — 45 checked, 57 unchecked, across 13 ordered steps.**
+**Current count: 102 tasks — 46 checked, 56 unchecked, across 13 ordered steps.**
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -148,7 +148,7 @@ Owner: reporting/calculations. Depends on steps 05–08.
 - [x] **09.03** Snapshot payloads support holdings/history/income/gains plus separate activity/price coverage fields.
 - [x] **09.04** Compose persisted effective ledger, opening history, calendar, validated actions and selected stored prices into report inputs; use corrected chronological replay from step 06. `composePersistedReportInputs` now performs this deterministic composition and derives the import revision.
 - [ ] **09.05** Wire report queue handler and import/undo/price-correction triggers through publication; reject stale workers and make retry/snapshot revision selection deterministic.
-- [ ] **09.06** Generate consolidated views that cancel linked internal transfers while excluding external flows and incentives; preserve unknown basis and incomplete return periods.
+- [x] **09.06** Generate consolidated views that cancel linked internal transfers while excluding external flows and incentives; preserve unknown basis and incomplete return periods. Evidence: `composeConsolidatedReportInputs` cancels only proven links, keeps unresolved transfers explicit, and preserves incomplete valuations/unknown basis in commit `01afe90`.
 - [ ] **09.07** Validate return/gain definitions and disclose daily flow timing approximation; do not bridge gaps, annualize short periods or imply tax calculations.
 - [ ] **09.08** Gate: upload → commit → queue → stored report completes without manually supplying a snapshot; undo/correction regenerates matching results and previous revisions remain reproducible.
 
@@ -250,6 +250,7 @@ Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/sh
 | 2026-09-10 | 12.04 — Durable deletion executor boundary (partial) | Commit `3c9b956`; ordered cleanup execution covers private files, accounts, reports, billing, profiles and auth through injectable adapters, with durable claim/retry/stale-claim/exhaustion RPCs and focused tests. | Live Auth/Storage/Stripe execution, scheduled deployment and verification of revoked access remain open. |
 | 2026-09-10 | 06.08 — Internal transfer reconciliation | Commit `504a2a4`; persisted cash/share transfers resolve through stable ticker aliases, preserve explicit unresolved states, and write account-owned reconciliation results under RLS. Five focused tests and typecheck passed. | Live Supabase migration/execution and end-to-end consolidated report validation remain open. |
 | 2026-09-10 | 10.05 — Portfolio detail metrics (partial) | Commit `0efe479`; report/dashboard payloads now expose net deposits, invested value, allocation percentages, explicit incomplete valuation states and FIFO realized-lot detail. Seven focused tests and typecheck passed. | Consolidated snapshots, dividend detail presentation and live authenticated browser verification remain open. |
+| 2026-09-10 | 09.06 — Consolidated report composition | Commit `01afe90`; consolidated inputs cancel only proven linked internal transfers, preserve external flows/incentives for return calculations, retain unresolved links, and carry incomplete valuation/unknown-basis states. Eight focused tests and typecheck passed. | Live Supabase execution, snapshot publication and end-to-end authenticated verification remain open. |
 | 2026-09-10 | 05.03 — Verified private statement object binding | Commit `1c8f694`; authenticated object-binding verifies account ownership, private Storage access, 10 MB/byte-size limits and SHA-256 before persisting import metadata through an RLS-backed RPC. Focused tests (38) and typecheck passed. | Live Supabase Storage/RLS execution and queued import processing remain open. |
 | 2026-09-10 | 09.05 — Report outbox-to-queue wiring (partial) | Commit `ff69ddb`; scheduled transactional outbox dispatch claims report events, publishes typed jobs to `REPORT_QUEUE`, uses `waitUntil` for cron work, and retries safely. Queue tests (9) and typecheck passed. | Durable report input loaders, all import/undo/price-correction triggers, live queue bindings and end-to-end snapshot execution remain open. |
 
