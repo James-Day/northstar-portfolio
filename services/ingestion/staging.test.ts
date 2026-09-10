@@ -7,7 +7,7 @@ describe('Robinhood import staging', () => {
   it('records an immutable original-file SHA-256, parser version, review status, and activity range', async () => {
     await expect(stageRobinhoodImport('account-123', csv)).resolves.toMatchObject({
       accountId: 'account-123',
-      parserVersion: 'robinhood-activity-v1',
+      parserVersion: 'robinhood-activity-v2',
       activityFrom: '2026-01-02',
       activityThrough: '2026-01-04',
       review: { sourceRowCount: 3, acceptedRowCount: 2, unsupportedRowCount: 1, materialUnsupportedRowCount: 1 },

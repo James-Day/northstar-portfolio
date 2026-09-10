@@ -6,9 +6,9 @@ import { isoDate, type IsoDate } from '@/lib/domain/types';
 const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_ROWS = 50_000;
 
-export const ROBINHOOD_ACTIVITY_PARSER_VERSION = 'robinhood-activity-v1';
+export const ROBINHOOD_ACTIVITY_PARSER_VERSION = 'robinhood-activity-v2';
 
-export type RobinhoodActivityType = 'buy' | 'sell' | 'dividend' | 'drip_buy' | 'interest' | 'fee' | 'deposit' | 'withdrawal' | 'ira_incentive' | 'transfer_in' | 'transfer_out';
+export type RobinhoodActivityType = 'buy' | 'sell' | 'dividend' | 'drip_buy' | 'interest' | 'fee' | 'deposit' | 'withdrawal' | 'ira_incentive' | 'transfer_in' | 'transfer_out' | 'split';
 
 export type ParsedRobinhoodRow = {
   rowNumber: number;
@@ -23,6 +23,11 @@ export type ParsedRobinhoodRow = {
     price: DecimalString | null;
     amount: DecimalString;
     description: string;
+    corporateAction?: {
+      type: 'split';
+      ratioNumerator: DecimalString;
+      ratioDenominator: DecimalString;
+    };
   };
 };
 
@@ -46,6 +51,7 @@ const transactionCodes: Record<string, RobinhoodActivityType> = {
   'IRA INCENTIVE': 'ira_incentive',
   'TRANSFER IN': 'transfer_in',
   'TRANSFER OUT': 'transfer_out',
+  SPL: 'split',
 };
 
 function normalizedHeader(header: string) { return header.trim().toLowerCase(); }
@@ -112,7 +118,7 @@ export function parseRobinhoodActivityCsv(csv: string): ParsedRobinhoodRow[] {
     if (!headerSet.has(required)) throw new Error(`Robinhood CSV is missing the required ${required} column.`);
   }
 
-  return records.flatMap<ParsedRobinhoodRow>((raw, index) => {
+  const parsedRows = records.flatMap<ParsedRobinhoodRow>((raw, index) => {
     const rowNumber = index + 2;
     if (Object.values(raw).every((value) => !String(value ?? '').trim())) return [];
     const code = (raw['trans code'] ?? '').trim().toUpperCase();
@@ -128,8 +134,8 @@ export function parseRobinhoodActivityCsv(csv: string): ParsedRobinhoodRow[] {
       const symbol = raw.instrument?.trim().toUpperCase() || null;
       const quantity = parseDecimal(raw.quantity ?? raw['quantity transacted'] ?? '', 'quantity', true);
       const price = parseDecimal(raw.price ?? raw['price per share'] ?? '', 'price', true);
-      const amount = parseDecimal(raw.amount, 'amount');
-      if (['buy', 'sell', 'drip_buy'].includes(type) && (!symbol || !quantity || new Decimal(quantity).lte(0))) {
+      const amount = type === 'split' ? decimalString('0') : parseDecimal(raw.amount, 'amount');
+      if (['buy', 'sell', 'drip_buy', 'split'].includes(type) && (!symbol || !quantity || new Decimal(quantity).lte(0))) {
         throw new Error(`Row ${rowNumber} requires an instrument and positive quantity for ${type}.`);
       }
       return [{
@@ -154,5 +160,36 @@ export function parseRobinhoodActivityCsv(csv: string): ParsedRobinhoodRow[] {
         message: error instanceof Error ? error.message : `Row ${rowNumber} is invalid.`,
       }];
     }
+  });
+  return resolveSplitRows(parsedRows);
+}
+
+/**
+ * Robinhood's SPL quantity is the number of shares added by the split, rather
+ * than a ratio. Infer the ratio only when the preceding buy/sell history gives
+ * us an unambiguous positive position; otherwise leave the row blocked.
+ */
+function resolveSplitRows(rows: ParsedRobinhoodRow[]): ParsedRobinhoodRow[] {
+  const positionBySymbol = new Map<string, Decimal>();
+  const prePositions = new Map<number, Decimal>();
+  const sorted = [...rows].filter((row) => row.status === 'supported' && row.activity).sort((left, right) => left.activity!.effectiveDate.localeCompare(right.activity!.effectiveDate) || left.rowNumber - right.rowNumber);
+  for (const row of sorted) {
+    const activity = row.activity!;
+    if (!activity.symbol || !activity.quantity) continue;
+    if (activity.type === 'split') {
+      prePositions.set(row.rowNumber, positionBySymbol.get(activity.symbol) ?? new Decimal(0));
+    } else if (activity.type === 'buy' || activity.type === 'drip_buy') {
+      positionBySymbol.set(activity.symbol, (positionBySymbol.get(activity.symbol) ?? new Decimal(0)).plus(activity.quantity));
+    } else if (activity.type === 'sell') {
+      positionBySymbol.set(activity.symbol, (positionBySymbol.get(activity.symbol) ?? new Decimal(0)).minus(activity.quantity));
+    }
+  }
+  return rows.map((row) => {
+    if (row.status !== 'supported' || row.activity?.type !== 'split' || !row.activity.symbol || !row.activity.quantity) return row;
+    const before = prePositions.get(row.rowNumber) ?? new Decimal(0);
+    if (before.lte(0)) return { ...row, status: 'unsupported', activity: undefined, message: `Stock split for ${row.activity.symbol} needs a positive pre-split position to infer its ratio.` };
+    const ratio = before.plus(row.activity.quantity).div(before);
+    if (ratio.lte(1) || !ratio.isInteger()) return { ...row, status: 'unsupported', activity: undefined, message: `Stock split for ${row.activity.symbol} has an ambiguous inferred ratio and requires corporate-action review.` };
+    return { ...row, activity: { ...row.activity, corporateAction: { type: 'split', ratioNumerator: decimalString(ratio.toFixed()), ratioDenominator: decimalString('1') } } };
   });
 }

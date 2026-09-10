@@ -28,6 +28,9 @@ export function normalizeRobinhoodRowsForLedger(
   for (const row of rows) {
     if (row.status !== 'supported' || !row.activity) continue;
     const activity = row.activity;
+    // SPL rows are persisted as corporate_actions by the commit RPC. They do
+    // not create cash or lot entries in the ledger projection.
+    if (activity.type === 'split') continue;
     const instrumentId = needsInstrument(activity.type) ? resolveInstrument(activity.symbol, instrumentIdBySymbol, row.rowNumber) : null;
     const base: Omit<LedgerEntryDraft, 'entryType' | 'cashAmount'> = {
       sourceRowNumber: row.rowNumber,

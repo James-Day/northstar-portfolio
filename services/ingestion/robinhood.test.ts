@@ -40,7 +40,7 @@ describe('parseRobinhoodActivityCsv', () => {
       { status: 'supported', activity: { type: 'deposit', amount: '500' } },
       { status: 'supported', activity: { type: 'withdrawal', amount: '-50' } },
     ]);
-    expect(rows[5]).toMatchObject({ status: 'unsupported', rowNumber: 8, message: 'Stock split for SCHD requires corporate-action review before this import can be committed.' });
+    expect(rows[5]).toMatchObject({ status: 'unsupported', rowNumber: 8, message: 'Stock split for SCHD needs a positive pre-split position to infer its ratio.' });
   });
 
   it('ignores Robinhood’s trailing informational footer', () => {
@@ -55,7 +55,7 @@ describe('parseRobinhoodActivityCsv', () => {
     expect(rows[0]).toMatchObject({ status: 'supported', activity: { type: 'buy', symbol: 'VTI', amount: '-250' } });
   });
 
-  it('parses the sanitized shape of the supplied Robinhood export and keeps SPL fail-closed', () => {
+  it('keeps a split blocked when the sanitized sample has no pre-split position', () => {
     const csv = readFileSync(new URL('../../fixtures/robinhood/activity-sample.csv', import.meta.url), 'utf8');
     const rows = parseRobinhoodActivityCsv(csv);
 
@@ -65,6 +65,27 @@ describe('parseRobinhoodActivityCsv', () => {
       { status: 'supported', activity: { type: 'buy', symbol: 'SCHG', quantity: '5', amount: '-138.38' } },
       { status: 'supported', activity: { type: 'deposit', amount: '500' } },
     ]);
-    expect(rows[3]).toMatchObject({ status: 'unsupported', message: 'Stock split for SCHD requires corporate-action review before this import can be committed.' });
+    expect(rows[3]).toMatchObject({ status: 'unsupported', message: 'Stock split for SCHD needs a positive pre-split position to infer its ratio.' });
+  });
+
+  it('infers a split ratio from preceding share activity', () => {
+    const rows = parseRobinhoodActivityCsv([
+      'Activity Date,Trans Code,Instrument,Quantity,Price,Amount,Description',
+      '2024-10-01,Buy,SCHD,10,$70,($700),Bought before split',
+      '2024-10-11,SPL,SCHD,20,,,Stock split',
+    ].join('\n'));
+    expect(rows[1]).toMatchObject({ status: 'supported', activity: { type: 'split', corporateAction: { ratioNumerator: '3', ratioDenominator: '1' } } });
+  });
+
+  it('infers the four-for-one and fifty-for-one ratios in the supplied export shape', () => {
+    const rows = parseRobinhoodActivityCsv([
+      'Activity Date,Trans Code,Instrument,Quantity,Price,Amount,Description',
+      '2024-06-01,Buy,CMG,0.08,$3000,($240),Bought before split',
+      '2024-06-25,Buy,SCHG,16,$90,($1440),Bought before split',
+      '2024-06-26,SPL,CMG,3.92,,,Stock split',
+      '2024-10-11,SPL,SCHG,48,,,Stock split',
+    ].join('\n'));
+    expect(rows[2]).toMatchObject({ status: 'supported', activity: { corporateAction: { ratioNumerator: '50', ratioDenominator: '1' } } });
+    expect(rows[3]).toMatchObject({ status: 'supported', activity: { corporateAction: { ratioNumerator: '4', ratioDenominator: '1' } } });
   });
 });
