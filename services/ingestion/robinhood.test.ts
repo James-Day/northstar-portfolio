@@ -3,6 +3,51 @@ import { readFileSync } from 'node:fs';
 import { parseRobinhoodActivityCsv } from '@/services/ingestion/robinhood';
 
 describe('parseRobinhoodActivityCsv', () => {
+  it.each([
+    ['individual', 'individual-activity.csv', [
+      ['buy', 'VTI', '0.25', '300', '-75'],
+      ['deposit', null, null, null, '500'],
+      ['dividend', 'VTI', null, null, '0.24'],
+      ['buy', 'VTI', '0.0008', '300', '-0.24'],
+      ['sell', 'VTI', '0.1', '310', '31'],
+      ['fee', 'VTI', null, null, '-0.02'],
+      ['withdrawal', null, null, null, '-40'],
+    ]],
+    ['traditional IRA', 'traditional-ira-activity.csv', [
+      ['deposit', null, null, null, '1000'],
+      ['buy', 'SCHD', '3', '85', '-255'],
+      ['dividend', 'SCHD', null, null, '0.78'],
+      ['buy', 'SCHD', '0.0091', '85.71', '-0.78'],
+      ['ira_incentive', null, null, null, '10'],
+      ['sell', 'SCHD', '0.5', '87', '43.5'],
+      ['fee', null, null, null, '-0.03'],
+      ['withdrawal', null, null, null, '-100'],
+    ]],
+    ['Roth IRA', 'roth-ira-activity.csv', [
+      ['deposit', null, null, null, '750'],
+      ['buy', 'VOO', '0.5', '500', '-250'],
+      ['dividend', 'VOO', null, null, '0.55'],
+      ['buy', 'VOO', '0.0011', '500', '-0.55'],
+      ['transfer_in', null, null, null, '200'],
+      ['transfer_out', null, null, null, '-50'],
+      ['sell', 'VOO', '0.125', '510', '63.75'],
+      ['fee', null, null, null, '-1'],
+    ]],
+  ])('reconciles every row in the sanitized %s activity fixture', (_account, fileName, expected) => {
+    const csv = readFileSync(new URL(`../../fixtures/robinhood/${fileName}`, import.meta.url), 'utf8');
+    const rows = parseRobinhoodActivityCsv(csv);
+
+    expect(rows).toHaveLength(expected.length);
+    expect(rows.every((row) => row.status === 'supported')).toBe(true);
+    expect(rows.map((row) => [
+      row.activity?.type,
+      row.activity?.symbol,
+      row.activity?.quantity,
+      row.activity?.price,
+      row.activity?.amount,
+    ])).toEqual(expected);
+  });
+
   it('handles BOM, quoted commas, decimals, parentheses, and exact transaction codes', () => {
     const rows = parseRobinhoodActivityCsv('\uFEFFActivity Date,Trans Code,Instrument,Quantity,Price,Amount,Description\n01/02/2026,Buy,VTI,1.25,"$100.00","($125.00)","Market buy, limit order"\n01/03/2026,Cash Dividend,VTI,,,"$2.50",Dividend');
     expect(rows[0]).toMatchObject({ status: 'supported', activity: { effectiveDate: '2026-01-02', type: 'buy', symbol: 'VTI', quantity: '1.25', amount: '-125', description: 'Market buy, limit order' } });

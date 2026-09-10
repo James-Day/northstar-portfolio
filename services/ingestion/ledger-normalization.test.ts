@@ -1,8 +1,37 @@
 import { describe, expect, it } from 'vitest';
 import { parseRobinhoodActivityCsv } from '@/services/ingestion/robinhood';
 import { normalizeRobinhoodRowsForLedger } from '@/services/ingestion/ledger-normalization';
+import { readFileSync } from 'node:fs';
 
 describe('Robinhood ledger normalization', () => {
+  it('counts separately reported dividend plus reinvestment buy as one dividend', () => {
+    const csv = readFileSync(new URL('../../fixtures/robinhood/individual-activity.csv', import.meta.url), 'utf8');
+    const rows = parseRobinhoodActivityCsv(csv);
+    const entries = normalizeRobinhoodRowsForLedger(rows, new Map([['VTI', 'instrument-vti']]));
+
+    expect(entries.filter((entry) => entry.entryType === 'dividend')).toHaveLength(1);
+    expect(entries.filter((entry) => entry.entryType === 'buy')).toHaveLength(2);
+    expect(entries.filter((entry) => entry.entryType === 'dividend')[0]).toMatchObject({ cashAmount: '0.24', externalFlow: false });
+    expect(entries.filter((entry) => entry.entryType === 'buy').at(-1)).toMatchObject({ quantity: '0.0008', cashAmount: '-0.24' });
+  });
+
+  it.each([
+    ['traditional IRA', 'traditional-ira-activity.csv', 'SCHD'],
+    ['Roth IRA', 'roth-ira-activity.csv', 'VOO'],
+  ])('preserves %s incentive, transfer, fee, and fractional activity semantics', (_name, fileName, symbol) => {
+    const csv = readFileSync(new URL(`../../fixtures/robinhood/${fileName}`, import.meta.url), 'utf8');
+    const rows = parseRobinhoodActivityCsv(csv);
+    const entries = normalizeRobinhoodRowsForLedger(rows, new Map([[symbol, `instrument-${symbol.toLowerCase()}`]]));
+
+    expect(entries.filter((entry) => entry.entryType === 'dividend')).toHaveLength(1);
+    expect(entries.filter((entry) => entry.entryType === 'drip_buy')).toHaveLength(0);
+    expect(entries.filter((entry) => entry.entryType === 'ira_incentive')).toHaveLength(fileName.startsWith('traditional') ? 1 : 0);
+    expect(entries.filter((entry) => entry.entryType === 'transfer_in')).toHaveLength(fileName.startsWith('roth') ? 1 : 0);
+    expect(entries.filter((entry) => entry.entryType === 'transfer_out')).toHaveLength(fileName.startsWith('roth') ? 1 : 0);
+    expect(entries.filter((entry) => entry.entryType === 'fee')).toHaveLength(1);
+    expect(entries.filter((entry) => entry.entryType === 'deposit')[0].externalFlow).toBe(true);
+  });
+
   it('expands a DRIP into dividend income and a separate cash-neutral buy', () => {
     const rows = parseRobinhoodActivityCsv('Activity Date,Trans Code,Instrument,Quantity,Price,Amount,Description\n2026-01-02,Dividend Reinvestment,VTI,0.01,$200,($2),Reinvested dividend');
     const entries = normalizeRobinhoodRowsForLedger(rows, new Map([['VTI', 'instrument-vti']]));
