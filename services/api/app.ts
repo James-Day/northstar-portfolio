@@ -8,6 +8,7 @@ import { validateCreatePortfolioAccount, type AccountsRepository } from '@/servi
 import { SupabaseAccountsRepository } from '@/services/supabase/accounts-repository';
 import { stageRobinhoodImport, toPersistableImportStage } from '@/services/ingestion/staging';
 import { ImportOperationRejectedError, SupabaseImportsRepository, type ImportsRepository } from '@/services/supabase/imports-repository';
+import type { PriceFreshnessReportRepository } from '@/services/reporting/price-freshness';
 
 export type ApiBindings = {
   APP_ENV?: 'development' | 'staging' | 'production';
@@ -23,6 +24,7 @@ export type ApiDependencies = {
   verifySession?: (request: Request, bindings: ApiBindings) => Promise<AuthenticatedUser | undefined>;
   accountsRepository?: AccountsRepository;
   importsRepository?: ImportsRepository;
+  priceFreshnessRepository?: PriceFreshnessReportRepository;
 };
 
 export function createApi(dependencies: ApiDependencies = {}) {
@@ -34,6 +36,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
     }));
   const accountsRepository = dependencies.accountsRepository;
   const importsRepository = dependencies.importsRepository;
+  const priceFreshnessRepository = dependencies.priceFreshnessRepository;
 
   api.use('*', async (context, next) => {
     const origin = context.req.header('origin');
@@ -84,6 +87,15 @@ export function createApi(dependencies: ApiDependencies = {}) {
     const repository = accountsRepository ?? createAccountsRepository(context.env);
     const account = await repository.create(authenticated.user.id, authenticated.accessToken, input);
     return context.json({ account }, 201);
+  });
+
+  api.get('/v1/accounts/:accountId/price-freshness', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    if (!priceFreshnessRepository) return context.json({ error: 'reporting_unavailable' }, 503);
+    const report = await priceFreshnessRepository.get(context.req.param('accountId'), authenticated.user.id, authenticated.accessToken);
+    if (!report) return context.json({ error: 'not_found' }, 404);
+    return context.json({ report });
   });
 
   api.post('/v1/accounts/:accountId/import-preview', async (context) => {

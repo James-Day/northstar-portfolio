@@ -50,6 +50,17 @@ describe('standalone API', () => {
     await expect(response.json()).resolves.toEqual({ error: 'unauthorized' });
   });
 
+  it('serves an account-scoped freshness report only after session verification', async () => {
+    const get = async (accountId: string, userId: string, token: string) => {
+      expect([accountId, userId, token]).toEqual(['account-123', 'user-123', 'session-token']);
+      return { expectedDate: '2026-07-06' as never, rows: [{ symbol: 'AAPL', expectedDate: '2026-07-06' as never, latestDate: null, status: 'missing' as const }] };
+    };
+    const app = createApi({ verifySession: async () => ({ id: 'user-123' }), priceFreshnessRepository: { get } });
+    const response = await app.request('http://api.test/v1/accounts/account-123/price-freshness', { headers: { authorization: 'Bearer session-token' } });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ report: { expectedDate: '2026-07-06', rows: [{ symbol: 'AAPL', expectedDate: '2026-07-06', latestDate: null, status: 'missing' }] } });
+  });
+
   it('lists accounts only after verifying the caller and carries the same token into the RLS repository', async () => {
     const list = async (userId: string, token: string) => {
       expect(userId).toBe('user-123');

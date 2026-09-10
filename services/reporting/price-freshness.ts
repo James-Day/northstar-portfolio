@@ -2,6 +2,7 @@ import type { InstrumentId, IsoDate } from '@/lib/domain/types';
 import { classifyPriceFreshness, type PriceFreshness } from '@/services/market-data/stale-prices';
 
 export type ReportInstrument = { instrumentId: InstrumentId; symbol: string };
+export type PriceFreshnessReportRepository = { get(accountId: string, userId: string, accessToken: string): Promise<{ expectedDate: IsoDate; rows: PriceFreshness[] } | undefined> };
 
 /** Joins stored latest-close dates to report symbols without embedding storage concerns in the UI. */
 export function buildPriceFreshnessReport(input: { instruments: ReportInstrument[]; expectedDate: IsoDate; latestByInstrument: Record<string, IsoDate | null> }): PriceFreshness[] {
