@@ -27,3 +27,13 @@ test('dashboard demo is clearly labeled as synthetic', async ({ page }) => {
   await expect(page.getByRole('heading', { name: /portfolio example/i })).toBeVisible();
   await expect(page.getByText(/fictional long-term portfolio/i)).toBeVisible();
 });
+
+test('configured dashboard does not render private data while signed out', async ({ page }) => {
+  await page.goto('/dashboard');
+  const privateBoundary = page.getByRole('heading', { name: /sign in to your workspace/i });
+  const demo = page.getByText('Synthetic demo · no account connected');
+  await expect(privateBoundary.or(demo)).toBeVisible();
+  if (await privateBoundary.isVisible()) {
+    await expect(page.getByText(/connected accounts and portfolio reports are private/i)).toBeVisible();
+  }
+});
