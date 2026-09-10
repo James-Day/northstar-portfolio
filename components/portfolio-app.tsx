@@ -44,6 +44,7 @@ import {
   parseRobinhoodCsv,
 } from "@/lib/portfolio";
 import { createPublicSupabaseClient } from "@/services/supabase/client";
+import type { AccountActivity, ActivityPage } from "@/services/supabase/activity-repository";
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
 type PublicApiConfig = { baseUrl: string };
@@ -92,6 +93,7 @@ type LiveImportSummary = {
 type LiveFreshnessReport = { expectedDate: string; rows: Array<{ symbol: string; expectedDate: string; latestDate: string | null; status: 'current' | 'stale' | 'missing' }> };
 type LiveReportHolding = { instrumentId: string; displayName?: string; quantity: string; close: string | null; value: string | null };
 type LiveReportSnapshot = { asOfDate: string; payload: { totalValue: string | null; cash: string | null; timeWeightedReturn: string | null; netDeposits?: string | null; dividendIncome?: string | null; realizedGainLoss?: string | null; valueHistory?: Array<{ date: string; value: string | null }>; activityCoveredThrough: string | null; pricesThrough: string | null; holdings: LiveReportHolding[] } };
+type LiveActivityPage = ActivityPage;
 
 const fmt = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -177,6 +179,11 @@ export function PortfolioApp({
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string>();
   const [reportRequestVersion, setReportRequestVersion] = useState(0);
+  const [activityPage, setActivityPage] = useState<LiveActivityPage>();
+  const [activityOffset, setActivityOffset] = useState(0);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState<string>();
+  const [activityRequestVersion, setActivityRequestVersion] = useState(0);
 
   useEffect(() => {
     if (!client) return;
@@ -299,6 +306,36 @@ export function PortfolioApp({
     }).catch((error) => { if (active) { setReportSnapshot(undefined); setReportError(error instanceof Error ? error.message : 'The persisted report is unavailable.'); } }).finally(() => { if (active) setReportLoading(false); });
     return () => { active = false; };
   }, [apiConfig, client, selectedAccountId, userId, reportRequestVersion]);
+
+  useEffect(() => {
+    if (!client || !apiConfig || !userId || !selectedAccountId) {
+      setActivityPage(undefined);
+      setActivityError(undefined);
+      setActivityLoading(false);
+      setActivityOffset(0);
+      return;
+    }
+    let active = true;
+    setActivityLoading(true);
+    setActivityError(undefined);
+    void client.auth.getSession().then(async ({ data }) => {
+      if (!data.session?.access_token) throw new Error('Your sign-in session has expired.');
+      const url = new URL(`${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/activity`);
+      url.searchParams.set('limit', '25');
+      url.searchParams.set('offset', String(activityOffset));
+      const response = await fetch(url, { headers: { authorization: `Bearer ${data.session.access_token}` } });
+      const payload: unknown = await response.json();
+      if (!response.ok) throw new Error(payload && typeof payload === 'object' && 'error' in payload ? String(payload.error).replaceAll('_', ' ') : 'Activity data is unavailable.');
+      if (!payload || typeof payload !== 'object' || !('activity' in payload)) throw new Error('Activity data is unavailable.');
+      if (active) setActivityPage((payload as { activity: LiveActivityPage }).activity);
+    }).catch((error) => {
+      if (active) {
+        setActivityPage(undefined);
+        setActivityError(error instanceof Error ? error.message : 'Activity data is unavailable.');
+      }
+    }).finally(() => { if (active) setActivityLoading(false); });
+    return () => { active = false; };
+  }, [apiConfig, client, selectedAccountId, userId, activityOffset, activityRequestVersion]);
 
   async function createAccount(input: {
     name: string;
@@ -502,6 +539,7 @@ export function PortfolioApp({
             : "The server could not commit this import.",
         );
       setHistoryVersion((current) => current + 1);
+      setActivityRequestVersion((current) => current + 1);
       setStagedImportId(undefined);
       setStageMessage(
         "Import committed. Your reporting data will update after price and report processing are connected.",
@@ -545,6 +583,7 @@ export function PortfolioApp({
           : "This import could not be undone.",
       );
     setHistoryVersion((current) => current + 1);
+    setActivityRequestVersion((current) => current + 1);
   }
 
   async function discardLiveImport() {
@@ -670,7 +709,16 @@ export function PortfolioApp({
             <Overview summary={summary} onUpload={openFileChooser} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} onRetryFreshness={() => setFreshnessRequestVersion((value) => value + 1)} reportSnapshot={reportSnapshot} reportLoading={reportLoading} reportError={reportError} onRetryReport={() => setReportRequestVersion((value) => value + 1)} accounts={accounts} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} isLiveAccount={Boolean(client && userId && selectedAccountId)} />
           )}
           {active === "Activity" && (
-            <ActivityPanel onUpload={openFileChooser} isLiveAccount={Boolean(client && userId)} />
+            <ActivityPanel
+              onUpload={openFileChooser}
+              isLiveAccount={Boolean(client && userId && selectedAccountId)}
+              activityPage={activityPage}
+              isLoading={activityLoading}
+              loadError={activityError}
+              onRetry={() => setActivityRequestVersion((value) => value + 1)}
+              onPrevious={() => setActivityOffset((value) => Math.max(0, value - 25))}
+              onNext={() => setActivityOffset((value) => value + 25)}
+            />
           )}
           {active === "Accounts" && (
             <Accounts
@@ -942,8 +990,76 @@ function Holdings({ liveHoldings, isLiveAccount }: { liveHoldings?: LiveReportHo
   );
 }
 
-function ActivityPanel({ onUpload, isLiveAccount }: { onUpload: () => void; isLiveAccount: boolean }) {
-  if (isLiveAccount) return <><div className="mb-8 flex items-end justify-between"><div><Pill tone="green">Your account</Pill><h1 className="mt-3 text-3xl font-bold tracking-tight">Activity</h1></div><Button onClick={onUpload} className="rounded-xl bg-[#185da8] text-white"><Plus size={16} />Import CSV</Button></div><section className="grid min-h-80 place-items-center rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><div><Clock3 className="mx-auto text-[#185da8]" size={28} /><h2 className="mt-5 text-xl font-bold">Activity details are being prepared</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">Your imported activity will appear here after the report activity reader is connected. The dashboard will not substitute synthetic transactions for your account.</p></div></section></>;
+function ActivityPanel({
+  onUpload,
+  isLiveAccount,
+  activityPage,
+  isLoading,
+  loadError,
+  onRetry,
+  onPrevious,
+  onNext,
+}: {
+  onUpload: () => void;
+  isLiveAccount: boolean;
+  activityPage?: LiveActivityPage;
+  isLoading: boolean;
+  loadError?: string;
+  onRetry: () => void;
+  onPrevious: () => void;
+  onNext: () => void;
+}) {
+  if (isLiveAccount) return (
+    <>
+      <div className="mb-8 flex items-end justify-between">
+        <div>
+          <Pill tone="green">Your account</Pill>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight">Activity</h1>
+          <p className="mt-2 text-sm text-slate-500">Imported ledger entries from your selected account.</p>
+        </div>
+        <Button onClick={onUpload} className="rounded-xl bg-[#185da8] text-white"><Plus size={16} />Import CSV</Button>
+      </div>
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        {loadError && (
+          <div role="alert" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
+            <span>{loadError}</span>
+            <Button onClick={onRetry} className="rounded-lg bg-white text-rose-700 hover:bg-rose-100">Retry</Button>
+          </div>
+        )}
+        {isLoading && !activityPage ? (
+          <div className="grid min-h-64 place-items-center text-center">
+            <div><Clock3 className="mx-auto animate-pulse text-[#185da8]" size={28} /><p className="mt-4 text-sm text-slate-500">Loading your activity…</p></div>
+          </div>
+        ) : activityPage && activityPage.items.length > 0 ? (
+          <>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <p className="text-sm text-slate-500">Showing entries {activityPage.offset + 1}–{activityPage.offset + activityPage.items.length}{isLoading ? " · Updating…" : ""}</p>
+              <p className="text-xs text-slate-400">Source rows remain available for review</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left">
+                <thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400">
+                  <tr><th className="pb-3">Date</th><th className="pb-3">Activity</th><th className="pb-3">Instrument</th><th className="pb-3">Details</th><th className="pb-3">Source</th><th className="pb-3 text-right">Amount</th></tr>
+                </thead>
+                <tbody>
+                  {activityPage.items.map((item) => <LiveActivityRow key={item.id} item={item} />)}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
+              <Button disabled={activityPage.offset === 0 || isLoading} onClick={onPrevious} className="rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50">Previous</Button>
+              <span className="text-xs font-semibold text-slate-400">Page {Math.floor(activityPage.offset / activityPage.limit) + 1}</span>
+              <Button disabled={!activityPage.hasMore || isLoading} onClick={onNext} className="rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50">Next</Button>
+            </div>
+          </>
+        ) : loadError ? null : (
+          <div className="grid min-h-64 place-items-center text-center">
+            <div><Clock3 className="mx-auto text-[#185da8]" size={28} /><h2 className="mt-5 text-xl font-bold">No imported activity yet</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">Import a Robinhood activity CSV to populate this account’s ledger.</p><Button onClick={onUpload} className="mt-5 rounded-xl bg-[#185da8] text-white"><Plus size={16} />Import CSV</Button></div>
+          </div>
+        )}
+      </section>
+    </>
+  );
   return (
     <>
       <div className="mb-8 flex items-end justify-between">
@@ -1011,6 +1127,21 @@ function ActivityPanel({ onUpload, isLiveAccount }: { onUpload: () => void; isLi
         </div>
       </section>
     </>
+  );
+}
+
+function LiveActivityRow({ item }: { item: AccountActivity }) {
+  const amount = Number(item.cashAmount);
+  const entryType = item.entryType.replaceAll("_", " ");
+  return (
+    <tr className="border-b border-slate-50 last:border-0">
+      <td className="py-4 text-sm text-slate-500">{item.effectiveDate}</td>
+      <td className="py-4"><Pill tone={item.entryType === "dividend" ? "green" : "slate"}>{entryType}</Pill></td>
+      <td className="py-4 text-sm font-semibold">{item.instrumentId ? `${item.instrumentId.slice(0, 8)}…` : "Cash"}</td>
+      <td className="py-4 text-sm text-slate-500">{item.description}</td>
+      <td className="py-4 text-xs text-slate-400">{item.sourceRow ? `Row ${item.sourceRow.rowNumber}` : "System entry"}</td>
+      <td className={`py-4 text-right text-sm font-bold ${amount >= 0 ? "text-emerald-600" : "text-slate-700"}`}>{amount >= 0 ? "+" : ""}{precise.format(amount)}</td>
+    </tr>
   );
 }
 
