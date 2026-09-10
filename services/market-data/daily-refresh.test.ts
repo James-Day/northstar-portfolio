@@ -25,6 +25,14 @@ describe('daily price refresh preparation', () => {
     expect(getDailyPrices).not.toHaveBeenCalled();
   });
 
+  it('does not spend provider quota when the durable monthly cap would be exceeded', async () => {
+    const getDailyPrices = vi.fn();
+    const provider: DailyPriceProvider = { getDailyPrices };
+    const quota = { monthlyCap: 100, getUsedUnits: vi.fn().mockResolvedValue(99) };
+    await expect(prepareDailyPriceRefresh(new Date('2026-07-06T22:00:00.000Z'), ['AAPL', 'VTI'], provider, quota)).resolves.toEqual({ status: 'skipped', reason: 'quota_exhausted' });
+    expect(getDailyPrices).not.toHaveBeenCalled();
+  });
+
   it('rejects incomplete, duplicate, off-date, and unrequested provider results', async () => {
     const provider: DailyPriceProvider = { getDailyPrices: vi.fn().mockResolvedValue([price('AAPL')]) };
     await expect(prepareDailyPriceRefresh(new Date('2026-07-06T22:00:00.000Z'), ['AAPL', 'VTI'], provider)).rejects.toThrow('VTI');

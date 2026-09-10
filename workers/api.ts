@@ -8,11 +8,13 @@ import { SupabaseMarketDataJobRunsRepository } from '@/services/supabase/market-
 function scheduledDependencies(environment: ApiBindings) {
   if (!environment.SUPABASE_URL || !environment.SUPABASE_SERVICE_ROLE_KEY || !environment.MARKETSTACK_API_KEY) throw new Error('Scheduled pricing requires SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and MARKETSTACK_API_KEY secrets.');
   const cap = Number(environment.MARKETSTACK_MONTHLY_CAP ?? '100');
+  const recorder = new SupabaseMarketDataJobRunsRepository({ supabaseUrl: environment.SUPABASE_URL, serviceRoleKey: environment.SUPABASE_SERVICE_ROLE_KEY });
   return {
     symbols: new SupabaseActiveSymbolsRepository({ supabaseUrl: environment.SUPABASE_URL, serviceRoleKey: environment.SUPABASE_SERVICE_ROLE_KEY }),
     provider: new MarketstackProvider({ apiKey: environment.MARKETSTACK_API_KEY, requestBudget: new MonthlyRequestBudget(cap) }),
     persistence: new SupabaseDailyPricesRepository({ supabaseUrl: environment.SUPABASE_URL, serviceRoleKey: environment.SUPABASE_SERVICE_ROLE_KEY }),
-    recorder: new SupabaseMarketDataJobRunsRepository({ supabaseUrl: environment.SUPABASE_URL, serviceRoleKey: environment.SUPABASE_SERVICE_ROLE_KEY }),
+    recorder,
+    quota: { monthlyCap: cap, getUsedUnits: (now: Date) => recorder.getMonthlyQuotaUsage(now) },
   };
 }
 
