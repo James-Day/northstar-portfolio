@@ -7,5 +7,6 @@ describe('Supabase report snapshot reader', () => {
     const reader = new SupabaseReportSnapshotReader({ supabaseUrl: 'https://supabase.test', anonKey: 'public-key', fetcher: fetcher as typeof fetch });
     await expect(reader.getLatest('33333333-3333-4333-8333-333333333333', 'user-token')).resolves.toMatchObject({ asOfDate: '2026-07-06', payload: { totalValue: '100' } });
     expect(fetcher.mock.calls[0][1].headers.authorization).toBe('Bearer user-token');
+    expect(String(fetcher.mock.calls[0][0])).toContain('order=as_of_date.desc%2Cpublished_at.desc%2Cid.desc');
   });
 });

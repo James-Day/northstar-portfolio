@@ -15,7 +15,9 @@ export class SupabaseReportSnapshotReader {
     url.searchParams.set('select', 'id,user_id,account_id,report_type,as_of_date,import_state_revision,price_revision_id,payload,published_at');
     url.searchParams.set('account_id', 'eq.' + accountId);
     url.searchParams.set('report_type', 'eq.account_daily');
-    url.searchParams.set('order', 'as_of_date.desc,published_at.desc');
+    // Date is the report’s visible chronology; publication time selects the
+    // newest dependency revision on that date and id breaks timestamp ties.
+    url.searchParams.set('order', 'as_of_date.desc,published_at.desc,id.desc');
     url.searchParams.set('limit', '1');
     const response = await this.fetcher(url, { headers: { apikey: this.options.anonKey, authorization: `Bearer ${accessToken}` } });
     if (!response.ok) throw new Error(`Supabase report snapshot query failed with HTTP ${response.status}.`);
