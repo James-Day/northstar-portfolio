@@ -24,7 +24,7 @@ export type OutboxDispatchResult = {
   skipped: number;
 };
 
-type SupportedPayload = { accountId: string; importId?: string; requestedBy?: string };
+type SupportedPayload = { accountId: string; importId?: string; requestedBy?: string; tradingDate?: string; instrumentId?: string; priceRevisionId?: string };
 
 function payloadForEvent(event: OutboxRecord): SupportedPayload | undefined {
   if (typeof event.payload !== 'object' || event.payload === null) return undefined;
@@ -34,6 +34,9 @@ function payloadForEvent(event: OutboxRecord): SupportedPayload | undefined {
     accountId: payload.accountId,
     importId: typeof payload.importId === 'string' ? payload.importId : undefined,
     requestedBy: typeof payload.requestedBy === 'string' ? payload.requestedBy : undefined,
+    tradingDate: typeof payload.tradingDate === 'string' ? payload.tradingDate : undefined,
+    instrumentId: typeof payload.instrumentId === 'string' ? payload.instrumentId : undefined,
+    priceRevisionId: typeof payload.priceRevisionId === 'string' ? payload.priceRevisionId : undefined,
   };
 }
 
@@ -43,7 +46,7 @@ function backoff(attempts: number, now: Date): string {
 }
 
 /**
- * Claims transactional outbox rows and translates only known import events to
+ * Claims transactional outbox rows and translates known activity/price events to
  * account-owned report jobs. The queue publisher receives a stable outbox key
  * so a provider adapter can deduplicate retries. A row is completed only after
  * publish succeeds; failures remain retryable until maxAttempts is reached.
@@ -75,7 +78,7 @@ export async function dispatchOutbox(input: {
     }
     seen.add(event.id);
     const payload = payloadForEvent(event);
-    const reason = event.eventType === 'import.committed' ? 'import_committed' : event.eventType === 'import.undone' ? 'import_undone' : undefined;
+    const reason = event.eventType === 'import.committed' ? 'import_committed' : event.eventType === 'import.undone' ? 'import_undone' : event.eventType === 'price.updated' ? 'price_updated' : undefined;
     if (!payload || !reason) {
       await finishFailure(`Unsupported outbox event: ${event.eventType}.`);
       continue;

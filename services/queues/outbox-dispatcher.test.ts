@@ -15,6 +15,14 @@ describe('transactional outbox dispatcher', () => {
     expect(repo.complete).toHaveBeenCalledWith('event-1');
   });
 
+  it('dispatches a price update as an idempotent account-owned report job', async () => {
+    const repo = repository([{ id: 'price-event-1', eventType: 'price.updated', payload: { accountId: 'account-1', instrumentId: 'instrument-1', tradingDate: '2026-07-06', priceRevisionId: 'revision-1' }, attempts: 1 }]);
+    const publish = vi.fn().mockResolvedValue(undefined);
+    await expect(dispatchOutbox({ repository: repo, publish, now })).resolves.toEqual({ claimed: 1, dispatched: 1, retried: 0, failed: 0, skipped: 0 });
+    expect(publish).toHaveBeenCalledWith({ kind: 'report.recompute', accountId: 'account-1', requestedBy: 'user-1', reason: 'price_updated' }, 'job-outbox:price-event-1');
+    expect(repo.complete).toHaveBeenCalledWith('price-event-1');
+  });
+
   it('leaves publication failures retryable and never completes the row', async () => {
     const repo = repository([{ id: 'event-1', eventType: 'import.undone', payload: { accountId: 'account-1' }, attempts: 2 }]);
     const fail = repo.fail as ReturnType<typeof vi.fn>;
