@@ -664,7 +664,7 @@ export function PortfolioApp({
             <Overview summary={summary} onUpload={openFileChooser} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} onRetryFreshness={() => setFreshnessRequestVersion((value) => value + 1)} reportSnapshot={reportSnapshot} reportLoading={reportLoading} reportError={reportError} onRetryReport={() => setReportRequestVersion((value) => value + 1)} accounts={accounts} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} isLiveAccount={Boolean(client && userId && selectedAccountId)} />
           )}
           {active === "Activity" && (
-            <ActivityPanel onUpload={openFileChooser} />
+            <ActivityPanel onUpload={openFileChooser} isLiveAccount={Boolean(client && userId)} />
           )}
           {active === "Accounts" && (
             <Accounts
@@ -934,7 +934,8 @@ function Holdings({ liveHoldings, isLiveAccount }: { liveHoldings?: LiveReportHo
   );
 }
 
-function ActivityPanel({ onUpload }: { onUpload: () => void }) {
+function ActivityPanel({ onUpload, isLiveAccount }: { onUpload: () => void; isLiveAccount: boolean }) {
+  if (isLiveAccount) return <><div className="mb-8 flex items-end justify-between"><div><Pill tone="green">Your account</Pill><h1 className="mt-3 text-3xl font-bold tracking-tight">Activity</h1></div><Button onClick={onUpload} className="rounded-xl bg-[#185da8] text-white"><Plus size={16} />Import CSV</Button></div><section className="grid min-h-80 place-items-center rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center"><div><Clock3 className="mx-auto text-[#185da8]" size={28} /><h2 className="mt-5 text-xl font-bold">Activity details are being prepared</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">Your imported activity will appear here after the report activity reader is connected. The dashboard will not substitute synthetic transactions for your account.</p></div></section></>;
   return (
     <>
       <div className="mb-8 flex items-end justify-between">
