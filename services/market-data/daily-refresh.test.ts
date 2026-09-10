@@ -62,9 +62,14 @@ describe('daily price refresh preparation', () => {
     expect(ledger.reconcile).not.toHaveBeenCalled();
   });
 
-  it('rejects incomplete, duplicate, off-date, and unrequested provider results', async () => {
+  it('treats incomplete provider results as delayed publication without persisting', async () => {
     const provider: DailyPriceProvider = { getDailyPrices: vi.fn().mockResolvedValue([price('AAPL')]) };
-    await expect(prepareDailyPriceRefresh(new Date('2026-07-06T22:00:00.000Z'), ['AAPL', 'VTI'], provider)).rejects.toThrow('VTI');
+    await expect(runDailyPriceRefreshWithRetry(new Date('2026-07-06T22:00:00.000Z'), ['AAPL', 'VTI'], provider, { persist: vi.fn() })).resolves.toEqual({ status: 'skipped', reason: 'provider_data_pending' });
+  });
+
+  it('rejects duplicate, off-date, and unrequested provider results', async () => {
+    const provider: DailyPriceProvider = { getDailyPrices: vi.fn().mockResolvedValue([{ ...price('AAPL'), ...{ tradingDate: '2026-07-07' as never } }]) };
+    await expect(prepareDailyPriceRefresh(new Date('2026-07-06T22:00:00.000Z'), ['AAPL'], provider)).rejects.toThrow('not requested date');
   });
 
   it('persists one complete shared-symbol batch after the session guard', async () => {

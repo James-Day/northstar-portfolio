@@ -5,7 +5,7 @@ import { RefreshMetricsCollector } from '@/services/market-data/refresh-metrics'
 import type { MarketDataQuotaLedger, QuotaReservation } from '@/services/market-data/quota';
 
 export type DailyRefreshResult =
-  | { status: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'quota_exhausted' }
+  | { status: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'quota_exhausted' | 'provider_data_pending' }
   | { status: 'ready_to_persist'; tradingDate: IsoDate; requestedSymbols: string[]; prices: DailyPrice[] };
 
 export type DailyPricePersistence = {
@@ -14,12 +14,12 @@ export type DailyPricePersistence = {
 };
 
 export type DailyRefreshJobResult =
-  | { status: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'quota_exhausted' }
+  | { status: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'quota_exhausted' | 'provider_data_pending' }
   | { status: 'persisted'; tradingDate: IsoDate; requestedSymbols: string[]; upserted: number };
 
 export type DailyRefreshRetryOptions = { maxAttempts?: number; baseDelayMs?: number; sleep?: (milliseconds: number) => Promise<void> };
 export type DailyRefreshEvent =
-  | { type: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'quota_exhausted' }
+  | { type: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'quota_exhausted' | 'provider_data_pending' }
   | { type: 'attempt'; attempt: number; maxAttempts: number; symbolCount: number }
   /** Emitted only immediately before a provider call, after all skip guards pass. */
   | { type: 'requested'; symbolCount: number }
@@ -38,6 +38,15 @@ export type DailyQuotaGuard = {
   ledger?: MarketDataQuotaLedger;
   idempotencyKeyPrefix?: string;
 };
+
+export class DailyPricePublicationPendingError extends Error {
+  readonly missingSymbols: string[];
+  constructor(missingSymbols: string[]) {
+    super(`Daily close is not published for: ${missingSymbols.join(', ')}.`);
+    this.name = 'DailyPricePublicationPendingError';
+    this.missingSymbols = missingSymbols;
+  }
+}
 
 /** Optional durable cache lookup used to avoid re-requesting a completed EOD close. */
 export type DailyPriceCache = { getMissingSymbols(symbols: string[], tradingDate: IsoDate): Promise<string[]> };
@@ -147,6 +156,10 @@ export async function runDailyPriceRefreshWithRetry(
       else telemetry?.record({ type: 'persisted', tradingDate: result.tradingDate, symbolCount: result.requestedSymbols.length, upserted: result.upserted });
       return result;
     } catch (error) {
+      if (error instanceof DailyPricePublicationPendingError) {
+        telemetry?.record({ type: 'skipped', reason: 'provider_data_pending' });
+        return { status: 'skipped', reason: 'provider_data_pending' };
+      }
       const message = error instanceof Error ? error.message : 'Daily refresh failed.';
       telemetry?.record({ type: 'failed', attempt, maxAttempts, message });
       if (attempt >= maxAttempts) throw error;
@@ -212,5 +225,5 @@ function validateProviderResponse(prices: DailyPrice[], requestedSymbols: string
     returned.add(price.symbol);
   }
   const missing = requestedSymbols.filter((symbol) => !returned.has(symbol));
-  if (missing.length > 0) throw new Error(`Provider returned no daily close for: ${missing.join(', ')}.`);
+  if (missing.length > 0) throw new DailyPricePublicationPendingError(missing);
 }

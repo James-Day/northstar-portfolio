@@ -98,4 +98,10 @@ describe("refresh operational alerts", () => {
       }),
     ).toEqual([expect.objectContaining({ kind: "partial_persistence" })]);
   });
+
+  it("distinguishes delayed publication from a provider outage", () => {
+    expect(classifyRefreshAlerts({ status: "skipped", failedAttempts: 0, requestedSymbols: 2, persistedRows: 0, publicationPendingSymbols: 2 })).toEqual([
+      expect.objectContaining({ kind: "publication_pending", severity: "warning" }),
+    ]);
+  });
 });

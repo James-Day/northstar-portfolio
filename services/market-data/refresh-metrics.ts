@@ -22,6 +22,7 @@ export type RefreshOperationalAlert = {
   kind:
     | "provider_failure"
     | "quota_exhausted"
+    | "publication_pending"
     | "partial_persistence"
     | "stale_prices";
   severity: "warning" | "critical";
@@ -37,6 +38,7 @@ export function classifyRefreshAlerts(input: {
   persistedRows: number;
   quotaExhausted?: boolean;
   staleSymbols?: number;
+  publicationPendingSymbols?: number;
 }): RefreshOperationalAlert[] {
   const alerts: RefreshOperationalAlert[] = [];
   if (input.status === "failed" && input.failedAttempts > 0)
@@ -52,6 +54,12 @@ export function classifyRefreshAlerts(input: {
       severity: "critical",
       message:
         "The monthly market-data quota is exhausted; no additional provider calls will be attempted.",
+      });
+  if ((input.publicationPendingSymbols ?? 0) > 0)
+    alerts.push({
+      kind: "publication_pending",
+      severity: "warning",
+      message: `${input.publicationPendingSymbols} symbol(s) have not published a daily close yet; valuation remains unavailable for that date.`,
     });
   if (
     input.status === "persisted" &&
