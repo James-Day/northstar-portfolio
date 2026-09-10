@@ -170,9 +170,11 @@ export function PortfolioApp({
   const [freshnessReport, setFreshnessReport] = useState<LiveFreshnessReport>();
   const [freshnessLoading, setFreshnessLoading] = useState(false);
   const [freshnessError, setFreshnessError] = useState<string>();
+  const [freshnessRequestVersion, setFreshnessRequestVersion] = useState(0);
   const [reportSnapshot, setReportSnapshot] = useState<LiveReportSnapshot>();
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string>();
+  const [reportRequestVersion, setReportRequestVersion] = useState(0);
 
   useEffect(() => {
     if (!client) return;
@@ -273,7 +275,7 @@ export function PortfolioApp({
       if (active && payload && typeof payload === 'object' && 'report' in payload) setFreshnessReport((payload as { report: LiveFreshnessReport }).report);
     }).catch((error) => { if (active) setFreshnessError(error instanceof Error ? error.message : 'Freshness data is unavailable.'); }).finally(() => { if (active) setFreshnessLoading(false); });
     return () => { active = false; };
-  }, [apiConfig, client, selectedAccountId, userId]);
+  }, [apiConfig, client, selectedAccountId, userId, freshnessRequestVersion]);
 
   useEffect(() => {
     if (!client || !apiConfig || !userId || !selectedAccountId) { setReportSnapshot(undefined); return; }
@@ -289,7 +291,7 @@ export function PortfolioApp({
       if (active) setReportSnapshot((payload as { snapshot: LiveReportSnapshot }).snapshot);
     }).catch((error) => { if (active) { setReportSnapshot(undefined); setReportError(error instanceof Error ? error.message : 'The persisted report is unavailable.'); } }).finally(() => { if (active) setReportLoading(false); });
     return () => { active = false; };
-  }, [apiConfig, client, selectedAccountId, userId]);
+  }, [apiConfig, client, selectedAccountId, userId, reportRequestVersion]);
 
   async function createAccount(input: {
     name: string;
@@ -659,7 +661,7 @@ export function PortfolioApp({
             <Menu size={18} />
           </button>
           {active === "Overview" && (
-            <Overview summary={summary} onUpload={openFileChooser} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} reportSnapshot={reportSnapshot} reportLoading={reportLoading} reportError={reportError} accounts={accounts} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} />
+            <Overview summary={summary} onUpload={openFileChooser} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} onRetryFreshness={() => setFreshnessRequestVersion((value) => value + 1)} reportSnapshot={reportSnapshot} reportLoading={reportLoading} reportError={reportError} onRetryReport={() => setReportRequestVersion((value) => value + 1)} accounts={accounts} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} />
           )}
           {active === "Activity" && (
             <ActivityPanel onUpload={openFileChooser} />
@@ -722,9 +724,11 @@ function Overview({
   freshnessReport,
   freshnessLoading,
   freshnessError,
+  onRetryFreshness,
   reportSnapshot,
   reportLoading,
   reportError,
+  onRetryReport,
   accounts,
   selectedAccountId,
   onSelectAccount,
@@ -734,9 +738,11 @@ function Overview({
   freshnessReport?: LiveFreshnessReport;
   freshnessLoading: boolean;
   freshnessError?: string;
+  onRetryFreshness: () => void;
   reportSnapshot?: LiveReportSnapshot;
   reportLoading: boolean;
   reportError?: string;
+  onRetryReport: () => void;
   accounts: LiveAccount[];
   selectedAccountId?: string;
   onSelectAccount: (accountId: string) => void;
@@ -775,11 +781,11 @@ function Overview({
             {freshnessError && <Pill tone="gold">Unavailable</Pill>}
             {freshnessReport && !freshnessLoading && <div className="flex gap-2 text-xs font-semibold"><Pill tone="green">{freshnessReport.rows.filter((row) => row.status === "current").length} current</Pill><Pill tone="gold">{freshnessReport.rows.filter((row) => row.status === "stale").length} stale</Pill><Pill>{freshnessReport.rows.filter((row) => row.status === "missing").length} missing</Pill></div>}
           </div>
-          {freshnessError && <p className="mt-3 text-sm text-amber-800">{freshnessError}</p>}
+          {freshnessError && <div className="mt-3 flex flex-wrap items-center gap-3"><p className="text-sm text-amber-800">{freshnessError}</p><button type="button" onClick={onRetryFreshness} className="text-sm font-bold text-[#185da8] underline underline-offset-2">Retry</button></div>}
         </section>
       )}
       {reportLoading && <section className="mb-7 rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-500 shadow-sm">Loading your persisted report…</section>}
-      {reportError && <section role="alert" className="mb-7 rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">{reportError}</section>}
+      {reportError && <section role="alert" className="mb-7 flex flex-wrap items-center gap-3 rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800"><span>{reportError}</span><button type="button" onClick={onRetryReport} className="font-bold underline underline-offset-2">Retry</button></section>}
       {!reportLoading && !reportError && hasLiveReport && reportSnapshot?.payload.totalValue === null && <section className="mb-7 rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">Your report has incomplete price coverage, so portfolio value is temporarily unavailable.</section>}
       <div className="mb-7 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,.85fr)]">
         <section className="overflow-hidden rounded-3xl bg-[#152b4a] p-6 text-white shadow-[0_18px_55px_rgba(21,43,74,.16)] md:p-8">
