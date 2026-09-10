@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { SupabaseImportsRepository } from '@/services/supabase/imports-repository';
+import { ImportCommitRejectedError, SupabaseImportsRepository } from '@/services/supabase/imports-repository';
 import { stageRobinhoodImport, toPersistableImportStage } from '@/services/ingestion/staging';
 
 describe('Supabase imports repository', () => {
@@ -47,5 +47,27 @@ describe('Supabase imports repository', () => {
 
     await expect(repository.get('import-id', 'user-token')).resolves.toMatchObject({ import: { id: 'import-id' }, sourceRows: [{ rowNumber: 2, status: 'supported' }] });
     expect(fetcher.mock.calls[1][0].pathname).toBe('/rest/v1/import_source_rows');
+  });
+
+  it('uses the commit RPC, then returns the RLS-scoped committed import summary', async () => {
+    const committedSummary = { ...summary, status: 'committed' };
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify('import-id')))
+      .mockResolvedValueOnce(new Response(JSON.stringify([committedSummary])))
+      .mockResolvedValueOnce(new Response(JSON.stringify([])));
+    const repository = new SupabaseImportsRepository({ supabaseUrl: 'https://project.supabase.co', supabaseAnonKey: 'anon-key', fetcher });
+
+    await expect(repository.commit('import-id', 'user-token')).resolves.toMatchObject({ id: 'import-id', status: 'committed' });
+    const [url, init] = fetcher.mock.calls[0];
+    expect(url.pathname).toBe('/rest/v1/rpc/commit_import');
+    expect(init.headers).toMatchObject({ authorization: 'Bearer user-token' });
+    expect(JSON.parse(init.body)).toEqual({ p_import_id: 'import-id' });
+  });
+
+  it('turns a rejected database commit into a safe review conflict', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ message: 'Resolve invalid rows.' }), { status: 400 }));
+    const repository = new SupabaseImportsRepository({ supabaseUrl: 'https://project.supabase.co', supabaseAnonKey: 'anon-key', fetcher });
+
+    await expect(repository.commit('import-id', 'user-token')).rejects.toBeInstanceOf(ImportCommitRejectedError);
   });
 });

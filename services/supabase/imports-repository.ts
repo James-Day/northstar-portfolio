@@ -32,6 +32,7 @@ export type ImportsRepository = {
   list(accountId: string, accessToken: string): Promise<ImportSummary[]>;
   get(importId: string, accessToken: string): Promise<ImportReviewDetail | undefined>;
   discard(importId: string, accessToken: string): Promise<ImportSummary | undefined>;
+  commit(importId: string, accessToken: string): Promise<ImportSummary | undefined>;
 };
 
 export type SupabaseImportsRepositoryOptions = {
@@ -39,6 +40,14 @@ export type SupabaseImportsRepositoryOptions = {
   supabaseAnonKey: string;
   fetcher?: typeof fetch;
 };
+
+/** A review-ready import can still be rejected atomically when its stored rows are invalid. */
+export class ImportCommitRejectedError extends Error {
+  constructor() {
+    super('This import cannot be committed until its review issues are resolved.');
+    this.name = 'ImportCommitRejectedError';
+  }
+}
 
 /** The user token is intentionally forwarded so import RLS verifies account ownership. */
 export class SupabaseImportsRepository implements ImportsRepository {
@@ -141,6 +150,21 @@ export class SupabaseImportsRepository implements ImportsRepository {
     const rows: unknown = await response.json();
     if (!Array.isArray(rows)) throw new Error('Supabase import discard returned an invalid result.');
     return rows[0] ? toImportSummary(rows[0]) : undefined;
+  }
+
+  async commit(importId: string, accessToken: string): Promise<ImportSummary | undefined> {
+    const rpcUrl = new URL('/rest/v1/rpc/commit_import', this.baseUrl);
+    const response = await this.fetcher(rpcUrl, {
+      method: 'POST',
+      headers: { apikey: this.options.supabaseAnonKey, authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ p_import_id: importId }),
+    });
+    if (response.status === 403 || response.status === 404) return undefined;
+    if (response.status === 400 || response.status === 409) throw new ImportCommitRejectedError();
+    if (!response.ok) throw new Error(`Supabase import commit failed with HTTP ${response.status}.`);
+    const committedId: unknown = await response.json();
+    if (typeof committedId !== 'string') throw new Error('Supabase import commit returned an invalid import ID.');
+    return this.get(committedId, accessToken).then((detail) => detail?.import);
   }
 }
 

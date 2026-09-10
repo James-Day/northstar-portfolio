@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createApi } from '@/services/api/app';
+import { ImportCommitRejectedError } from '@/services/supabase/imports-repository';
 
 describe('standalone API', () => {
   it('serves a deployment-safe health response without exposing bindings', async () => {
@@ -90,7 +91,7 @@ describe('standalone API', () => {
     const app = createApi({
       verifySession: async () => ({ id: 'user-123' }),
       accountsRepository: { list: async () => [], get: async () => account, create: async () => account },
-      importsRepository: { hasFileHash, stage: async () => { throw new Error('unused'); }, list: async () => [], get: async () => undefined, discard: async () => undefined },
+      importsRepository: { hasFileHash, stage: async () => { throw new Error('unused'); }, list: async () => [], get: async () => undefined, discard: async () => undefined, commit: async () => undefined },
     });
 
     const response = await app.request(`http://api.test/v1/accounts/${account.id}/import-preview`, {
@@ -107,7 +108,7 @@ describe('standalone API', () => {
     const app = createApi({
       verifySession: async () => ({ id: 'user-123' }),
       accountsRepository: { list: async () => [], get: async () => undefined, create: async () => { throw new Error('unused'); } },
-      importsRepository: { hasFileHash: async () => { throw new Error('must not query imports'); }, stage: async () => { throw new Error('must not stage imports'); }, list: async () => [], get: async () => undefined, discard: async () => undefined },
+      importsRepository: { hasFileHash: async () => { throw new Error('must not query imports'); }, stage: async () => { throw new Error('must not stage imports'); }, list: async () => [], get: async () => undefined, discard: async () => undefined, commit: async () => undefined },
     });
 
     const response = await app.request('http://api.test/v1/accounts/another-user-account/import-preview', { method: 'POST', headers: { authorization: 'Bearer session-token', 'content-type': 'text/csv' }, body: 'Activity Date,Trans Code,Amount\n2026-01-02,Interest,$2' });
@@ -125,7 +126,7 @@ describe('standalone API', () => {
     const app = createApi({
       verifySession: async () => ({ id: 'user-123' }),
       accountsRepository: { list: async () => [], get: async () => account, create: async () => account },
-      importsRepository: { hasFileHash: async () => false, stage, list: async () => [], get: async () => undefined, discard: async () => undefined },
+      importsRepository: { hasFileHash: async () => false, stage, list: async () => [], get: async () => undefined, discard: async () => undefined, commit: async () => undefined },
     });
 
     const response = await app.request(`http://api.test/v1/accounts/${account.id}/imports`, {
@@ -143,7 +144,7 @@ describe('standalone API', () => {
     const app = createApi({
       verifySession: async () => ({ id: 'user-123' }),
       accountsRepository: { list: async () => [], get: async () => account, create: async () => account },
-      importsRepository: { hasFileHash: async () => true, stage: async () => { throw new Error('must not stage duplicate'); }, list: async () => [], get: async () => undefined, discard: async () => undefined },
+      importsRepository: { hasFileHash: async () => true, stage: async () => { throw new Error('must not stage duplicate'); }, list: async () => [], get: async () => undefined, discard: async () => undefined, commit: async () => undefined },
     });
 
     const response = await app.request(`http://api.test/v1/accounts/${account.id}/imports`, { method: 'POST', headers: { authorization: 'Bearer session-token', 'content-type': 'text/csv', 'x-file-name': 'activity.csv' }, body: 'Activity Date,Trans Code,Amount\n2026-01-02,Interest,$2' });
@@ -161,7 +162,7 @@ describe('standalone API', () => {
     const app = createApi({
       verifySession: async () => ({ id: 'user-123' }),
       accountsRepository: { list: async () => [], get: async () => account, create: async () => account },
-      importsRepository: { hasFileHash: async () => false, stage: async () => { throw new Error('unused'); }, list, get: async () => undefined, discard: async () => undefined },
+      importsRepository: { hasFileHash: async () => false, stage: async () => { throw new Error('unused'); }, list, get: async () => undefined, discard: async () => undefined, commit: async () => undefined },
     });
 
     const response = await app.request(`http://api.test/v1/accounts/${account.id}/imports`, { headers: { authorization: 'Bearer session-token' } });
@@ -178,13 +179,54 @@ describe('standalone API', () => {
     };
     const app = createApi({
       verifySession: async () => ({ id: 'user-123' }),
-      importsRepository: { hasFileHash: async () => false, stage: async () => { throw new Error('unused'); }, list: async () => [], get: async () => undefined, discard },
+      importsRepository: { hasFileHash: async () => false, stage: async () => { throw new Error('unused'); }, list: async () => [], get: async () => undefined, discard, commit: async () => undefined },
     });
 
     const response = await app.request('http://api.test/v1/imports/import-123/discard', { method: 'POST', headers: { authorization: 'Bearer session-token' } });
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ import: { id: 'import-123', status: 'discarded' } });
+  });
+
+  it('commits a reviewed import through the authenticated repository', async () => {
+    const commit = async (importId: string, token: string) => {
+      expect(importId).toBe('import-123');
+      expect(token).toBe('session-token');
+      return { id: importId, accountId: 'account-123', status: 'committed' as const, fileName: 'activity.csv', sourceRowCount: 1, usableRowCount: 1, warningCount: 0, activityFrom: '2026-01-02', activityThrough: '2026-01-02', createdAt: '2026-09-09T00:00:00.000Z' };
+    };
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123' }),
+      importsRepository: { hasFileHash: async () => false, stage: async () => { throw new Error('unused'); }, list: async () => [], get: async () => undefined, discard: async () => undefined, commit },
+    });
+
+    const response = await app.request('http://api.test/v1/imports/import-123/commit', { method: 'POST', headers: { authorization: 'Bearer session-token' } });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ import: { id: 'import-123', status: 'committed' } });
+  });
+
+  it('does not claim an unavailable or already-committed import was committed', async () => {
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123' }),
+      importsRepository: { hasFileHash: async () => false, stage: async () => { throw new Error('unused'); }, list: async () => [], get: async () => undefined, discard: async () => undefined, commit: async () => undefined },
+    });
+
+    const response = await app.request('http://api.test/v1/imports/import-123/commit', { method: 'POST', headers: { authorization: 'Bearer session-token' } });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: 'not_found_or_not_committable' });
+  });
+
+  it('reports stored review issues as a resolvable conflict', async () => {
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123' }),
+      importsRepository: { hasFileHash: async () => false, stage: async () => { throw new Error('unused'); }, list: async () => [], get: async () => undefined, discard: async () => undefined, commit: async () => { throw new ImportCommitRejectedError(); } },
+    });
+
+    const response = await app.request('http://api.test/v1/imports/import-123/commit', { method: 'POST', headers: { authorization: 'Bearer session-token' } });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: 'review_issues_must_be_resolved' });
   });
 
   it('returns persisted review rows through the RLS-scoped import repository', async () => {
@@ -195,7 +237,7 @@ describe('standalone API', () => {
     };
     const app = createApi({
       verifySession: async () => ({ id: 'user-123' }),
-      importsRepository: { hasFileHash: async () => false, stage: async () => { throw new Error('unused'); }, list: async () => [], get, discard: async () => undefined },
+      importsRepository: { hasFileHash: async () => false, stage: async () => { throw new Error('unused'); }, list: async () => [], get, discard: async () => undefined, commit: async () => undefined },
     });
 
     const response = await app.request('http://api.test/v1/imports/import-123', { headers: { authorization: 'Bearer session-token' } });
