@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { BrandMark } from '@/components/brand-mark';
 import { createPublicSupabaseClient } from '@/services/supabase/client';
+import { readOAuthCallbackError } from '@/lib/auth/oauth-callback';
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
 
@@ -12,6 +13,11 @@ export function AuthCallbackPage({ supabaseConfig }: { supabaseConfig?: PublicSu
   const client = useMemo(() => supabaseConfig ? createPublicSupabaseClient(supabaseConfig) : undefined, [supabaseConfig]);
 
   useEffect(() => {
+    const callbackError = readOAuthCallbackError(window.location.search);
+    if (callbackError) {
+      setMessage(callbackError);
+      return;
+    }
     if (!client) {
       setMessage('Northstar authentication has not been configured yet.');
       return;
