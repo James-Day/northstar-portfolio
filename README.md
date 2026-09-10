@@ -12,7 +12,7 @@ Northstar is a US-focused portfolio-tracker prototype. It currently offers a cle
 
 The present UI is a Vinext/Sites application. The planned production system keeps a separate Cloudflare Hono API boundary and uses Supabase over HTTP for authentication, PostgreSQL, and private storage. Financial values cross API boundaries as canonical decimal strings and will be stored as `NUMERIC(38,12)` in PostgreSQL. Economic dates are `YYYY-MM-DD`; system events will use UTC timestamps.
 
-The module boundaries are identity/billing, accounts, ingestion, ledger, calculations, market data, and reporting. The source folders now establish the shared numeric, date, instrument-alias, configuration, and API-health contracts. The API is not mounted until user authentication and database ownership controls are implemented.
+The module boundaries are identity/billing, accounts, ingestion, ledger, calculations, market data, and reporting. `services/module-boundaries.ts` is the public composition contract: storage, provider, and HTTP adapters implement ports there, while domain modules do not depend on the UI. The source folders also establish the shared numeric, date, instrument-alias, configuration, and API-health contracts. The API is not mounted until user authentication and database ownership controls are implemented.
 
 ## Supabase schema
 
