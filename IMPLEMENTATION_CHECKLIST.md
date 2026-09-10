@@ -13,7 +13,7 @@ This file is the current implementation plan. Work through the numbered steps in
 - Keep commits large and coherent. Record meaningful milestone evidence rather than a log entry for every small UI change.
 - Never commit secrets. Configure credentials through local ignored environment files or the service's secret interface.
 
-**Current count: 102 tasks — 54 checked, 48 unchecked, across 13 ordered steps.**
+**Current count: 102 tasks — 55 checked, 47 unchecked, across 13 ordered steps.**
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -161,7 +161,7 @@ Owner: product UI. Depends on step 09.
 - [x] **10.03** Persisted import review/history/commit/discard/latest-only undo controls exist; public skip links and active-navigation labels exist.
 - [x] **10.04** Implement persisted activity list with pagination/filtering and ledger-to-source-row detail. The authenticated Activity view now uses the account-scoped API with loading, empty, error, retry and pagination states; demo activity remains isolated.
 - [ ] **10.05** Finish value/return period controls, consolidated/account selection, allocation, invested capital/net deposits, dividend and realized-lot detail views.
-- [ ] **10.06** Complete opening-history and actionable warning flows; distinguish no holdings, missing report, stale report, partial history and unavailable prices without synthetic fallback.
+- [x] **10.06** Complete opening-history and actionable warning flows; distinguish no holdings, missing report, stale report, partial history and unavailable prices without synthetic fallback. Evidence: typed warning classifier and authenticated Overview actions for import, opening-history review and retry in commits `4176951` and `dda6349`.
 - [ ] **10.07** Verify dialog focus/keyboard/screen-reader behavior, accessible tables, mobile layouts and 200% enlargement across authenticated flows.
 - [ ] **10.08** Audit any retained WebMCP hooks against actual authorized app actions/state; remove unsupported claims or obsolete hooks.
 - [ ] **10.09** Gate: authenticated browser fixture flows reconcile displayed numbers to stored records; every enabled action works and logout/account switching cannot leak prior account values.
@@ -259,6 +259,7 @@ Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/sh
 | 2026-09-10 | 02.06 — Auth recovery and session lifecycle | Commit `b4d361a`; password recovery has a dedicated route and validated update, logout revokes globally, account/identity changes clear all private state, and stale session reads are ignored. Full validation: 80 test files / 285 tests and typecheck passed. | Hosted Supabase redirects, email verification and real token revocation remain open. |
 | 2026-09-10 | 09.07 — Report methodology and gap disclosure | Commit `6a3718c`; snapshots and dashboard expose chained daily Modified Dietz methodology, midpoint flow timing, no annualization, unavailable non-contiguous periods, explicit gain definitions and not-tax-reporting disclosure. Full validation: 80 test files / 286 tests and typecheck passed. | Live report execution and hosted browser verification remain open. |
 | 2026-09-10 | 01.06/13.01 — Static schema security CI gate (partial) | Commit `68d632b`; CI now runs a migration-wide RLS/service-privilege/security-definer audit plus the existing typecheck, unit suite and build. Four security tests passed. | Live RLS guessed-ID/direct-write tests, private Storage execution and authenticated Playwright coverage still require staging infrastructure. |
+| 2026-09-10 | 10.06 — Actionable dashboard warning states | Commits `4176951`, `dda6349`, `f5f7274`; authenticated Overview distinguishes missing/stale reports, incomplete history, unavailable prices and no holdings, with direct import, opening-history and retry actions and no synthetic fallback. Full validation: 82 test files / 294 tests and typecheck passed. | Live authenticated browser verification remains open. |
 | 2026-09-10 | 05.03 — Verified private statement object binding | Commit `1c8f694`; authenticated object-binding verifies account ownership, private Storage access, 10 MB/byte-size limits and SHA-256 before persisting import metadata through an RLS-backed RPC. Focused tests (38) and typecheck passed. | Live Supabase Storage/RLS execution and queued import processing remain open. |
 | 2026-09-10 | 09.05 — Report outbox-to-queue wiring (partial) | Commit `ff69ddb`; scheduled transactional outbox dispatch claims report events, publishes typed jobs to `REPORT_QUEUE`, uses `waitUntil` for cron work, and retries safely. Queue tests (9) and typecheck passed. | Durable report input loaders, all import/undo/price-correction triggers, live queue bindings and end-to-end snapshot execution remain open. |
 
