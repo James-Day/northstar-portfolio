@@ -46,6 +46,7 @@ import {
 import { createPublicSupabaseClient } from "@/services/supabase/client";
 import type { AccountActivity, ActivityPage } from "@/services/supabase/activity-repository";
 import { filterReportHistory, reportPeriodDescription, reportPeriodOptions, type ReportPeriod } from "@/services/reporting/period-filter";
+import { SettingsPanel } from "@/components/settings-panel";
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
 type PublicApiConfig = { baseUrl: string };
@@ -111,6 +112,7 @@ const nav = [
   ["Accounts", WalletCards],
   ["Activity", Clock3],
   ["Documents", FileUp],
+  ["Settings", Landmark],
 ] as const;
 
 function Pill({
@@ -366,6 +368,45 @@ export function PortfolioApp({
   async function signOut() {
     await client?.auth.signOut();
     window.location.assign("/");
+  }
+
+  async function downloadLiveExport(kind: "activity" | "report") {
+    if (!client || !apiConfig || !selectedAccountId) throw new Error("Select an account before exporting.");
+    const { data } = await client.auth.getSession();
+    if (!data.session?.access_token) throw new Error("Your sign-in session has expired. Sign in again before exporting.");
+    const response = await fetch(`${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/${kind}.csv`, { headers: { authorization: `Bearer ${data.session.access_token}` } });
+    if (!response.ok) {
+      const payload: unknown = await response.json().catch(() => undefined);
+      throw new Error(payload && typeof payload === "object" && "error" in payload ? String(payload.error).replaceAll("_", " ") : "This export is not available yet.");
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = response.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1] ?? `northstar-${kind}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function openBillingPortal() {
+    if (!client || !apiConfig) throw new Error("Billing is not configured for this environment.");
+    const { data } = await client.auth.getSession();
+    if (!data.session?.access_token) throw new Error("Your sign-in session has expired. Sign in again before managing billing.");
+    const response = await fetch(`${apiConfig.baseUrl}/v1/billing/portal`, { method: "POST", headers: { authorization: `Bearer ${data.session.access_token}` } });
+    const payload: unknown = await response.json();
+    if (!response.ok || !payload || typeof payload !== "object" || !("url" in payload)) throw new Error("Billing is not available yet.");
+    window.location.assign(String(payload.url));
+  }
+
+  async function requestDeletion() {
+    if (!client || !apiConfig) throw new Error("Account deletion is not configured for this environment.");
+    const { data } = await client.auth.getSession();
+    if (!data.session?.access_token) throw new Error("Your sign-in session has expired. Sign in again before requesting deletion.");
+    const response = await fetch(`${apiConfig.baseUrl}/v1/me/deletion-request`, { method: "POST", headers: { authorization: `Bearer ${data.session.access_token}` } });
+    const payload: unknown = await response.json().catch(() => undefined);
+    if (!response.ok) throw new Error(payload && typeof payload === "object" && "error" in payload ? String(payload.error).replaceAll("_", " ") : "Account deletion is not available yet.");
   }
 
   function clearStaging() {
@@ -751,6 +792,18 @@ export function PortfolioApp({
               importHistory={importHistory}
               historyLoading={historyLoading}
               onUndo={undoLiveImport}
+            />
+          )}
+          {active === "Settings" && (
+            <SettingsPanel
+              email={email}
+              accounts={accounts}
+              selectedAccountId={selectedAccountId}
+              onSelectAccount={setSelectedAccountId}
+              onExportActivity={() => downloadLiveExport("activity")}
+              onExportReport={() => downloadLiveExport("report")}
+              onOpenBilling={openBillingPortal}
+              onRequestDeletion={requestDeletion}
             />
           )}
         </section>

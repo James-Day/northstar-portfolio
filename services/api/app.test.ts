@@ -175,6 +175,25 @@ describe('standalone API', () => {
     await expect(response.text()).resolves.toContain("'=formula");
   });
 
+  it('exports an owned persisted report as a rectangular CSV', async () => {
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123' }),
+      accountsRepository: { list: async () => [], get: async () => ({ id: 'account-123' } as never), create: async () => { throw new Error('unused'); } },
+      reportSnapshotReader: { getLatest: async () => ({ id: 'snapshot-123', userId: 'user-123', accountId: 'account-123', reportType: 'account_daily', asOfDate: '2026-07-06', importStateRevision: 'rev-1', priceRevisionId: null, publishedAt: '2026-07-06T23:00:00Z', payload: { totalValue: '100', cash: '20', timeWeightedReturn: '0.1', activityCoveredThrough: '2026-07-05', pricesThrough: '2026-07-06', holdings: [{ instrumentId: 'AAPL', quantity: '1', close: '80', value: '80' }] } }) },
+    });
+    const response = await app.request('http://api.test/v1/accounts/account-123/report.csv', { headers: { authorization: 'Bearer session-token' } });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-disposition')).toContain('portfolio-report-account-123.csv');
+    await expect(response.text()).resolves.toContain('holding,AAPL');
+  });
+
+  it('keeps account deletion request unavailable until a durable executor is configured', async () => {
+    const app = createApi({ verifySession: async () => ({ id: 'user-123' }) });
+    const response = await app.request('http://api.test/v1/me/deletion-request', { method: 'POST', headers: { authorization: 'Bearer session-token' } });
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ error: 'deletion_unavailable' });
+  });
+
   it('lists accounts only after verifying the caller and carries the same token into the RLS repository', async () => {
     const list = async (userId: string, token: string) => {
       expect(userId).toBe('user-123');
