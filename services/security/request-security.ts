@@ -83,8 +83,29 @@ export type RateLimitStore = {
     now: number,
     limit: number,
     windowMs: number,
-  ): RateLimitDecision;
+  ): RateLimitDecision | Promise<RateLimitDecision>;
 };
+
+/** Shared production counter contract. Implementations must increment and
+ * rotate a bucket atomically (for example inside a Durable Object). */
+export type AtomicRateLimitCounterStore = {
+  increment(key: string, now: number, windowMs: number): Promise<{ windowStartedAt: number; count: number }>;
+};
+
+export class SharedRateLimitStore implements RateLimitStore {
+  constructor(private readonly counters: AtomicRateLimitCounterStore) {}
+
+  async consume(key: string, now: number, limit: number, windowMs: number): Promise<RateLimitDecision> {
+    const counter = await this.counters.increment(key, now, windowMs);
+    const elapsed = Math.max(0, now - counter.windowStartedAt);
+    return {
+      allowed: counter.count <= limit,
+      limit,
+      remaining: Math.max(0, limit - counter.count),
+      retryAfterSeconds: Math.max(1, Math.ceil((windowMs - elapsed) / 1000)),
+    };
+  }
+}
 
 type Counter = { windowStartedAt: number; count: number };
 

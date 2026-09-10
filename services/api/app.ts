@@ -174,7 +174,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
         request.method === 'DELETE'
           ? 'write'
           : 'read';
-      const decision = rateLimitStore.consume(
+      const decision = await rateLimitStore.consume(
         `${requestClientKey(request)}:${bucket}`,
         now(),
         policy.limit,

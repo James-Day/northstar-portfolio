@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   MemoryRateLimitStore,
+  SharedRateLimitStore,
   RequestBodyTooLargeError,
   readJsonRequest,
   readRequestText,
@@ -28,6 +29,18 @@ describe('request security', () => {
       allowed: true,
       remaining: 1,
     });
+  });
+
+  it('adapts an atomic shared counter for multi-instance deployments', async () => {
+    const increment = vi.fn().mockResolvedValue({ windowStartedAt: 1_000, count: 3 });
+    const store = new SharedRateLimitStore({ increment });
+    await expect(store.consume('ip', 1_500, 2, 60_000)).resolves.toEqual({
+      allowed: false,
+      limit: 2,
+      remaining: 0,
+      retryAfterSeconds: 60,
+    });
+    expect(increment).toHaveBeenCalledWith('ip', 1_500, 60_000);
   });
 
   it('uses trusted edge identity and classifies writes more tightly', () => {
