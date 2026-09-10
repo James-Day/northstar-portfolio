@@ -28,6 +28,17 @@ describe('Supabase imports repository', () => {
     expect(JSON.parse(init.body)).toMatchObject({ p_account_id: 'account-id', p_file_name: 'activity.csv', p_source_rows: [{ status: 'supported' }] });
   });
 
+  it('converges on the existing review when concurrent staging loses the unique-index race', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ code: '23505' }), { status: 409 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ id: 'existing-import' }])));
+    const repository = new SupabaseImportsRepository({ supabaseUrl: 'https://project.supabase.co', supabaseAnonKey: 'anon-key', fetcher });
+    const staged = toPersistableImportStage(await stageRobinhoodImport('account-id', 'Activity Date,Trans Code,Amount\n2026-01-02,Interest,$2'), 'activity.csv');
+
+    await expect(repository.stage('user-token', staged)).resolves.toEqual({ id: 'existing-import', status: 'ready_for_review' });
+    expect(fetcher.mock.calls[1][0].searchParams.get('status')).toBe('not.in.(discarded,undone)');
+  });
+
   it('lists a caller-owned account history and discards only a review-ready import', async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify([summary])))
@@ -72,6 +83,17 @@ describe('Supabase imports repository', () => {
     await expect(repository.commit('import-id', 'user-token')).rejects.toBeInstanceOf(ImportOperationRejectedError);
   });
 
+  it('returns the committed result when a retry observes the prior successful commit', async () => {
+    const committedSummary = { ...summary, status: 'committed' };
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'already committed' }), { status: 409 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([committedSummary])))
+      .mockResolvedValueOnce(new Response(JSON.stringify([])));
+    const repository = new SupabaseImportsRepository({ supabaseUrl: 'https://project.supabase.co', supabaseAnonKey: 'anon-key', fetcher });
+
+    await expect(repository.commit('import-id', 'user-token')).resolves.toMatchObject({ id: 'import-id', status: 'committed' });
+  });
+
   it('uses the undo RPC, then returns the RLS-scoped undone import summary', async () => {
     const undoneSummary = { ...summary, status: 'undone' };
     const fetcher = vi.fn()
@@ -85,5 +107,16 @@ describe('Supabase imports repository', () => {
     expect(url.pathname).toBe('/rest/v1/rpc/undo_import');
     expect(init.headers).toMatchObject({ authorization: 'Bearer user-token' });
     expect(JSON.parse(init.body)).toEqual({ p_import_id: 'import-id' });
+  });
+
+  it('returns the undone result when a retry observes the prior successful undo', async () => {
+    const undoneSummary = { ...summary, status: 'undone' };
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'already undone' }), { status: 409 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([undoneSummary])))
+      .mockResolvedValueOnce(new Response(JSON.stringify([])));
+    const repository = new SupabaseImportsRepository({ supabaseUrl: 'https://project.supabase.co', supabaseAnonKey: 'anon-key', fetcher });
+
+    await expect(repository.undo('import-id', 'user-token')).resolves.toMatchObject({ id: 'import-id', status: 'undone' });
   });
 });

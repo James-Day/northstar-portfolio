@@ -103,6 +103,14 @@ export class SupabaseImportsRepository implements ImportsRepository {
         p_warning_count: input.warningCount,
       }),
     });
+    if (response.status === 409) {
+      // The API preflight and this RPC are intentionally both guarded. If two
+      // browser tabs stage the same statement at once, the unique index wins
+      // the race; return the already-created review instead of surfacing a
+      // transient server error.
+      const existingId = await this.findActiveImportId(input.accountId, accessToken, input.fileSha256);
+      if (existingId) return { id: existingId, status: 'ready_for_review' };
+    }
     if (!response.ok) throw new Error(`Supabase import staging failed with HTTP ${response.status}.`);
     const id: unknown = await response.json();
     if (typeof id !== 'string' || !id) throw new Error('Supabase import staging returned an invalid import ID.');
@@ -166,7 +174,13 @@ export class SupabaseImportsRepository implements ImportsRepository {
       body: JSON.stringify({ p_import_id: importId }),
     });
     if (response.status === 403 || response.status === 404) return undefined;
-    if (response.status === 400 || response.status === 409) throw new ImportOperationRejectedError();
+    if (response.status === 400 || response.status === 409) {
+      // A request can time out after the RPC commits. A retry then receives a
+      // state conflict; make that retry converge on the committed result.
+      const detail = await this.get(importId, accessToken).catch(() => undefined);
+      if (detail?.import.status === 'committed') return detail.import;
+      throw new ImportOperationRejectedError();
+    }
     if (!response.ok) throw new Error(`Supabase import commit failed with HTTP ${response.status}.`);
     const committedId: unknown = await response.json();
     if (typeof committedId !== 'string') throw new Error('Supabase import commit returned an invalid import ID.');
@@ -181,11 +195,33 @@ export class SupabaseImportsRepository implements ImportsRepository {
       body: JSON.stringify({ p_import_id: importId }),
     });
     if (response.status === 403 || response.status === 404) return undefined;
-    if (response.status === 400 || response.status === 409) throw new ImportOperationRejectedError();
+    if (response.status === 400 || response.status === 409) {
+      // Undo is also a safe retry after a lost response. The RPC locks the
+      // import row, so an already-undone state is authoritative.
+      const detail = await this.get(importId, accessToken).catch(() => undefined);
+      if (detail?.import.status === 'undone') return detail.import;
+      throw new ImportOperationRejectedError();
+    }
     if (!response.ok) throw new Error(`Supabase import undo failed with HTTP ${response.status}.`);
     const undoneId: unknown = await response.json();
     if (typeof undoneId !== 'string') throw new Error('Supabase import undo returned an invalid import ID.');
     return this.get(undoneId, accessToken).then((detail) => detail?.import);
+  }
+
+  private async findActiveImportId(accountId: string, accessToken: string, fileSha256: string): Promise<string | undefined> {
+    const url = new URL('/rest/v1/imports', this.baseUrl);
+    url.searchParams.set('account_id', `eq.${accountId}`);
+    url.searchParams.set('file_sha256', `eq.${fileSha256}`);
+    url.searchParams.set('status', 'not.in.(discarded,undone)');
+    url.searchParams.set('select', 'id');
+    url.searchParams.set('order', 'created_at.asc');
+    url.searchParams.set('limit', '1');
+    const response = await this.fetcher(url, { headers: { apikey: this.options.supabaseAnonKey, authorization: `Bearer ${accessToken}` } });
+    if (!response.ok) throw new Error(`Supabase import query failed with HTTP ${response.status}.`);
+    const rows: unknown = await response.json();
+    if (!Array.isArray(rows)) throw new Error('Supabase import query returned an invalid result.');
+    const id = rows[0] && typeof rows[0] === 'object' ? (rows[0] as Record<string, unknown>).id : undefined;
+    return typeof id === 'string' && id ? id : undefined;
   }
 }
 
