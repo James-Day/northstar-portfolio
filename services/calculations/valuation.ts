@@ -45,6 +45,7 @@ const asString = (value: Decimal.Value) => decimalString(new Decimal(value).toFi
 export function valueLedgerHistory(input: {
   dates: ValuationDate[];
   events: LedgerEvent[];
+  openingLots?: import('@/services/ledger/fifo').LotInput[];
   closes: DailyClose[];
   corporateActions?: Array<CorporateAction & { effectiveDate: IsoDate }>;
 }): ValuationHistory {
@@ -53,7 +54,7 @@ export function valueLedgerHistory(input: {
   const closeIndex = indexCloses(input.closes);
   const valuations: DailyValuation[] = [];
   for (const valuationDate of input.dates) {
-    const ledger = applyFifoLedger(input.events.filter((event) => event.date <= valuationDate.date));
+    const ledger = applyFifoLedger(input.events.filter((event) => event.date <= valuationDate.date), input.openingLots ?? []);
     let lots = ledger.openLots;
     for (const action of [...(input.corporateActions ?? [])].sort((left, right) => left.effectiveDate.localeCompare(right.effectiveDate))) {
       if (action.effectiveDate <= valuationDate.date) lots = applyValidatedCorporateAction(lots, action);
