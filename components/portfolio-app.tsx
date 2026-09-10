@@ -303,6 +303,7 @@ export function PortfolioApp({
   const [stageMessage, setStageMessage] = useState<string>();
   const [stagedImportId, setStagedImportId] = useState<string>();
   const [liveRows, setLiveRows] = useState<LiveImportRow[]>([]);
+  const [resolvedIssueRowIds, setResolvedIssueRowIds] = useState<Set<string>>(new Set());
   const [importHistory, setImportHistory] = useState<LiveImportSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0);
@@ -339,6 +340,7 @@ export function PortfolioApp({
     setStagedCsv(undefined);
     setStagedImportId(undefined);
     setLiveRows([]);
+    setResolvedIssueRowIds(new Set());
     setImportHistory([]);
     setFreshnessReport(undefined);
     setReportSnapshot(undefined);
@@ -1016,6 +1018,7 @@ export function PortfolioApp({
         );
       setStagedImportId(importId);
       setLiveRows(detail.sourceRows as LiveImportRow[]);
+      setResolvedIssueRowIds(new Set());
       setHistoryVersion((current) => current + 1);
       setStageMessage(
         'Saved for review. This import has not changed your portfolio yet.',
@@ -1065,6 +1068,26 @@ export function PortfolioApp({
           ? error.message
           : 'We could not commit this import.',
       );
+    } finally {
+      setIsStagingImport(false);
+    }
+  }
+
+  async function resolveUnsupportedIssue(sourceRowId: string) {
+    if (!client || !apiConfig || !stagedImportId) return;
+    setIsStagingImport(true);
+    try {
+      const { data } = await client.auth.getSession();
+      if (!data.session?.access_token) throw new Error('Your sign-in session has expired. Sign in again before resolving review issues.');
+      const response = await fetch(`${apiConfig.baseUrl}/v1/imports/${stagedImportId}/issues`, {
+        method: 'PUT',
+        headers: { authorization: `Bearer ${data.session.access_token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ sourceRowId, issueCode: 'unsupported_row', resolutionKind: 'non_reportable', note: 'Marked non-reportable during import review.' }),
+      });
+      if (!response.ok) throw new Error('The review issue could not be resolved.');
+      setResolvedIssueRowIds((current) => new Set(current).add(sourceRowId));
+    } catch (error) {
+      setStageMessage(error instanceof Error ? error.message : 'The review issue could not be resolved.');
     } finally {
       setIsStagingImport(false);
     }
@@ -1345,8 +1368,10 @@ export function PortfolioApp({
         stageMessage={stageMessage}
         onStage={persistLiveImport}
         onCommit={commitLiveImport}
-        onDiscard={discardLiveImport}
-      />
+          onDiscard={discardLiveImport}
+          resolvedIssueRowIds={resolvedIssueRowIds}
+          onResolveUnsupportedIssue={resolveUnsupportedIssue}
+        />
     </main>
   );
 }
@@ -3077,6 +3102,8 @@ function ImportReview({
   onStage,
   onCommit,
   onDiscard,
+  resolvedIssueRowIds,
+  onResolveUnsupportedIssue,
 }: {
   open: boolean;
   fileName: string;
@@ -3089,11 +3116,13 @@ function ImportReview({
   onStage: () => Promise<void>;
   onCommit: () => Promise<void>;
   onDiscard: () => Promise<void>;
+  resolvedIssueRowIds: Set<string>;
+  onResolveUnsupportedIssue: (sourceRowId: string) => Promise<void>;
 }) {
   const warnings = activities.filter((activity) => activity.warning).length;
   const review = livePreview?.review;
   const liveWarnings = review
-    ? review.unsupportedRowCount +
+    ? Math.max(0, review.unsupportedRowCount - resolvedIssueRowIds.size) +
       review.invalidRowCount +
       review.duplicateRowCount
     : 0;
@@ -3181,6 +3210,7 @@ function ImportReview({
                   <th scope="col" className="p-3">
                     Message
                   </th>
+                  <th scope="col" className="p-3">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -3200,6 +3230,11 @@ function ImportReview({
                         : '—'}
                     </td>
                     <td className="p-3 text-slate-500">{row.message ?? '—'}</td>
+                    <td className="p-3">
+                      {row.status === 'unsupported' && !resolvedIssueRowIds.has(row.id) ? (
+                        <button disabled={isStaging} onClick={() => void onResolveUnsupportedIssue(row.id)} className="font-semibold text-[#185da8] hover:text-[#154f8e]">Mark non-reportable</button>
+                      ) : row.status === 'unsupported' ? 'Resolved' : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
