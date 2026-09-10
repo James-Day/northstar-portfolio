@@ -28,6 +28,13 @@ export type HistoricalContinuityIssue = {
   dates: IsoDate[];
 };
 
+export type HistoricalGapBackfillRequest = {
+  symbol: string;
+  from: IsoDate;
+  through: IsoDate;
+  reason: 'missing_trading_dates' | 'alias_gap';
+};
+
 export type HistoricalPageSource = {
   getDailyClosePage(input: { symbols: string[]; from: IsoDate; through: IsoDate; limit?: number; cursor?: { tradingDate: IsoDate; symbol: string } }): Promise<{ records: DoltHubDailyClose[]; sourceRevision: string; nextCursor: { tradingDate: IsoDate; symbol: string } | null }>;
 };
@@ -96,6 +103,26 @@ export function inspectHistoricalContinuity(records: DoltHubDailyClose[], aliase
     if (missing.length) issues.push({ symbol, kind: 'missing_trading_dates', dates: missing });
   }
   return issues;
+}
+
+/**
+ * Converts continuity findings into deterministic, bounded backfill work. The
+ * planner never invents prices; it only asks the source for the exact dates
+ * that need another lookup, allowing a later job to quarantine unresolved
+ * aliases or unavailable source data.
+ */
+export function planHistoricalGapBackfills(issues: HistoricalContinuityIssue[], maxDatesPerRequest = 30): HistoricalGapBackfillRequest[] {
+  if (!Number.isInteger(maxDatesPerRequest) || maxDatesPerRequest < 1 || maxDatesPerRequest > 365)
+    throw new Error('Historical backfill batch size must be an integer from 1 through 365.');
+  const requests: HistoricalGapBackfillRequest[] = [];
+  for (const issue of issues) {
+    const dates = [...new Set(issue.dates)].sort();
+    for (let index = 0; index < dates.length; index += maxDatesPerRequest) {
+      const batch = dates.slice(index, index + maxDatesPerRequest);
+      if (batch.length) requests.push({ symbol: issue.symbol.trim().toUpperCase(), from: batch[0], through: batch.at(-1)!, reason: issue.kind });
+    }
+  }
+  return requests.sort((left, right) => left.symbol.localeCompare(right.symbol) || left.from.localeCompare(right.from) || left.reason.localeCompare(right.reason));
 }
 
 /**

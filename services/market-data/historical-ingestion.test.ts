@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { decimalString } from '@/lib/domain/money';
 import { isoDate, type InstrumentId } from '@/lib/domain/types';
-import { ingestDoltHubHistory, inspectHistoricalContinuity, prepareHistoricalPriceIngestion } from '@/services/market-data/historical-ingestion';
+import { ingestDoltHubHistory, inspectHistoricalContinuity, planHistoricalGapBackfills, prepareHistoricalPriceIngestion } from '@/services/market-data/historical-ingestion';
 
 const alias = (symbol: string, instrumentId: string, from = '2020-01-01') => ({ instrumentId: instrumentId as InstrumentId, symbol, effectiveFrom: isoDate(from), effectiveTo: null });
 const close = (symbol: string, date: string, value: string) => ({ symbol, tradingDate: isoDate(date), close: decimalString(value), source: 'dolthub' as const, sourceRevision: 'rev-1' });
@@ -50,5 +50,15 @@ describe('historical price ingestion preparation', () => {
       { symbol: 'AAPL', kind: 'missing_trading_dates', dates: ['2024-01-03'] },
       { symbol: 'OLD', kind: 'alias_gap', dates: ['2024-01-03'] },
     ]));
+  });
+
+  it('plans bounded, deterministic gap backfills without fabricating prices', () => {
+    expect(planHistoricalGapBackfills([
+      { symbol: 'aapl', kind: 'missing_trading_dates', dates: [isoDate('2024-01-05'), isoDate('2024-01-03'), isoDate('2024-01-04')] },
+    ], 2)).toEqual([
+      { symbol: 'AAPL', from: '2024-01-03', through: '2024-01-04', reason: 'missing_trading_dates' },
+      { symbol: 'AAPL', from: '2024-01-05', through: '2024-01-05', reason: 'missing_trading_dates' },
+    ]);
+    expect(() => planHistoricalGapBackfills([], 0)).toThrow('batch size');
   });
 });
