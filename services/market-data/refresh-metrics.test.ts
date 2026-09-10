@@ -1,0 +1,18 @@
+import { describe, expect, it } from 'vitest';
+import { evaluateQuota, RefreshMetricsCollector } from '@/services/market-data/refresh-metrics';
+
+describe('daily refresh metrics', () => {
+  it('aggregates refresh events without losing retry attempts', () => {
+    const metrics = new RefreshMetricsCollector();
+    metrics.record({ type: 'attempt', attempt: 1, maxAttempts: 3, symbolCount: 4 });
+    metrics.record({ type: 'failed', attempt: 1, maxAttempts: 3, message: 'temporary' });
+    metrics.record({ type: 'attempt', attempt: 2, maxAttempts: 3, symbolCount: 4 });
+    metrics.record({ type: 'persisted', tradingDate: '2026-07-06' as never, symbolCount: 4, upserted: 4 });
+    expect(metrics.getSnapshot()).toEqual({ attempts: 2, failedAttempts: 1, skippedRuns: 0, requestedSymbols: 8, persistedRows: 4 });
+  });
+
+  it('alerts when the configured reserve would be consumed', () => {
+    expect(evaluateQuota(8_100, 10_000)).toEqual({ usedUnits: 8_100, monthlyCap: 10_000, reserveUnits: 2_000, remainingUnits: 1_900, alert: true });
+    expect(evaluateQuota(7_500, 10_000).alert).toBe(false);
+  });
+});
