@@ -13,6 +13,7 @@ export type ImportSummary = {
   activityFrom: string | null;
   activityThrough: string | null;
   createdAt: string;
+  committedAt?: string | null;
 };
 
 export type ImportSourceRow = {
@@ -107,7 +108,7 @@ export class SupabaseImportsRepository implements ImportsRepository {
   async list(accountId: string, accessToken: string): Promise<ImportSummary[]> {
     const url = new URL('/rest/v1/imports', this.baseUrl);
     url.searchParams.set('account_id', `eq.${accountId}`);
-    url.searchParams.set('select', 'id,account_id,status,file_name,source_row_count,usable_row_count,warning_count,activity_from,activity_through,created_at');
+    url.searchParams.set('select', 'id,account_id,status,file_name,source_row_count,usable_row_count,warning_count,activity_from,activity_through,created_at,committed_at');
     url.searchParams.set('order', 'created_at.desc');
     const response = await this.fetcher(url, { headers: { apikey: this.options.supabaseAnonKey, authorization: `Bearer ${accessToken}` } });
     if (!response.ok) throw new Error(`Supabase import list failed with HTTP ${response.status}.`);
@@ -119,7 +120,7 @@ export class SupabaseImportsRepository implements ImportsRepository {
   async get(importId: string, accessToken: string): Promise<ImportReviewDetail | undefined> {
     const importUrl = new URL('/rest/v1/imports', this.baseUrl);
     importUrl.searchParams.set('id', `eq.${importId}`);
-    importUrl.searchParams.set('select', 'id,account_id,status,file_name,source_row_count,usable_row_count,warning_count,activity_from,activity_through,created_at');
+    importUrl.searchParams.set('select', 'id,account_id,status,file_name,source_row_count,usable_row_count,warning_count,activity_from,activity_through,created_at,committed_at');
     importUrl.searchParams.set('limit', '1');
     const importResponse = await this.fetcher(importUrl, { headers: { apikey: this.options.supabaseAnonKey, authorization: `Bearer ${accessToken}` } });
     if (!importResponse.ok) throw new Error(`Supabase import query failed with HTTP ${importResponse.status}.`);
@@ -188,7 +189,7 @@ function toImportSummary(row: unknown): ImportSummary {
   if (!row || typeof row !== 'object') throw new Error('Supabase returned an invalid import row.');
   const value = row as Record<string, unknown>;
   const statusValues = ['staged', 'processing', 'ready_for_review', 'committed', 'discarded', 'undone', 'failed'] as const;
-  if (typeof value.id !== 'string' || typeof value.account_id !== 'string' || !statusValues.includes(value.status as typeof statusValues[number]) || typeof value.file_name !== 'string' || typeof value.source_row_count !== 'number' || typeof value.usable_row_count !== 'number' || typeof value.warning_count !== 'number' || typeof value.created_at !== 'string' || (value.activity_from !== null && typeof value.activity_from !== 'string') || (value.activity_through !== null && typeof value.activity_through !== 'string')) {
+  if (typeof value.id !== 'string' || typeof value.account_id !== 'string' || !statusValues.includes(value.status as typeof statusValues[number]) || typeof value.file_name !== 'string' || typeof value.source_row_count !== 'number' || typeof value.usable_row_count !== 'number' || typeof value.warning_count !== 'number' || typeof value.created_at !== 'string' || (value.activity_from !== null && typeof value.activity_from !== 'string') || (value.activity_through !== null && typeof value.activity_through !== 'string') || (value.committed_at !== undefined && value.committed_at !== null && typeof value.committed_at !== 'string')) {
     throw new Error('Supabase returned an invalid import row.');
   }
   return {
@@ -202,6 +203,7 @@ function toImportSummary(row: unknown): ImportSummary {
     activityFrom: value.activity_from,
     activityThrough: value.activity_through,
     createdAt: value.created_at,
+    committedAt: typeof value.committed_at === 'string' ? value.committed_at : null,
   };
 }
 

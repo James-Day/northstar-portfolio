@@ -41,4 +41,16 @@ describe('parseRobinhoodActivityCsv', () => {
     ]);
     expect(rows[5]).toMatchObject({ status: 'unsupported', rowNumber: 8, message: expect.stringContaining('SPL') });
   });
+
+  it('ignores Robinhood’s trailing informational footer', () => {
+    const rows = parseRobinhoodActivityCsv([
+      'Activity Date,Process Date,Settle Date,Instrument,Description,Trans Code,Quantity,Price,Amount',
+      '5/16/2025,5/16/2025,5/19/2025,VTI,Market buy,Buy,1,$250,($250)',
+      '""',
+      '"","","","","","","","","","This data is for informational purposes only."',
+    ].join('\n'));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ status: 'supported', activity: { type: 'buy', symbol: 'VTI', amount: '-250' } });
+  });
 });

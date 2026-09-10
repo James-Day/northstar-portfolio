@@ -103,6 +103,7 @@ Acceptance: multiple accounts remain separate, fractional positions are supporte
 
 - [ ] Obtain redacted official brokerage and IRA CSV fixtures; add sanitized fixtures with expected results.
 - [x] Use a real CSV parser supporting quoted commas, escaped quotes, embedded newlines and BOMs.
+- [x] Ignore the blank/footer records appended by official Robinhood activity exports without dropping transaction rows.
 - [x] Validate dates, signed amounts, parentheses, decimals, required headers and row counts; enforce 10 MB / 50,000 rows in the server-side parser.
 - [x] Map verified Robinhood transaction codes rather than guessing from descriptions or using Process Date as the transaction type.
 - [ ] Normalize buys/sells, dividends, reinvestment buys, interest, fees, deposits/withdrawals, incentives and supported transfers.
@@ -120,10 +121,12 @@ Acceptance: supported fixtures reconcile row-for-row; malformed values never sil
 - [x] Add authenticated API contracts to list staged import history, retrieve preserved review rows, and discard a review-ready import without deleting audit history.
 - [ ] Queue parsing and persist staged results with progress/failure status.
 - [ ] Show source rows, interpreted transactions, account/date range, duplicates and actionable warnings.
+- [x] Display preserved source-row statuses, interpreted activity, and parser messages in the authenticated review dialog.
 - [x] Implement multiplicity-aware overlap fingerprints including account, date, type, symbol, quantity, price, amount and description.
 - [x] Connect fingerprints to persisted file hashes and committed imports for identical-file idempotency.
 - [x] Commit accepted records atomically with concurrency protection and an outbox event for recomputation.
 - [ ] Add discard, import history and undo that preserves audit history and recomputes downstream state.
+- [x] Show account-scoped import history and expose undo only for the latest committed import, matching the database constraint.
 
 Acceptance: repeated and overlapping files never double-count; legitimate identical trades remain distinct; interrupted/retried commits are safe; undo restores the prior report state.
 
@@ -264,6 +267,7 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-09 | 11 — Daily valuation core (partial) | Exact-decimal valuation derives cash and quantities from the normalized ledger, values only against supplied closes, calculates daily Modified Dietz and time-weighted return, and makes missing/gapped intervals unavailable. Fixtures cover deposits, incentives, DRIP, and missing prices. | Database report inputs, corporate actions, internal transfers, snapshots, and dashboard reads remain. |
 | 2026-09-09 | 04/05 — Local authenticated account setup (partial) | Local Supabase configuration enables the existing sign-in flow; dashboard account setup lists and creates RLS-scoped Robinhood individual, Traditional IRA, and Roth IRA accounts without showing synthetic values as real balances. | Live deployment configuration, account selection, imports, and reports remain. |
 | 2026-09-09 | 07/12 — Authenticated staged-import entry point (partial) | Signed-in users select a real account and send CSVs to the Worker for server-side preview and staging. Development CORS admits only the local app origin and expected import headers; the UI distinguishes staged review from portfolio commitment. | Source-row review, background processing, commit/undo controls, production origin configuration, and reports remain. |
+| 2026-09-09 | 06/07/12 — Robinhood export review and history controls (partial) | Official-export footer handling, persisted source-row review, commit control, account-scoped history, and latest-only undo controls added. | Supported split handling, discard control, background report recomputation, and report display remain. |
 | 2026-09-09 | 07 — Import workflow (partial) | Lifecycle and review-commit blocking rules added; `npm run typecheck`, `npm test` (25 passing), and `npm run build` passed | Lifecycle is not yet persisted or processed through queues |
 | 2026-09-09 | 08 — Corporate-action safeguards (partial) | Validated split and ticker-change lot handling added; `npm run typecheck`, `npm test` (28 passing), and `npm run build` passed | Corporate actions are not yet sourced, evidenced, or connected to stored price history |
 | 2026-09-09 | 08 — Internal-transfer linking (partial) | Reconciled-account transfer linking and unresolved-transfer rules added; `npm run typecheck`, `npm test` (30 passing), and `npm run build` passed | Transferred lots/basis require persisted cross-account transfer workflows |

@@ -99,6 +99,10 @@ export function parseRobinhoodActivityCsv(csv: string): ParsedRobinhoodRow[] {
     skip_empty_lines: true,
     trim: true,
     relax_quotes: false,
+    // Robinhood appends an informational footer with one additional column.
+    // The mapped data columns are blank, so it is ignored below with other
+    // fully blank records. Transaction content is still validated per row.
+    relax_column_count: true,
   }) as Record<string, string>[];
   if (records.length === 0) throw new Error('CSV needs a header and at least one activity row.');
   if (records.length > MAX_ROWS) throw new Error('CSV exceeds the 50,000-row import limit.');
