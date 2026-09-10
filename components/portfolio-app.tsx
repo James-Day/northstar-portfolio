@@ -45,16 +45,48 @@ import {
   parseRobinhoodCsv,
 } from "@/lib/portfolio";
 import { createPublicSupabaseClient } from "@/services/supabase/client";
-import type { AccountActivity, ActivityPage } from "@/services/supabase/activity-repository";
-import { filterReportHistory, reportPeriodDescription, reportPeriodOptions, type ReportPeriod } from "@/services/reporting/period-filter";
+import type {
+  AccountActivity,
+  ActivityPage,
+} from "@/services/supabase/activity-repository";
+import {
+  filterReportHistory,
+  reportPeriodDescription,
+  reportPeriodOptions,
+  type ReportPeriod,
+} from "@/services/reporting/period-filter";
 import { SettingsPanel } from "@/components/settings-panel";
 import type { OpeningHistory } from "@/services/accounts/opening-history";
 import { buildAllocationRows } from "@/lib/report-details";
 import { clearPrivateWorkspaceState } from "@/lib/auth/private-workspace";
-import { getDashboardWarnings, type DashboardWarning } from "@/lib/dashboard-warnings";
+import {
+  getDashboardWarnings,
+  type DashboardWarning,
+} from "@/lib/dashboard-warnings";
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
 type PublicApiConfig = { baseUrl: string };
+
+function SessionLoadingState() {
+  return (
+    <main className="grid min-h-screen place-items-center bg-[#f5f7fb] px-6 text-[#13233a]">
+      <section
+        className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm"
+        role="status"
+        aria-live="polite"
+      >
+        <div
+          className="mx-auto h-10 w-10 animate-pulse rounded-2xl bg-[#eaf2ff]"
+          aria-hidden="true"
+        />
+        <h1 className="mt-5 text-xl font-bold">Loading your workspace</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          Checking your secure session before showing portfolio data.
+        </p>
+      </section>
+    </main>
+  );
+}
 type LiveAccount = {
   id: string;
   name: string;
@@ -98,12 +130,68 @@ type LiveImportSummary = {
   createdAt: string;
   committedAt?: string | null;
 };
-type LiveFreshnessReport = { expectedDate: string; rows: Array<{ symbol: string; expectedDate: string; latestDate: string | null; status: 'current' | 'stale' | 'missing' }> };
-type LiveReportHolding = { instrumentId: string; displayName?: string; quantity: string; close: string | null; value: string | null };
-type LiveRealizedSale = { eventId: string; date: string; instrumentId: string; quantity: string; proceeds: string; matchedCostBasis: string | null; gainLoss: string | null; basisKnown: boolean };
-type LiveReportSnapshot = { asOfDate: string; payload: { totalValue: string | null; cash: string | null; timeWeightedReturn: string | null; netDeposits?: string | null; dividendIncome?: string | null; realizedGainLoss?: string | null; realizedSales?: LiveRealizedSale[]; valueHistory?: Array<{ date: string; value: string | null }>; activityCoveredThrough: string | null; pricesThrough: string | null; holdings: LiveReportHolding[]; methodology?: { disclosure?: string; annualized?: boolean; taxReporting?: boolean; externalFlowTiming?: string; gapHandling?: string } } };
+type LiveFreshnessReport = {
+  expectedDate: string;
+  rows: Array<{
+    symbol: string;
+    expectedDate: string;
+    latestDate: string | null;
+    status: "current" | "stale" | "missing";
+  }>;
+};
+type LiveReportHolding = {
+  instrumentId: string;
+  displayName?: string;
+  quantity: string;
+  close: string | null;
+  value: string | null;
+};
+type LiveRealizedSale = {
+  eventId: string;
+  date: string;
+  instrumentId: string;
+  quantity: string;
+  proceeds: string;
+  matchedCostBasis: string | null;
+  gainLoss: string | null;
+  basisKnown: boolean;
+};
+type LiveReportSnapshot = {
+  asOfDate: string;
+  payload: {
+    totalValue: string | null;
+    cash: string | null;
+    timeWeightedReturn: string | null;
+    netDeposits?: string | null;
+    dividendIncome?: string | null;
+    realizedGainLoss?: string | null;
+    realizedSales?: LiveRealizedSale[];
+    valueHistory?: Array<{ date: string; value: string | null }>;
+    activityCoveredThrough: string | null;
+    pricesThrough: string | null;
+    holdings: LiveReportHolding[];
+    methodology?: {
+      disclosure?: string;
+      annualized?: boolean;
+      taxReporting?: boolean;
+      externalFlowTiming?: string;
+      gapHandling?: string;
+    };
+  };
+};
 type LiveActivityPage = ActivityPage;
-type LiveBillingStatus = { status: 'inactive' | 'trialing' | 'active' | 'past_due' | 'canceled'; allowed: boolean; reason: 'active' | 'trialing' | 'trial_expired' | 'past_due' | 'canceled' | 'inactive'; trialEndsAt: string | null };
+type LiveBillingStatus = {
+  status: "inactive" | "trialing" | "active" | "past_due" | "canceled";
+  allowed: boolean;
+  reason:
+    | "active"
+    | "trialing"
+    | "trial_expired"
+    | "past_due"
+    | "canceled"
+    | "inactive";
+  trialEndsAt: string | null;
+};
 
 const fmt = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -168,6 +256,7 @@ export function PortfolioApp({
   );
   const [email, setEmail] = useState<string>();
   const [userId, setUserId] = useState<string>();
+  const [authLoading, setAuthLoading] = useState(Boolean(supabaseConfig));
   const [accounts, setAccounts] = useState<LiveAccount[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(false);
   const [accountsError, setAccountsError] = useState<string>();
@@ -193,7 +282,9 @@ export function PortfolioApp({
   const [reportError, setReportError] = useState<string>();
   const [reportRequestVersion, setReportRequestVersion] = useState(0);
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>("all");
-  const [reportScope, setReportScope] = useState<"account" | "consolidated">("account");
+  const [reportScope, setReportScope] = useState<"account" | "consolidated">(
+    "account",
+  );
   const [activityPage, setActivityPage] = useState<LiveActivityPage>();
   const [activityOffset, setActivityOffset] = useState(0);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -255,15 +346,20 @@ export function PortfolioApp({
       if (active && generation === authGeneration.current) {
         setEmail(data.user?.email);
         setUserId(data.user?.id);
+        setAuthLoading(false);
       }
     });
-    const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
-      authGeneration.current += 1;
-      const nextUserId = session?.user.id;
-      if (!nextUserId || (userId && nextUserId !== userId)) clearSessionWorkspaceState();
-      setEmail(session?.user.email);
-      setUserId(nextUserId);
-    });
+    const { data: listener } = client.auth.onAuthStateChange(
+      (_event, session) => {
+        authGeneration.current += 1;
+        const nextUserId = session?.user.id;
+        if (!nextUserId || (userId && nextUserId !== userId))
+          clearSessionWorkspaceState();
+        setEmail(session?.user.email);
+        setUserId(nextUserId);
+        setAuthLoading(false);
+      },
+    );
     return () => {
       active = false;
       listener.subscription.unsubscribe();
@@ -279,20 +375,51 @@ export function PortfolioApp({
   }, [selectedAccountId]);
 
   useEffect(() => {
-    if (!client || !userId || !apiConfig) { setBillingStatus(undefined); return; }
+    if (!client || !userId || !apiConfig) {
+      setBillingStatus(undefined);
+      return;
+    }
     let active = true;
     void client.auth.getSession().then(async ({ data }) => {
       if (!data.session?.access_token) return;
-      const response = await fetch(`${apiConfig.baseUrl}/v1/billing/status`, { headers: { authorization: `Bearer ${data.session.access_token}` } });
+      const response = await fetch(`${apiConfig.baseUrl}/v1/billing/status`, {
+        headers: { authorization: `Bearer ${data.session.access_token}` },
+      });
       if (!response.ok) return;
-      const payload = await response.json().catch(() => undefined) as { entitlement?: { status?: unknown; trialEndsAt?: unknown }; access?: { allowed?: unknown; reason?: unknown } } | undefined;
+      const payload = (await response.json().catch(() => undefined)) as
+        | {
+            entitlement?: { status?: unknown; trialEndsAt?: unknown };
+            access?: { allowed?: unknown; reason?: unknown };
+          }
+        | undefined;
       const status = payload?.entitlement?.status;
       const reason = payload?.access?.reason;
       const trialEndsAt = payload?.entitlement?.trialEndsAt;
-      if (!active || (status !== 'inactive' && status !== 'trialing' && status !== 'active' && status !== 'past_due' && status !== 'canceled') || (reason !== 'active' && reason !== 'trialing' && reason !== 'trial_expired' && reason !== 'past_due' && reason !== 'canceled' && reason !== 'inactive')) return;
-      setBillingStatus({ status, allowed: payload?.access?.allowed === true, reason, trialEndsAt: typeof trialEndsAt === 'string' ? trialEndsAt : null });
+      if (
+        !active ||
+        (status !== "inactive" &&
+          status !== "trialing" &&
+          status !== "active" &&
+          status !== "past_due" &&
+          status !== "canceled") ||
+        (reason !== "active" &&
+          reason !== "trialing" &&
+          reason !== "trial_expired" &&
+          reason !== "past_due" &&
+          reason !== "canceled" &&
+          reason !== "inactive")
+      )
+        return;
+      setBillingStatus({
+        status,
+        allowed: payload?.access?.allowed === true,
+        reason,
+        trialEndsAt: typeof trialEndsAt === "string" ? trialEndsAt : null,
+      });
     });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [apiConfig, client, userId]);
 
   useEffect(() => {
@@ -331,26 +458,73 @@ export function PortfolioApp({
   }, [accounts, selectedAccountId]);
 
   useEffect(() => {
-    if (!client || !apiConfig || !userId || !selectedAccountId) { setOpeningHistory(undefined); return; }
+    if (!client || !apiConfig || !userId || !selectedAccountId) {
+      setOpeningHistory(undefined);
+      return;
+    }
     let active = true;
     setOpeningHistoryLoading(true);
-    void client.auth.getSession().then(async ({ data }) => {
-      if (!data.session?.access_token) return;
-      const response = await fetch(`${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/opening-history`, { headers: { authorization: `Bearer ${data.session.access_token}` } });
-      const payload: unknown = await response.json();
-      if (!response.ok) throw new Error('Opening history is unavailable.');
-      if (active && payload && typeof payload === 'object' && 'history' in payload) setOpeningHistory((payload as { history: LiveOpeningHistory | null }).history ?? undefined);
-    }).catch(() => { if (active) setOpeningHistory(undefined); }).finally(() => { if (active) setOpeningHistoryLoading(false); });
-    return () => { active = false; };
+    void client.auth
+      .getSession()
+      .then(async ({ data }) => {
+        if (!data.session?.access_token) return;
+        const response = await fetch(
+          `${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/opening-history`,
+          { headers: { authorization: `Bearer ${data.session.access_token}` } },
+        );
+        const payload: unknown = await response.json();
+        if (!response.ok) throw new Error("Opening history is unavailable.");
+        if (
+          active &&
+          payload &&
+          typeof payload === "object" &&
+          "history" in payload
+        )
+          setOpeningHistory(
+            (payload as { history: LiveOpeningHistory | null }).history ??
+              undefined,
+          );
+      })
+      .catch(() => {
+        if (active) setOpeningHistory(undefined);
+      })
+      .finally(() => {
+        if (active) setOpeningHistoryLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [apiConfig, client, selectedAccountId, userId]);
 
   async function saveOpeningHistory(history: OpeningHistory) {
-    if (!client || !apiConfig || !selectedAccountId) throw new Error('Select an account first.');
+    if (!client || !apiConfig || !selectedAccountId)
+      throw new Error("Select an account first.");
     const { data } = await client.auth.getSession();
-    if (!data.session?.access_token) throw new Error('Your sign-in session has expired.');
-    const response = await fetch(`${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/opening-history`, { method: 'PUT', headers: { authorization: `Bearer ${data.session.access_token}`, 'content-type': 'application/json' }, body: JSON.stringify(history) });
+    if (!data.session?.access_token)
+      throw new Error("Your sign-in session has expired.");
+    const response = await fetch(
+      `${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/opening-history`,
+      {
+        method: "PUT",
+        headers: {
+          authorization: `Bearer ${data.session.access_token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(history),
+      },
+    );
     const payload: unknown = await response.json();
-    if (!response.ok || !payload || typeof payload !== 'object' || !('history' in payload)) throw new Error(payload && typeof payload === 'object' && 'error' in payload ? String(payload.error) : 'Opening history could not be saved.');
+    if (
+      !response.ok ||
+      !payload ||
+      typeof payload !== "object" ||
+      !("history" in payload)
+    )
+      throw new Error(
+        payload && typeof payload === "object" && "error" in payload
+          ? String(payload.error)
+          : "Opening history could not be saved.",
+      );
     setOpeningHistory((payload as { history: LiveOpeningHistory }).history);
   }
 
@@ -390,34 +564,104 @@ export function PortfolioApp({
   }, [apiConfig, client, historyVersion, selectedAccountId, userId]);
 
   useEffect(() => {
-    if (!client || !apiConfig || !userId || !selectedAccountId) { setFreshnessReport(undefined); return; }
+    if (!client || !apiConfig || !userId || !selectedAccountId) {
+      setFreshnessReport(undefined);
+      return;
+    }
     let active = true;
     setFreshnessLoading(true);
     setFreshnessError(undefined);
-    void client.auth.getSession().then(async ({ data }) => {
-      if (!data.session?.access_token) throw new Error('Your sign-in session has expired.');
-      const response = await fetch(`${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/price-freshness`, { headers: { authorization: `Bearer ${data.session.access_token}` } });
-      const payload: unknown = await response.json();
-      if (!response.ok) throw new Error(payload && typeof payload === 'object' && 'error' in payload ? String(payload.error).replaceAll('_', ' ') : 'Freshness data is unavailable.');
-      if (active && payload && typeof payload === 'object' && 'report' in payload) setFreshnessReport((payload as { report: LiveFreshnessReport }).report);
-    }).catch((error) => { if (active) setFreshnessError(error instanceof Error ? error.message : 'Freshness data is unavailable.'); }).finally(() => { if (active) setFreshnessLoading(false); });
-    return () => { active = false; };
+    void client.auth
+      .getSession()
+      .then(async ({ data }) => {
+        if (!data.session?.access_token)
+          throw new Error("Your sign-in session has expired.");
+        const response = await fetch(
+          `${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/price-freshness`,
+          { headers: { authorization: `Bearer ${data.session.access_token}` } },
+        );
+        const payload: unknown = await response.json();
+        if (!response.ok)
+          throw new Error(
+            payload && typeof payload === "object" && "error" in payload
+              ? String(payload.error).replaceAll("_", " ")
+              : "Freshness data is unavailable.",
+          );
+        if (
+          active &&
+          payload &&
+          typeof payload === "object" &&
+          "report" in payload
+        )
+          setFreshnessReport(
+            (payload as { report: LiveFreshnessReport }).report,
+          );
+      })
+      .catch((error) => {
+        if (active)
+          setFreshnessError(
+            error instanceof Error
+              ? error.message
+              : "Freshness data is unavailable.",
+          );
+      })
+      .finally(() => {
+        if (active) setFreshnessLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [apiConfig, client, selectedAccountId, userId, freshnessRequestVersion]);
 
   useEffect(() => {
-    if (!client || !apiConfig || !userId || !selectedAccountId) { setReportSnapshot(undefined); return; }
+    if (!client || !apiConfig || !userId || !selectedAccountId) {
+      setReportSnapshot(undefined);
+      return;
+    }
     let active = true;
     setReportLoading(true);
     setReportError(undefined);
-    void client.auth.getSession().then(async ({ data }) => {
-      if (!data.session?.access_token) return;
-      const response = await fetch(`${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/report`, { headers: { authorization: `Bearer ${data.session.access_token}` } });
-      if (response.status === 404) { if (active) setReportSnapshot(undefined); return; }
-      const payload: unknown = await response.json();
-      if (!response.ok || !payload || typeof payload !== 'object' || !('snapshot' in payload)) throw new Error('The persisted report is unavailable.');
-      if (active) setReportSnapshot((payload as { snapshot: LiveReportSnapshot }).snapshot);
-    }).catch((error) => { if (active) { setReportSnapshot(undefined); setReportError(error instanceof Error ? error.message : 'The persisted report is unavailable.'); } }).finally(() => { if (active) setReportLoading(false); });
-    return () => { active = false; };
+    void client.auth
+      .getSession()
+      .then(async ({ data }) => {
+        if (!data.session?.access_token) return;
+        const response = await fetch(
+          `${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/report`,
+          { headers: { authorization: `Bearer ${data.session.access_token}` } },
+        );
+        if (response.status === 404) {
+          if (active) setReportSnapshot(undefined);
+          return;
+        }
+        const payload: unknown = await response.json();
+        if (
+          !response.ok ||
+          !payload ||
+          typeof payload !== "object" ||
+          !("snapshot" in payload)
+        )
+          throw new Error("The persisted report is unavailable.");
+        if (active)
+          setReportSnapshot(
+            (payload as { snapshot: LiveReportSnapshot }).snapshot,
+          );
+      })
+      .catch((error) => {
+        if (active) {
+          setReportSnapshot(undefined);
+          setReportError(
+            error instanceof Error
+              ? error.message
+              : "The persisted report is unavailable.",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setReportLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [apiConfig, client, selectedAccountId, userId, reportRequestVersion]);
 
   useEffect(() => {
@@ -431,24 +675,55 @@ export function PortfolioApp({
     let active = true;
     setActivityLoading(true);
     setActivityError(undefined);
-    void client.auth.getSession().then(async ({ data }) => {
-      if (!data.session?.access_token) throw new Error('Your sign-in session has expired.');
-      const url = new URL(`${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/activity`);
-      url.searchParams.set('limit', '25');
-      url.searchParams.set('offset', String(activityOffset));
-      const response = await fetch(url, { headers: { authorization: `Bearer ${data.session.access_token}` } });
-      const payload: unknown = await response.json();
-      if (!response.ok) throw new Error(payload && typeof payload === 'object' && 'error' in payload ? String(payload.error).replaceAll('_', ' ') : 'Activity data is unavailable.');
-      if (!payload || typeof payload !== 'object' || !('activity' in payload)) throw new Error('Activity data is unavailable.');
-      if (active) setActivityPage((payload as { activity: LiveActivityPage }).activity);
-    }).catch((error) => {
-      if (active) {
-        setActivityPage(undefined);
-        setActivityError(error instanceof Error ? error.message : 'Activity data is unavailable.');
-      }
-    }).finally(() => { if (active) setActivityLoading(false); });
-    return () => { active = false; };
-  }, [apiConfig, client, selectedAccountId, userId, activityOffset, activityRequestVersion]);
+    void client.auth
+      .getSession()
+      .then(async ({ data }) => {
+        if (!data.session?.access_token)
+          throw new Error("Your sign-in session has expired.");
+        const url = new URL(
+          `${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/activity`,
+        );
+        url.searchParams.set("limit", "25");
+        url.searchParams.set("offset", String(activityOffset));
+        const response = await fetch(url, {
+          headers: { authorization: `Bearer ${data.session.access_token}` },
+        });
+        const payload: unknown = await response.json();
+        if (!response.ok)
+          throw new Error(
+            payload && typeof payload === "object" && "error" in payload
+              ? String(payload.error).replaceAll("_", " ")
+              : "Activity data is unavailable.",
+          );
+        if (!payload || typeof payload !== "object" || !("activity" in payload))
+          throw new Error("Activity data is unavailable.");
+        if (active)
+          setActivityPage((payload as { activity: LiveActivityPage }).activity);
+      })
+      .catch((error) => {
+        if (active) {
+          setActivityPage(undefined);
+          setActivityError(
+            error instanceof Error
+              ? error.message
+              : "Activity data is unavailable.",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setActivityLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [
+    apiConfig,
+    client,
+    selectedAccountId,
+    userId,
+    activityOffset,
+    activityRequestVersion,
+  ]);
 
   async function createAccount(input: {
     name: string;
@@ -479,19 +754,33 @@ export function PortfolioApp({
   }
 
   async function downloadLiveExport(kind: "activity" | "report") {
-    if (!client || !apiConfig || !selectedAccountId) throw new Error("Select an account before exporting.");
+    if (!client || !apiConfig || !selectedAccountId)
+      throw new Error("Select an account before exporting.");
     const { data } = await client.auth.getSession();
-    if (!data.session?.access_token) throw new Error("Your sign-in session has expired. Sign in again before exporting.");
-    const response = await fetch(`${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/${kind}.csv`, { headers: { authorization: `Bearer ${data.session.access_token}` } });
+    if (!data.session?.access_token)
+      throw new Error(
+        "Your sign-in session has expired. Sign in again before exporting.",
+      );
+    const response = await fetch(
+      `${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/${kind}.csv`,
+      { headers: { authorization: `Bearer ${data.session.access_token}` } },
+    );
     if (!response.ok) {
       const payload: unknown = await response.json().catch(() => undefined);
-      throw new Error(payload && typeof payload === "object" && "error" in payload ? String(payload.error).replaceAll("_", " ") : "This export is not available yet.");
+      throw new Error(
+        payload && typeof payload === "object" && "error" in payload
+          ? String(payload.error).replaceAll("_", " ")
+          : "This export is not available yet.",
+      );
     }
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = response.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1] ?? `northstar-${kind}.csv`;
+    link.download =
+      response.headers
+        .get("content-disposition")
+        ?.match(/filename="([^"]+)"/)?.[1] ?? `northstar-${kind}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -499,22 +788,52 @@ export function PortfolioApp({
   }
 
   async function openBillingPortal() {
-    if (!client || !apiConfig) throw new Error("Billing is not configured for this environment.");
+    if (!client || !apiConfig)
+      throw new Error("Billing is not configured for this environment.");
     const { data } = await client.auth.getSession();
-    if (!data.session?.access_token) throw new Error("Your sign-in session has expired. Sign in again before managing billing.");
-    const response = await fetch(`${apiConfig.baseUrl}/v1/billing/portal`, { method: "POST", headers: { authorization: `Bearer ${data.session.access_token}` } });
+    if (!data.session?.access_token)
+      throw new Error(
+        "Your sign-in session has expired. Sign in again before managing billing.",
+      );
+    const response = await fetch(`${apiConfig.baseUrl}/v1/billing/portal`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${data.session.access_token}` },
+    });
     const payload: unknown = await response.json();
-    if (!response.ok || !payload || typeof payload !== "object" || !("url" in payload)) throw new Error("Billing is not available yet.");
+    if (
+      !response.ok ||
+      !payload ||
+      typeof payload !== "object" ||
+      !("url" in payload)
+    )
+      throw new Error("Billing is not available yet.");
     window.location.assign(String(payload.url));
   }
 
   async function requestDeletion() {
-    if (!client || !apiConfig) throw new Error("Account deletion is not configured for this environment.");
+    if (!client || !apiConfig)
+      throw new Error(
+        "Account deletion is not configured for this environment.",
+      );
     const { data } = await client.auth.getSession();
-    if (!data.session?.access_token) throw new Error("Your sign-in session has expired. Sign in again before requesting deletion.");
-    const response = await fetch(`${apiConfig.baseUrl}/v1/me/deletion-request`, { method: "POST", headers: { authorization: `Bearer ${data.session.access_token}` } });
+    if (!data.session?.access_token)
+      throw new Error(
+        "Your sign-in session has expired. Sign in again before requesting deletion.",
+      );
+    const response = await fetch(
+      `${apiConfig.baseUrl}/v1/me/deletion-request`,
+      {
+        method: "POST",
+        headers: { authorization: `Bearer ${data.session.access_token}` },
+      },
+    );
     const payload: unknown = await response.json().catch(() => undefined);
-    if (!response.ok) throw new Error(payload && typeof payload === "object" && "error" in payload ? String(payload.error).replaceAll("_", " ") : "Account deletion is not available yet.");
+    if (!response.ok)
+      throw new Error(
+        payload && typeof payload === "object" && "error" in payload
+          ? String(payload.error).replaceAll("_", " ")
+          : "Account deletion is not available yet.",
+      );
   }
 
   function clearStaging() {
@@ -779,7 +1098,9 @@ export function PortfolioApp({
     }
   }
 
-  return (
+  return authLoading ? (
+    <SessionLoadingState />
+  ) : (
     <main className="min-h-screen bg-[#f5f7fb] text-[#13233a]">
       <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-[#f5f7fb]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-4 md:px-8">
@@ -859,7 +1180,32 @@ export function PortfolioApp({
             <Menu size={18} />
           </button>
           {active === "Overview" && (
-            <Overview summary={summary} onUpload={openFileChooser} onOpenAccounts={() => setActive("Accounts")} freshnessReport={freshnessReport} freshnessLoading={freshnessLoading} freshnessError={freshnessError} onRetryFreshness={() => setFreshnessRequestVersion((value) => value + 1)} reportSnapshot={reportSnapshot} reportLoading={reportLoading} reportError={reportError} onRetryReport={() => setReportRequestVersion((value) => value + 1)} accounts={accounts} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} reportPeriod={reportPeriod} onSelectReportPeriod={setReportPeriod} reportScope={reportScope} onSelectReportScope={setReportScope} openingHistory={openingHistory} isLiveAccount={Boolean(client && userId && selectedAccountId)} />
+            <Overview
+              summary={summary}
+              onUpload={openFileChooser}
+              onOpenAccounts={() => setActive("Accounts")}
+              freshnessReport={freshnessReport}
+              freshnessLoading={freshnessLoading}
+              freshnessError={freshnessError}
+              onRetryFreshness={() =>
+                setFreshnessRequestVersion((value) => value + 1)
+              }
+              reportSnapshot={reportSnapshot}
+              reportLoading={reportLoading}
+              reportError={reportError}
+              onRetryReport={() =>
+                setReportRequestVersion((value) => value + 1)
+              }
+              accounts={accounts}
+              selectedAccountId={selectedAccountId}
+              onSelectAccount={setSelectedAccountId}
+              reportPeriod={reportPeriod}
+              onSelectReportPeriod={setReportPeriod}
+              reportScope={reportScope}
+              onSelectReportScope={setReportScope}
+              openingHistory={openingHistory}
+              isLiveAccount={Boolean(client && userId && selectedAccountId)}
+            />
           )}
           {active === "Activity" && (
             <ActivityPanel
@@ -869,7 +1215,9 @@ export function PortfolioApp({
               isLoading={activityLoading}
               loadError={activityError}
               onRetry={() => setActivityRequestVersion((value) => value + 1)}
-              onPrevious={() => setActivityOffset((value) => Math.max(0, value - 25))}
+              onPrevious={() =>
+                setActivityOffset((value) => Math.max(0, value - 25))
+              }
               onNext={() => setActivityOffset((value) => value + 25)}
               filter={activityFilter}
               onFilterChange={setActivityFilter}
@@ -998,70 +1346,310 @@ function Overview({
   const hasLiveReport = Boolean(reportSnapshot);
   const showDemo = !isLiveAccount;
   const chartData = hasLiveReport
-    ? filterReportHistory(reportSnapshot?.payload.valueHistory ?? [], reportPeriod).map((point) => ({ date: point.date, value: point.value === null ? null : Number(point.value) }))
-    : showDemo ? demoPrices : [];
+    ? filterReportHistory(
+        reportSnapshot?.payload.valueHistory ?? [],
+        reportPeriod,
+      ).map((point) => ({
+        date: point.date,
+        value: point.value === null ? null : Number(point.value),
+      }))
+    : showDemo
+      ? demoPrices
+      : [];
   const dashboardWarnings = getDashboardWarnings({
     isLiveAccount,
     reportLoading,
     reportError,
-    report: reportSnapshot ? { asOfDate: reportSnapshot.asOfDate, totalValue: reportSnapshot.payload.totalValue, holdings: reportSnapshot.payload.holdings } : undefined,
-    freshness: freshnessReport ? { expectedDate: freshnessReport.expectedDate, rows: freshnessReport.rows } : undefined,
+    report: reportSnapshot
+      ? {
+          asOfDate: reportSnapshot.asOfDate,
+          totalValue: reportSnapshot.payload.totalValue,
+          holdings: reportSnapshot.payload.holdings,
+        }
+      : undefined,
+    freshness: freshnessReport
+      ? {
+          expectedDate: freshnessReport.expectedDate,
+          rows: freshnessReport.rows,
+        }
+      : undefined,
     openingHistory,
   });
   return (
     <>
       <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <Pill tone={hasLiveReport ? "green" : "gold"}>{hasLiveReport ? "Your account" : showDemo ? "Demo data" : "Awaiting report"}</Pill>
+          <Pill tone={hasLiveReport ? "green" : "gold"}>
+            {hasLiveReport
+              ? "Your account"
+              : showDemo
+                ? "Demo data"
+                : "Awaiting report"}
+          </Pill>
           <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
-            {hasLiveReport || isLiveAccount ? "Portfolio overview" : "Portfolio example"}
+            {hasLiveReport || isLiveAccount
+              ? "Portfolio overview"
+              : "Portfolio example"}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            {hasLiveReport ? `As of ${reportSnapshot?.asOfDate}. Values come from your persisted report snapshot.` : showDemo ? "A fictional long-term portfolio used to preview the product." : "No persisted report is available for this account yet."}
+            {hasLiveReport
+              ? `As of ${reportSnapshot?.asOfDate}. Values come from your persisted report snapshot.`
+              : showDemo
+                ? "A fictional long-term portfolio used to preview the product."
+                : "No persisted report is available for this account yet."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {accounts.length > 0 && <label className="text-xs font-semibold text-slate-500">Account<select aria-label="Select account for report" value={selectedAccountId ?? accounts[0].id} onChange={(event) => onSelectAccount(event.target.value)} className="ml-2 h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm outline-none focus:border-[#185da8] focus:ring-2 focus:ring-[#185da8]/20">{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>}
-          {isLiveAccount && <label className="text-xs font-semibold text-slate-500">Scope<select aria-label="Select report scope" value={reportScope} onChange={(event) => onSelectReportScope(event.target.value as "account" | "consolidated")} className="ml-2 h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm outline-none focus:border-[#185da8] focus:ring-2 focus:ring-[#185da8]/20"><option value="account">This account</option><option value="consolidated" disabled>All accounts (coming soon)</option></select></label>}
-          {hasLiveReport && <label className="text-xs font-semibold text-slate-500">Chart period<select aria-label="Select report chart period" value={reportPeriod} onChange={(event) => onSelectReportPeriod(event.target.value as ReportPeriod)} className="ml-2 h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm outline-none focus:border-[#185da8] focus:ring-2 focus:ring-[#185da8]/20">{reportPeriodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}
-          <Button onClick={onUpload} className="h-11 rounded-xl bg-[#185da8] px-5 text-white hover:bg-[#154f8e]"><Upload size={17} />Preview a CSV</Button>
+          {accounts.length > 0 && (
+            <label className="text-xs font-semibold text-slate-500">
+              Account
+              <select
+                aria-label="Select account for report"
+                value={selectedAccountId ?? accounts[0].id}
+                onChange={(event) => onSelectAccount(event.target.value)}
+                className="ml-2 h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm outline-none focus:border-[#185da8] focus:ring-2 focus:ring-[#185da8]/20"
+              >
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {isLiveAccount && (
+            <label className="text-xs font-semibold text-slate-500">
+              Scope
+              <select
+                aria-label="Select report scope"
+                value={reportScope}
+                onChange={(event) =>
+                  onSelectReportScope(
+                    event.target.value as "account" | "consolidated",
+                  )
+                }
+                className="ml-2 h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm outline-none focus:border-[#185da8] focus:ring-2 focus:ring-[#185da8]/20"
+              >
+                <option value="account">This account</option>
+                <option value="consolidated" disabled>
+                  All accounts (coming soon)
+                </option>
+              </select>
+            </label>
+          )}
+          {hasLiveReport && (
+            <label className="text-xs font-semibold text-slate-500">
+              Chart period
+              <select
+                aria-label="Select report chart period"
+                value={reportPeriod}
+                onChange={(event) =>
+                  onSelectReportPeriod(event.target.value as ReportPeriod)
+                }
+                className="ml-2 h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm outline-none focus:border-[#185da8] focus:ring-2 focus:ring-[#185da8]/20"
+              >
+                {reportPeriodOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <Button
+            onClick={onUpload}
+            className="h-11 rounded-xl bg-[#185da8] px-5 text-white hover:bg-[#154f8e]"
+          >
+            <Upload size={17} />
+            Preview a CSV
+          </Button>
         </div>
       </div>
       {(freshnessLoading || freshnessError || freshnessReport) && (
         <section className="mb-7 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><p className="text-sm font-bold">Stored price freshness</p><p className="mt-1 text-xs text-slate-500">Expected through {freshnessReport?.expectedDate ?? "—"}</p></div>
+            <div>
+              <p className="text-sm font-bold">Stored price freshness</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Expected through {freshnessReport?.expectedDate ?? "—"}
+              </p>
+            </div>
             {freshnessLoading && <Pill>Checking…</Pill>}
             {freshnessError && <Pill tone="gold">Unavailable</Pill>}
-            {freshnessReport && !freshnessLoading && <div className="flex gap-2 text-xs font-semibold"><Pill tone="green">{freshnessReport.rows.filter((row) => row.status === "current").length} current</Pill><Pill tone="gold">{freshnessReport.rows.filter((row) => row.status === "stale").length} stale</Pill><Pill>{freshnessReport.rows.filter((row) => row.status === "missing").length} missing</Pill></div>}
+            {freshnessReport && !freshnessLoading && (
+              <div className="flex gap-2 text-xs font-semibold">
+                <Pill tone="green">
+                  {
+                    freshnessReport.rows.filter(
+                      (row) => row.status === "current",
+                    ).length
+                  }{" "}
+                  current
+                </Pill>
+                <Pill tone="gold">
+                  {
+                    freshnessReport.rows.filter((row) => row.status === "stale")
+                      .length
+                  }{" "}
+                  stale
+                </Pill>
+                <Pill>
+                  {
+                    freshnessReport.rows.filter(
+                      (row) => row.status === "missing",
+                    ).length
+                  }{" "}
+                  missing
+                </Pill>
+              </div>
+            )}
           </div>
-          {freshnessError && <div className="mt-3 flex flex-wrap items-center gap-3"><p className="text-sm text-amber-800">{freshnessError}</p><button type="button" onClick={onRetryFreshness} className="text-sm font-bold text-[#185da8] underline underline-offset-2">Retry</button></div>}
-          {freshnessReport && freshnessReport.rows.length > 0 && <ul aria-label="Price freshness by symbol" className="mt-4 grid gap-2 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-3">{freshnessReport.rows.map((row) => <li key={`${row.symbol}-${row.expectedDate}`} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-xs"><span className="font-bold text-slate-700">{row.symbol}</span><span className={row.status === "current" ? "font-semibold text-emerald-700" : row.status === "stale" ? "font-semibold text-amber-700" : "font-semibold text-slate-500"}>{row.status === "current" ? `Current · ${row.latestDate}` : row.status === "stale" ? `Stale · ${row.latestDate ?? "no close"}` : "Missing · no close"}</span></li>)}</ul>}
+          {freshnessError && (
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <p className="text-sm text-amber-800">{freshnessError}</p>
+              <button
+                type="button"
+                onClick={onRetryFreshness}
+                className="text-sm font-bold text-[#185da8] underline underline-offset-2"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {freshnessReport && freshnessReport.rows.length > 0 && (
+            <ul
+              aria-label="Price freshness by symbol"
+              className="mt-4 grid gap-2 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-3"
+            >
+              {freshnessReport.rows.map((row) => (
+                <li
+                  key={`${row.symbol}-${row.expectedDate}`}
+                  className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-xs"
+                >
+                  <span className="font-bold text-slate-700">{row.symbol}</span>
+                  <span
+                    className={
+                      row.status === "current"
+                        ? "font-semibold text-emerald-700"
+                        : row.status === "stale"
+                          ? "font-semibold text-amber-700"
+                          : "font-semibold text-slate-500"
+                    }
+                  >
+                    {row.status === "current"
+                      ? `Current · ${row.latestDate}`
+                      : row.status === "stale"
+                        ? `Stale · ${row.latestDate ?? "no close"}`
+                        : "Missing · no close"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
-      {reportLoading && <section className="mb-7 rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-500 shadow-sm">Loading your persisted report…</section>}
-      {reportError && <section role="alert" className="mb-7 flex flex-wrap items-center gap-3 rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800"><span>{reportError}</span><button type="button" onClick={onRetryReport} className="font-bold underline underline-offset-2">Retry</button></section>}
-      {dashboardWarnings.length > 0 && <DashboardWarningList warnings={dashboardWarnings} onUpload={onUpload} onOpenAccounts={onOpenAccounts} onRetryReport={onRetryReport} />}
-      {hasLiveReport && <section aria-label="Report coverage" className="mb-7 grid gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2"><div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Activity covered through</p><p className="mt-1 text-sm font-semibold text-slate-700">{reportSnapshot?.payload.activityCoveredThrough ?? "Unavailable"}</p></div><div><p className="text-xs font-bold uppercase tracking-wide text-slate-400">Prices through</p><p className="mt-1 text-sm font-semibold text-slate-700">{reportSnapshot?.payload.pricesThrough ?? "Unavailable"}</p></div></section>}
-      {hasLiveReport && <section aria-label="Report methodology" className="mb-7 rounded-3xl border border-sky-200 bg-sky-50 p-5 text-sm text-sky-950 shadow-sm"><p className="font-bold">How these figures are calculated</p><p className="mt-2 leading-6">{reportSnapshot?.payload.methodology?.disclosure ?? "Daily returns use Modified Dietz intervals. External cash flows are approximated at the midpoint of their day, missing valuation periods remain unavailable, and returns are not annualized."}</p><p className="mt-2 text-xs font-semibold text-sky-800">Realized gains/losses are analytical FIFO estimates and are not tax reporting.</p></section>}
+      {reportLoading && (
+        <section className="mb-7 rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-500 shadow-sm">
+          Loading your persisted report…
+        </section>
+      )}
+      {reportError && (
+        <section
+          role="alert"
+          className="mb-7 flex flex-wrap items-center gap-3 rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800"
+        >
+          <span>{reportError}</span>
+          <button
+            type="button"
+            onClick={onRetryReport}
+            className="font-bold underline underline-offset-2"
+          >
+            Retry
+          </button>
+        </section>
+      )}
+      {dashboardWarnings.length > 0 && (
+        <DashboardWarningList
+          warnings={dashboardWarnings}
+          onUpload={onUpload}
+          onOpenAccounts={onOpenAccounts}
+          onRetryReport={onRetryReport}
+        />
+      )}
+      {hasLiveReport && (
+        <section
+          aria-label="Report coverage"
+          className="mb-7 grid gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2"
+        >
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+              Activity covered through
+            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-700">
+              {reportSnapshot?.payload.activityCoveredThrough ?? "Unavailable"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+              Prices through
+            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-700">
+              {reportSnapshot?.payload.pricesThrough ?? "Unavailable"}
+            </p>
+          </div>
+        </section>
+      )}
+      {hasLiveReport && (
+        <section
+          aria-label="Report methodology"
+          className="mb-7 rounded-3xl border border-sky-200 bg-sky-50 p-5 text-sm text-sky-950 shadow-sm"
+        >
+          <p className="font-bold">How these figures are calculated</p>
+          <p className="mt-2 leading-6">
+            {reportSnapshot?.payload.methodology?.disclosure ??
+              "Daily returns use Modified Dietz intervals. External cash flows are approximated at the midpoint of their day, missing valuation periods remain unavailable, and returns are not annualized."}
+          </p>
+          <p className="mt-2 text-xs font-semibold text-sky-800">
+            Realized gains/losses are analytical FIFO estimates and are not tax
+            reporting.
+          </p>
+        </section>
+      )}
       <div className="mb-7 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,.85fr)]">
         <section className="overflow-hidden rounded-3xl bg-[#152b4a] p-6 text-white shadow-[0_18px_55px_rgba(21,43,74,.16)] md:p-8">
           <div className="flex items-start justify-between">
             <div>
               <p className="mb-3 text-sm font-semibold text-slate-300">
-                {showDemo ? "Example portfolio value" : `Portfolio value · ${reportPeriodDescription(reportPeriod)}`}
+                {showDemo
+                  ? "Example portfolio value"
+                  : `Portfolio value · ${reportPeriodDescription(reportPeriod)}`}
               </p>
               <h2 className="text-4xl font-semibold tracking-tight md:text-5xl">
-                {liveValue != null ? precise.format(Number(liveValue)) : showDemo ? fmt.format(summary.value) : "—"}
+                {liveValue != null
+                  ? precise.format(Number(liveValue))
+                  : showDemo
+                    ? fmt.format(summary.value)
+                    : "—"}
               </h2>
               <p className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-emerald-300">
                 <ArrowUpRight size={17} />
-                {liveReturn != null ? `${(Number(liveReturn) * 100).toFixed(1)}% stored return` : showDemo ? `${precise.format(summary.gain)} (${summary.returnPercent.toFixed(1)}%) in this example` : "Return unavailable until a report is published"}
+                {liveReturn != null
+                  ? `${(Number(liveReturn) * 100).toFixed(1)}% stored return`
+                  : showDemo
+                    ? `${precise.format(summary.gain)} (${summary.returnPercent.toFixed(1)}%) in this example`
+                    : "Return unavailable until a report is published"}
               </p>
             </div>
-            <Pill tone={hasLiveReport ? "green" : "gold"}>{hasLiveReport ? "Persisted" : "Synthetic"}</Pill>
+            <Pill tone={hasLiveReport ? "green" : "gold"}>
+              {hasLiveReport ? "Persisted" : "Synthetic"}
+            </Pill>
           </div>
-          {hasLiveReport && <p className="mt-2 text-xs text-slate-300">The chart window changes with the selected period. Headline metrics use the latest stored report.</p>}
+          {hasLiveReport && (
+            <p className="mt-2 text-xs text-slate-300">
+              The chart window changes with the selected period. Headline
+              metrics use the latest stored report.
+            </p>
+          )}
           <div className="mt-8 h-44">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData}>
@@ -1097,89 +1685,393 @@ function Overview({
               </AreaChart>
             </ResponsiveContainer>
           </div>
-          {isLiveAccount && chartData.length === 0 && <p className="mt-2 text-xs text-slate-300">No persisted valuation history is available yet.</p>}
+          {isLiveAccount && chartData.length === 0 && (
+            <p className="mt-2 text-xs text-slate-300">
+              No persisted valuation history is available yet.
+            </p>
+          )}
         </section>
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm font-semibold text-slate-500">{showDemo ? "Example return" : "Your return"}</p>
+          <p className="text-sm font-semibold text-slate-500">
+            {showDemo ? "Example return" : "Your return"}
+          </p>
           <p className="mt-2 text-3xl font-bold tracking-tight text-emerald-600">
-            {liveReturn != null ? `${(Number(liveReturn) * 100).toFixed(1)}%` : showDemo ? `+${summary.returnPercent.toFixed(1)}%` : "—"}
+            {liveReturn != null
+              ? `${(Number(liveReturn) * 100).toFixed(1)}%`
+              : showDemo
+                ? `+${summary.returnPercent.toFixed(1)}%`
+                : "—"}
           </p>
           <div className="my-6 border-t border-slate-100" />
           <div className="grid grid-cols-2 gap-5">
             <Metric
               label="Dividends"
-              value={liveDividends == null ? (showDemo ? precise.format(summary.dividends) : "—") : precise.format(Number(liveDividends))}
+              value={
+                liveDividends == null
+                  ? showDemo
+                    ? precise.format(summary.dividends)
+                    : "—"
+                  : precise.format(Number(liveDividends))
+              }
             />
             <Metric
               label="Realized gains"
-              value={liveRealized == null ? (showDemo ? precise.format(summary.realized) : "—") : precise.format(Number(liveRealized))}
+              value={
+                liveRealized == null
+                  ? showDemo
+                    ? precise.format(summary.realized)
+                    : "—"
+                  : precise.format(Number(liveRealized))
+              }
             />
-            <Metric label="Cash balance" value={liveCash != null ? precise.format(Number(liveCash)) : showDemo ? precise.format(summary.cash) : "—"} />
-            <Metric label="Price source" value={showDemo ? "Not connected" : "Stored daily closes"} small />
+            <Metric
+              label="Cash balance"
+              value={
+                liveCash != null
+                  ? precise.format(Number(liveCash))
+                  : showDemo
+                    ? precise.format(summary.cash)
+                    : "—"
+              }
+            />
+            <Metric
+              label="Price source"
+              value={showDemo ? "Not connected" : "Stored daily closes"}
+              small
+            />
           </div>
         </section>
       </div>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(300px,.75fr)]">
-          <Holdings liveHoldings={reportSnapshot?.payload.holdings} isLiveAccount={isLiveAccount} />
+        <Holdings
+          liveHoldings={reportSnapshot?.payload.holdings}
+          isLiveAccount={isLiveAccount}
+        />
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-lg font-bold">{showDemo ? "Example income" : "Dividend income"}</h2>
+            <h2 className="text-lg font-bold">
+              {showDemo ? "Example income" : "Dividend income"}
+            </h2>
             <HandCoins size={20} className="text-[#185da8]" />
           </div>
           <p className="text-3xl font-bold tracking-tight">
-            {liveDividends == null ? (showDemo ? precise.format(summary.dividends) : "—") : precise.format(Number(liveDividends))}
+            {liveDividends == null
+              ? showDemo
+                ? precise.format(summary.dividends)
+                : "—"
+              : precise.format(Number(liveDividends))}
           </p>
           <p className="mt-1 text-sm text-slate-500">
-            {liveDividends == null ? (showDemo ? "Synthetic dividends in this scenario" : "No persisted dividend report yet") : "Income recorded from your imported activity"}
+            {liveDividends == null
+              ? showDemo
+                ? "Synthetic dividends in this scenario"
+                : "No persisted dividend report yet"
+              : "Income recorded from your imported activity"}
           </p>
         </section>
       </div>
-      <ReportDetails isLiveAccount={isLiveAccount} totalValue={liveValue ?? null} cash={liveCash ?? null} netDeposits={liveNetDeposits ?? null} holdings={reportSnapshot?.payload.holdings} realizedSales={reportSnapshot?.payload.realizedSales} />
+      <ReportDetails
+        isLiveAccount={isLiveAccount}
+        totalValue={liveValue ?? null}
+        cash={liveCash ?? null}
+        netDeposits={liveNetDeposits ?? null}
+        holdings={reportSnapshot?.payload.holdings}
+        realizedSales={reportSnapshot?.payload.realizedSales}
+      />
     </>
   );
 }
 
-function DashboardWarningList({ warnings, onUpload, onOpenAccounts, onRetryReport }: { warnings: DashboardWarning[]; onUpload: () => void; onOpenAccounts: () => void; onRetryReport: () => void }) {
-  return <section aria-label="Portfolio notices" className="mb-7 space-y-3">
-    {warnings.map((warning) => <article key={warning.kind} role={warning.kind === 'unavailable_prices' ? 'alert' : undefined} className={`rounded-3xl border p-5 text-sm shadow-sm ${warningClass(warning.kind)}`}>
-      <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="font-bold">{warning.title}</p><p className="mt-1 max-w-3xl leading-6">{warning.message}</p></div><button type="button" onClick={warning.action === 'import' ? onUpload : warning.action === 'accounts' ? onOpenAccounts : onRetryReport} className="shrink-0 font-bold underline underline-offset-2">{warning.action === 'import' ? 'Import activity' : warning.action === 'accounts' ? 'Review opening history' : 'Check again'}</button></div>
-    </article>)}
-  </section>;
+function DashboardWarningList({
+  warnings,
+  onUpload,
+  onOpenAccounts,
+  onRetryReport,
+}: {
+  warnings: DashboardWarning[];
+  onUpload: () => void;
+  onOpenAccounts: () => void;
+  onRetryReport: () => void;
+}) {
+  return (
+    <section aria-label="Portfolio notices" className="mb-7 space-y-3">
+      {warnings.map((warning) => (
+        <article
+          key={warning.kind}
+          role={warning.kind === "unavailable_prices" ? "alert" : undefined}
+          className={`rounded-3xl border p-5 text-sm shadow-sm ${warningClass(warning.kind)}`}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="font-bold">{warning.title}</p>
+              <p className="mt-1 max-w-3xl leading-6">{warning.message}</p>
+            </div>
+            <button
+              type="button"
+              onClick={
+                warning.action === "import"
+                  ? onUpload
+                  : warning.action === "accounts"
+                    ? onOpenAccounts
+                    : onRetryReport
+              }
+              className="shrink-0 font-bold underline underline-offset-2"
+            >
+              {warning.action === "import"
+                ? "Import activity"
+                : warning.action === "accounts"
+                  ? "Review opening history"
+                  : "Check again"}
+            </button>
+          </div>
+        </article>
+      ))}
+    </section>
+  );
 }
 
-function warningClass(kind: DashboardWarning['kind']) {
-  if (kind === 'unavailable_prices') return 'border-amber-200 bg-amber-50 text-amber-950';
-  if (kind === 'stale_report') return 'border-amber-200 bg-amber-50 text-amber-900';
-  if (kind === 'partial_history') return 'border-sky-200 bg-sky-50 text-sky-950';
-  if (kind === 'no_holdings') return 'border-slate-200 bg-slate-50 text-slate-800';
-  return 'border-blue-200 bg-blue-50 text-blue-950';
+function warningClass(kind: DashboardWarning["kind"]) {
+  if (kind === "unavailable_prices")
+    return "border-amber-200 bg-amber-50 text-amber-950";
+  if (kind === "stale_report")
+    return "border-amber-200 bg-amber-50 text-amber-900";
+  if (kind === "partial_history")
+    return "border-sky-200 bg-sky-50 text-sky-950";
+  if (kind === "no_holdings")
+    return "border-slate-200 bg-slate-50 text-slate-800";
+  return "border-blue-200 bg-blue-50 text-blue-950";
 }
 
-function ReportDetails({ isLiveAccount, totalValue, cash, netDeposits, holdings, realizedSales }: { isLiveAccount: boolean; totalValue: string | null; cash: string | null; netDeposits: string | null; holdings?: LiveReportHolding[]; realizedSales?: LiveRealizedSale[] }) {
+function ReportDetails({
+  isLiveAccount,
+  totalValue,
+  cash,
+  netDeposits,
+  holdings,
+  realizedSales,
+}: {
+  isLiveAccount: boolean;
+  totalValue: string | null;
+  cash: string | null;
+  netDeposits: string | null;
+  holdings?: LiveReportHolding[];
+  realizedSales?: LiveRealizedSale[];
+}) {
   const rows = buildAllocationRows(holdings ?? [], cash, totalValue);
   const hasReport = totalValue !== null || holdings !== undefined;
   const sales = realizedSales ?? [];
-  return <div className="mt-6 grid gap-6 xl:grid-cols-2">
-    <section aria-label="Capital and allocation" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="mb-5 flex items-center justify-between gap-3"><div><h2 className="text-lg font-bold">Capital & allocation</h2><p className="mt-0.5 text-sm text-slate-500">Portfolio composition from the latest stored valuation.</p></div><PieChart size={20} className="text-[#185da8]" /></div>
-      <div className="mb-6 grid grid-cols-2 gap-4"><Metric label="Net deposits" value={netDeposits === null ? (isLiveAccount ? "—" : "Unavailable") : precise.format(Number(netDeposits))} /><Metric label="Invested value" value={totalValue === null ? (isLiveAccount ? "—" : "Unavailable") : precise.format(Math.max(0, Number(totalValue) - Number(cash ?? 0)))} /></div>
-      {!hasReport && isLiveAccount && <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">Allocation becomes available after a report snapshot is published.</p>}
-      {hasReport && rows.length === 0 && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Allocation is unavailable because the latest valuation is incomplete.</p>}
-      {rows.length > 0 && <ul aria-label="Portfolio allocation" className="space-y-4">{rows.map((row) => <li key={row.key}><div className="mb-1 flex items-center justify-between gap-3 text-sm"><span className="font-semibold text-slate-700">{row.label}</span><span className="font-bold text-slate-800">{row.unavailable ? "Unavailable" : `${row.percentage.toFixed(1)}%`}</span></div>{!row.unavailable && <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#4f8ac9]" style={{ width: `${Math.min(100, Math.max(0, row.percentage))}%` }} /></div>}</li>)}</ul>}
-    </section>
-    <section aria-label="Realized lot detail" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="mb-5"><h2 className="text-lg font-bold">Realized lot detail</h2><p className="mt-0.5 text-sm text-slate-500">FIFO analytical matches for completed sales. Not tax reporting.</p></div>
-      {isLiveAccount && realizedSales === undefined && <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">Lot matches will appear after a report with realized sale detail is published.</p>}
-      {isLiveAccount && realizedSales !== undefined && sales.length === 0 && <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">No completed sales in the latest report.</p>}
-      {!isLiveAccount && <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">Realized lot detail is unavailable in the synthetic example.</p>}
-      {sales.length > 0 && <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left"><thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400"><tr><th className="pb-3">Date</th><th className="pb-3">Instrument</th><th className="pb-3 text-right">Qty</th><th className="pb-3 text-right">Gain / loss</th></tr></thead><tbody>{sales.map((sale) => <tr key={sale.eventId} className="border-b border-slate-50 last:border-0"><td className="py-3 text-sm text-slate-500">{sale.date}</td><td className="py-3 text-sm font-bold">{sale.instrumentId}</td><td className="py-3 text-right text-sm">{sale.quantity}</td><td className={`py-3 text-right text-sm font-bold ${sale.gainLoss === null ? "text-slate-500" : Number(sale.gainLoss) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{sale.gainLoss === null ? "Basis unavailable" : precise.format(Number(sale.gainLoss))}</td></tr>)}</tbody></table></div>}
-    </section>
-  </div>;
+  return (
+    <div className="mt-6 grid gap-6 xl:grid-cols-2">
+      <section
+        aria-label="Capital and allocation"
+        className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+      >
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold">Capital & allocation</h2>
+            <p className="mt-0.5 text-sm text-slate-500">
+              Portfolio composition from the latest stored valuation.
+            </p>
+          </div>
+          <PieChart size={20} className="text-[#185da8]" />
+        </div>
+        <div className="mb-6 grid grid-cols-2 gap-4">
+          <Metric
+            label="Net deposits"
+            value={
+              netDeposits === null
+                ? isLiveAccount
+                  ? "—"
+                  : "Unavailable"
+                : precise.format(Number(netDeposits))
+            }
+          />
+          <Metric
+            label="Invested value"
+            value={
+              totalValue === null
+                ? isLiveAccount
+                  ? "—"
+                  : "Unavailable"
+                : precise.format(
+                    Math.max(0, Number(totalValue) - Number(cash ?? 0)),
+                  )
+            }
+          />
+        </div>
+        {!hasReport && isLiveAccount && (
+          <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
+            Allocation becomes available after a report snapshot is published.
+          </p>
+        )}
+        {hasReport && rows.length === 0 && (
+          <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+            Allocation is unavailable because the latest valuation is
+            incomplete.
+          </p>
+        )}
+        {rows.length > 0 && (
+          <ul aria-label="Portfolio allocation" className="space-y-4">
+            {rows.map((row) => (
+              <li key={row.key}>
+                <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+                  <span className="font-semibold text-slate-700">
+                    {row.label}
+                  </span>
+                  <span className="font-bold text-slate-800">
+                    {row.unavailable
+                      ? "Unavailable"
+                      : `${row.percentage.toFixed(1)}%`}
+                  </span>
+                </div>
+                {!row.unavailable && (
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full bg-[#4f8ac9]"
+                      style={{
+                        width: `${Math.min(100, Math.max(0, row.percentage))}%`,
+                      }}
+                    />
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      <section
+        aria-label="Realized lot detail"
+        className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+      >
+        <div className="mb-5">
+          <h2 className="text-lg font-bold">Realized lot detail</h2>
+          <p className="mt-0.5 text-sm text-slate-500">
+            FIFO analytical matches for completed sales. Not tax reporting.
+          </p>
+        </div>
+        {isLiveAccount && realizedSales === undefined && (
+          <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
+            Lot matches will appear after a report with realized sale detail is
+            published.
+          </p>
+        )}
+        {isLiveAccount && realizedSales !== undefined && sales.length === 0 && (
+          <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
+            No completed sales in the latest report.
+          </p>
+        )}
+        {!isLiveAccount && (
+          <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
+            Realized lot detail is unavailable in the synthetic example.
+          </p>
+        )}
+        {sales.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px] text-left">
+              <thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400">
+                <tr>
+                  <th className="pb-3">Date</th>
+                  <th className="pb-3">Instrument</th>
+                  <th className="pb-3 text-right">Qty</th>
+                  <th className="pb-3 text-right">Gain / loss</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sales.map((sale) => (
+                  <tr
+                    key={sale.eventId}
+                    className="border-b border-slate-50 last:border-0"
+                  >
+                    <td className="py-3 text-sm text-slate-500">{sale.date}</td>
+                    <td className="py-3 text-sm font-bold">
+                      {sale.instrumentId}
+                    </td>
+                    <td className="py-3 text-right text-sm">{sale.quantity}</td>
+                    <td
+                      className={`py-3 text-right text-sm font-bold ${sale.gainLoss === null ? "text-slate-500" : Number(sale.gainLoss) >= 0 ? "text-emerald-600" : "text-rose-600"}`}
+                    >
+                      {sale.gainLoss === null
+                        ? "Basis unavailable"
+                        : precise.format(Number(sale.gainLoss))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </div>
+  );
 }
 
-function Holdings({ liveHoldings, isLiveAccount }: { liveHoldings?: LiveReportHolding[]; isLiveAccount: boolean }) {
-  if (isLiveAccount && !liveHoldings) return <section className="rounded-3xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500 shadow-sm">Holdings will appear after a persisted report is published for this account.</section>;
-  if (liveHoldings) return <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="mb-5"><h2 className="text-lg font-bold">Your holdings</h2><p className="mt-0.5 text-sm text-slate-500">Persisted quantities and stored closes as of the latest report.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[610px] text-left"><thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400"><tr><th className="pb-3">Instrument</th><th className="pb-3">Shares</th><th className="pb-3">Stored close</th><th className="pb-3 text-right">Stored value</th></tr></thead><tbody>{liveHoldings.map((holding) => <tr key={holding.instrumentId} className="border-b border-slate-50 last:border-0"><td className="py-4 text-sm font-bold"><span>{holding.displayName ?? holding.instrumentId}</span>{holding.displayName && <span className="mt-0.5 block text-xs font-normal text-slate-500">{holding.instrumentId}</span>}</td><td className="py-4 text-sm font-semibold">{holding.quantity}</td><td className="py-4 text-sm font-semibold">{holding.close === null ? 'Missing' : precise.format(Number(holding.close))}</td><td className="py-4 text-right text-sm font-bold">{holding.value === null ? 'Unavailable' : precise.format(Number(holding.value))}</td></tr>)}</tbody></table></div></section>;
+function Holdings({
+  liveHoldings,
+  isLiveAccount,
+}: {
+  liveHoldings?: LiveReportHolding[];
+  isLiveAccount: boolean;
+}) {
+  if (isLiveAccount && !liveHoldings)
+    return (
+      <section className="rounded-3xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500 shadow-sm">
+        Holdings will appear after a persisted report is published for this
+        account.
+      </section>
+    );
+  if (liveHoldings)
+    return (
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-5">
+          <h2 className="text-lg font-bold">Your holdings</h2>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Persisted quantities and stored closes as of the latest report.
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[610px] text-left">
+            <thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400">
+              <tr>
+                <th className="pb-3">Instrument</th>
+                <th className="pb-3">Shares</th>
+                <th className="pb-3">Stored close</th>
+                <th className="pb-3 text-right">Stored value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {liveHoldings.map((holding) => (
+                <tr
+                  key={holding.instrumentId}
+                  className="border-b border-slate-50 last:border-0"
+                >
+                  <td className="py-4 text-sm font-bold">
+                    <span>{holding.displayName ?? holding.instrumentId}</span>
+                    {holding.displayName && (
+                      <span className="mt-0.5 block text-xs font-normal text-slate-500">
+                        {holding.instrumentId}
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-4 text-sm font-semibold">
+                    {holding.quantity}
+                  </td>
+                  <td className="py-4 text-sm font-semibold">
+                    {holding.close === null
+                      ? "Missing"
+                      : precise.format(Number(holding.close))}
+                  </td>
+                  <td className="py-4 text-right text-sm font-bold">
+                    {holding.value === null
+                      ? "Unavailable"
+                      : precise.format(Number(holding.value))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    );
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
@@ -1249,61 +2141,159 @@ function ActivityPanel({
   filter: string;
   onFilterChange: (value: string) => void;
 }) {
-  if (isLiveAccount) return (
-    <>
-      <div className="mb-8 flex items-end justify-between">
-        <div>
-          <Pill tone="green">Your account</Pill>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight">Activity</h1>
-          <p className="mt-2 text-sm text-slate-500">Imported ledger entries from your selected account.</p>
+  if (isLiveAccount)
+    return (
+      <>
+        <div className="mb-8 flex items-end justify-between">
+          <div>
+            <Pill tone="green">Your account</Pill>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight">Activity</h1>
+            <p className="mt-2 text-sm text-slate-500">
+              Imported ledger entries from your selected account.
+            </p>
+          </div>
+          <Button
+            onClick={onUpload}
+            className="rounded-xl bg-[#185da8] text-white"
+          >
+            <Plus size={16} />
+            Import CSV
+          </Button>
         </div>
-        <Button onClick={onUpload} className="rounded-xl bg-[#185da8] text-white"><Plus size={16} />Import CSV</Button>
-      </div>
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <label htmlFor="activity-filter" className="text-sm font-semibold text-slate-700">Filter activity</label>
-          <Input id="activity-filter" value={filter} onChange={(event) => onFilterChange(event.target.value)} placeholder="Type, symbol, or description" className="w-full sm:max-w-xs" />
-        </div>
-        {loadError && (
-          <div role="alert" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
-            <span>{loadError}</span>
-            <Button onClick={onRetry} className="rounded-lg bg-white text-rose-700 hover:bg-rose-100">Retry</Button>
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <label
+              htmlFor="activity-filter"
+              className="text-sm font-semibold text-slate-700"
+            >
+              Filter activity
+            </label>
+            <Input
+              id="activity-filter"
+              value={filter}
+              onChange={(event) => onFilterChange(event.target.value)}
+              placeholder="Type, symbol, or description"
+              className="w-full sm:max-w-xs"
+            />
           </div>
-        )}
-        {isLoading && !activityPage ? (
-          <div className="grid min-h-64 place-items-center text-center">
-            <div><Clock3 className="mx-auto animate-pulse text-[#185da8]" size={28} /><p className="mt-4 text-sm text-slate-500">Loading your activity…</p></div>
-          </div>
-        ) : activityPage && activityPage.items.filter((item) => `${item.entryType} ${item.instrumentId ?? ""} ${item.description}`.toLowerCase().includes(filter.trim().toLowerCase())).length > 0 ? (
-          <>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <p className="text-sm text-slate-500">Showing entries {activityPage.offset + 1}–{activityPage.offset + activityPage.items.length}{isLoading ? " · Updating…" : ""}</p>
-              <p className="text-xs text-slate-400">Source rows remain available for review</p>
+          {loadError && (
+            <div
+              role="alert"
+              className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-rose-50 p-3 text-sm text-rose-700"
+            >
+              <span>{loadError}</span>
+              <Button
+                onClick={onRetry}
+                className="rounded-lg bg-white text-rose-700 hover:bg-rose-100"
+              >
+                Retry
+              </Button>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left">
-                <thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400">
-                  <tr><th className="pb-3">Date</th><th className="pb-3">Activity</th><th className="pb-3">Instrument</th><th className="pb-3">Details</th><th className="pb-3">Source</th><th className="pb-3 text-right">Amount</th></tr>
-                </thead>
-                <tbody>
-                  {activityPage.items.filter((item) => `${item.entryType} ${item.instrumentId ?? ""} ${item.description}`.toLowerCase().includes(filter.trim().toLowerCase())).map((item) => <LiveActivityRow key={item.id} item={item} />)}
-                </tbody>
-              </table>
+          )}
+          {isLoading && !activityPage ? (
+            <div className="grid min-h-64 place-items-center text-center">
+              <div>
+                <Clock3
+                  className="mx-auto animate-pulse text-[#185da8]"
+                  size={28}
+                />
+                <p className="mt-4 text-sm text-slate-500">
+                  Loading your activity…
+                </p>
+              </div>
             </div>
-            <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
-              <Button disabled={activityPage.offset === 0 || isLoading} onClick={onPrevious} className="rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50">Previous</Button>
-              <span className="text-xs font-semibold text-slate-400">Page {Math.floor(activityPage.offset / activityPage.limit) + 1}</span>
-              <Button disabled={!activityPage.hasMore || isLoading} onClick={onNext} className="rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50">Next</Button>
+          ) : activityPage &&
+            activityPage.items.filter((item) =>
+              `${item.entryType} ${item.instrumentId ?? ""} ${item.description}`
+                .toLowerCase()
+                .includes(filter.trim().toLowerCase()),
+            ).length > 0 ? (
+            <>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <p className="text-sm text-slate-500">
+                  Showing entries {activityPage.offset + 1}–
+                  {activityPage.offset + activityPage.items.length}
+                  {isLoading ? " · Updating…" : ""}
+                </p>
+                <p className="text-xs text-slate-400">
+                  Source rows remain available for review
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-left">
+                  <thead className="border-b border-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400">
+                    <tr>
+                      <th className="pb-3">Date</th>
+                      <th className="pb-3">Activity</th>
+                      <th className="pb-3">Instrument</th>
+                      <th className="pb-3">Details</th>
+                      <th className="pb-3">Source</th>
+                      <th className="pb-3 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activityPage.items
+                      .filter((item) =>
+                        `${item.entryType} ${item.instrumentId ?? ""} ${item.description}`
+                          .toLowerCase()
+                          .includes(filter.trim().toLowerCase()),
+                      )
+                      .map((item) => (
+                        <LiveActivityRow key={item.id} item={item} />
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
+                <Button
+                  disabled={activityPage.offset === 0 || isLoading}
+                  onClick={onPrevious}
+                  className="rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                >
+                  Previous
+                </Button>
+                <span className="text-xs font-semibold text-slate-400">
+                  Page{" "}
+                  {Math.floor(activityPage.offset / activityPage.limit) + 1}
+                </span>
+                <Button
+                  disabled={!activityPage.hasMore || isLoading}
+                  onClick={onNext}
+                  className="rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                >
+                  Next
+                </Button>
+              </div>
+            </>
+          ) : loadError ? null : (
+            <div className="grid min-h-64 place-items-center text-center">
+              <div>
+                <Clock3 className="mx-auto text-[#185da8]" size={28} />
+                <h2 className="mt-5 text-xl font-bold">
+                  {filter.trim()
+                    ? "No matching activity"
+                    : "No imported activity yet"}
+                </h2>
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                  {filter.trim()
+                    ? "Try a different type, symbol, or description."
+                    : "Import a Robinhood activity CSV to populate this account’s ledger."}
+                </p>
+                {!filter.trim() && (
+                  <Button
+                    onClick={onUpload}
+                    className="mt-5 rounded-xl bg-[#185da8] text-white"
+                  >
+                    <Plus size={16} />
+                    Import CSV
+                  </Button>
+                )}
+              </div>
             </div>
-          </>
-        ) : loadError ? null : (
-          <div className="grid min-h-64 place-items-center text-center">
-            <div><Clock3 className="mx-auto text-[#185da8]" size={28} /><h2 className="mt-5 text-xl font-bold">{filter.trim() ? "No matching activity" : "No imported activity yet"}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">{filter.trim() ? "Try a different type, symbol, or description." : "Import a Robinhood activity CSV to populate this account’s ledger."}</p>{!filter.trim() && <Button onClick={onUpload} className="mt-5 rounded-xl bg-[#185da8] text-white"><Plus size={16} />Import CSV</Button>}</div>
-          </div>
-        )}
-      </section>
-    </>
-  );
+          )}
+        </section>
+      </>
+    );
   return (
     <>
       <div className="mb-8 flex items-end justify-between">
@@ -1380,11 +2370,24 @@ function LiveActivityRow({ item }: { item: AccountActivity }) {
   return (
     <tr className="border-b border-slate-50 last:border-0">
       <td className="py-4 text-sm text-slate-500">{item.effectiveDate}</td>
-      <td className="py-4"><Pill tone={item.entryType === "dividend" ? "green" : "slate"}>{entryType}</Pill></td>
-      <td className="py-4 text-sm font-semibold">{item.instrumentId ? `${item.instrumentId.slice(0, 8)}…` : "Cash"}</td>
+      <td className="py-4">
+        <Pill tone={item.entryType === "dividend" ? "green" : "slate"}>
+          {entryType}
+        </Pill>
+      </td>
+      <td className="py-4 text-sm font-semibold">
+        {item.instrumentId ? `${item.instrumentId.slice(0, 8)}…` : "Cash"}
+      </td>
       <td className="py-4 text-sm text-slate-500">{item.description}</td>
-      <td className="py-4 text-xs text-slate-400">{item.sourceRow ? `Row ${item.sourceRow.rowNumber}` : "System entry"}</td>
-      <td className={`py-4 text-right text-sm font-bold ${amount >= 0 ? "text-emerald-600" : "text-slate-700"}`}>{amount >= 0 ? "+" : ""}{precise.format(amount)}</td>
+      <td className="py-4 text-xs text-slate-400">
+        {item.sourceRow ? `Row ${item.sourceRow.rowNumber}` : "System entry"}
+      </td>
+      <td
+        className={`py-4 text-right text-sm font-bold ${amount >= 0 ? "text-emerald-600" : "text-slate-700"}`}
+      >
+        {amount >= 0 ? "+" : ""}
+        {precise.format(amount)}
+      </td>
     </tr>
   );
 }
@@ -1493,9 +2496,18 @@ function Accounts({
         </Button>
       </div>
       {loadError ? (
-        <section role="alert" className="flex flex-wrap items-center gap-3 rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-800 shadow-sm">
+        <section
+          role="alert"
+          className="flex flex-wrap items-center gap-3 rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-800 shadow-sm"
+        >
           <span>{loadError}</span>
-          <button type="button" onClick={onRetry} className="font-bold underline underline-offset-2">Retry</button>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="font-bold underline underline-offset-2"
+          >
+            Retry
+          </button>
         </section>
       ) : isLoading ? (
         <section className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
@@ -1522,28 +2534,34 @@ function Accounts({
         </section>
       ) : (
         <>
-        <section className="space-y-3">
-          {accounts.map((account) => (
-            <article
-              key={account.id}
-              className="flex items-center gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-            >
-              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
-                <CircleDollarSign size={23} />
-              </span>
-              <div className="flex-1">
-                <p className="font-bold">{account.name}</p>
-                <p className="mt-0.5 text-sm text-slate-500">
-                  Robinhood · {accountTypeLabel(account.account_type)}
+          <section className="space-y-3">
+            {accounts.map((account) => (
+              <article
+                key={account.id}
+                className="flex items-center gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+              >
+                <span className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
+                  <CircleDollarSign size={23} />
+                </span>
+                <div className="flex-1">
+                  <p className="font-bold">{account.name}</p>
+                  <p className="mt-0.5 text-sm text-slate-500">
+                    Robinhood · {accountTypeLabel(account.account_type)}
+                  </p>
+                </div>
+                <p className="text-sm font-semibold text-slate-500">
+                  No live valuation yet
                 </p>
-              </div>
-              <p className="text-sm font-semibold text-slate-500">
-                No live valuation yet
-              </p>
-            </article>
-          ))}
-        </section>
-        {selectedAccountId && <OpeningHistoryEditor history={openingHistory} loading={openingHistoryLoading} onSave={onSaveOpeningHistory} />}
+              </article>
+            ))}
+          </section>
+          {selectedAccountId && (
+            <OpeningHistoryEditor
+              history={openingHistory}
+              loading={openingHistoryLoading}
+              onSave={onSaveOpeningHistory}
+            />
+          )}
         </>
       )}
       <Dialog open={open} onOpenChange={setOpen}>
@@ -1558,7 +2576,10 @@ function Accounts({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <label htmlFor="account-name" className="block text-sm font-semibold text-slate-700">
+            <label
+              htmlFor="account-name"
+              className="block text-sm font-semibold text-slate-700"
+            >
               Account name
               <Input
                 id="account-name"
@@ -1568,7 +2589,10 @@ function Accounts({
                 className="mt-1.5 h-11 rounded-xl"
               />
             </label>
-            <label htmlFor="account-type" className="block text-sm font-semibold text-slate-700">
+            <label
+              htmlFor="account-type"
+              className="block text-sm font-semibold text-slate-700"
+            >
               Account type
               <select
                 id="account-type"
@@ -1609,17 +2633,125 @@ function Accounts({
   );
 }
 
-function OpeningHistoryEditor({ history, loading, onSave }: { history?: OpeningHistory; loading: boolean; onSave: (history: OpeningHistory) => Promise<void> }) {
-  const [cash, setCash] = useState(history?.openingCash ?? '0');
-  const [coveredFrom, setCoveredFrom] = useState(history?.activityCoveredFrom ?? '');
-  const [reason, setReason] = useState(history?.incompleteReason ?? '');
-  const [positions, setPositions] = useState(JSON.stringify(history?.positions ?? [], null, 2));
+function OpeningHistoryEditor({
+  history,
+  loading,
+  onSave,
+}: {
+  history?: OpeningHistory;
+  loading: boolean;
+  onSave: (history: OpeningHistory) => Promise<void>;
+}) {
+  const [cash, setCash] = useState(history?.openingCash ?? "0");
+  const [coveredFrom, setCoveredFrom] = useState(
+    history?.activityCoveredFrom ?? "",
+  );
+  const [reason, setReason] = useState(history?.incompleteReason ?? "");
+  const [positions, setPositions] = useState(
+    JSON.stringify(history?.positions ?? [], null, 2),
+  );
   const [message, setMessage] = useState<string>();
-  useEffect(() => { setCash(history?.openingCash ?? '0'); setCoveredFrom(history?.activityCoveredFrom ?? ''); setReason(history?.incompleteReason ?? ''); setPositions(JSON.stringify(history?.positions ?? [], null, 2)); }, [history]);
+  useEffect(() => {
+    setCash(history?.openingCash ?? "0");
+    setCoveredFrom(history?.activityCoveredFrom ?? "");
+    setReason(history?.incompleteReason ?? "");
+    setPositions(JSON.stringify(history?.positions ?? [], null, 2));
+  }, [history]);
   async function submit() {
-    try { setMessage(undefined); const parsed = JSON.parse(positions); await onSave({ openingCash: cash as OpeningHistory['openingCash'], activityCoveredFrom: coveredFrom ? coveredFrom as OpeningHistory['activityCoveredFrom'] : null, incompleteReason: reason || null, positions: parsed }); setMessage('Opening history saved.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Opening history could not be saved.'); }
+    try {
+      setMessage(undefined);
+      const parsed = JSON.parse(positions);
+      await onSave({
+        openingCash: cash as OpeningHistory["openingCash"],
+        activityCoveredFrom: coveredFrom
+          ? (coveredFrom as OpeningHistory["activityCoveredFrom"])
+          : null,
+        incompleteReason: reason || null,
+        positions: parsed,
+      });
+      setMessage("Opening history saved.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Opening history could not be saved.",
+      );
+    }
   }
-  return <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-3"><div><Pill tone="slate">Incomplete history</Pill><h2 className="mt-3 text-xl font-bold">Opening balances and lots</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">Record what your first statement does not include. Leave acquisition dates or basis null when unknown and explain the gap.</p></div><Button type="button" disabled={loading} onClick={submit} className="rounded-xl bg-[#185da8] text-white">Save opening history</Button></div><div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold text-slate-700">Opening cash<input value={cash} onChange={(event) => setCash(event.target.value)} inputMode="decimal" className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3 font-normal" /></label><label className="text-sm font-semibold text-slate-700">Activity covered from<input type="date" value={coveredFrom} onChange={(event) => setCoveredFrom(event.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3 font-normal" /></label></div><label className="mt-4 block text-sm font-semibold text-slate-700">Incomplete-history explanation<textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={2} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 font-normal" placeholder="Example: imported history begins after account opening." /></label><label className="mt-4 block text-sm font-semibold text-slate-700">Opening lots (JSON)<textarea value={positions} onChange={(event) => setPositions(event.target.value)} rows={6} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs font-normal" aria-describedby="opening-lots-help" /><span id="opening-lots-help" className="mt-1 block text-xs font-normal text-slate-500">Each item uses instrumentId, quantity, acquiredOn, and totalCostBasis. Use null for unknown date or basis.</span></label>{message && <p role="status" className="mt-3 text-sm text-slate-600">{message}</p>}</section>;
+  return (
+    <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <Pill tone="slate">Incomplete history</Pill>
+          <h2 className="mt-3 text-xl font-bold">Opening balances and lots</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+            Record what your first statement does not include. Leave acquisition
+            dates or basis null when unknown and explain the gap.
+          </p>
+        </div>
+        <Button
+          type="button"
+          disabled={loading}
+          onClick={submit}
+          className="rounded-xl bg-[#185da8] text-white"
+        >
+          Save opening history
+        </Button>
+      </div>
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <label className="text-sm font-semibold text-slate-700">
+          Opening cash
+          <input
+            value={cash}
+            onChange={(event) => setCash(event.target.value)}
+            inputMode="decimal"
+            className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3 font-normal"
+          />
+        </label>
+        <label className="text-sm font-semibold text-slate-700">
+          Activity covered from
+          <input
+            type="date"
+            value={coveredFrom}
+            onChange={(event) => setCoveredFrom(event.target.value)}
+            className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3 font-normal"
+          />
+        </label>
+      </div>
+      <label className="mt-4 block text-sm font-semibold text-slate-700">
+        Incomplete-history explanation
+        <textarea
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          rows={2}
+          className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 font-normal"
+          placeholder="Example: imported history begins after account opening."
+        />
+      </label>
+      <label className="mt-4 block text-sm font-semibold text-slate-700">
+        Opening lots (JSON)
+        <textarea
+          value={positions}
+          onChange={(event) => setPositions(event.target.value)}
+          rows={6}
+          className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs font-normal"
+          aria-describedby="opening-lots-help"
+        />
+        <span
+          id="opening-lots-help"
+          className="mt-1 block text-xs font-normal text-slate-500"
+        >
+          Each item uses instrumentId, quantity, acquiredOn, and totalCostBasis.
+          Use null for unknown date or basis.
+        </span>
+      </label>
+      {message && (
+        <p role="status" className="mt-3 text-sm text-slate-600">
+          {message}
+        </p>
+      )}
+    </section>
+  );
 }
 
 function accountTypeLabel(accountType: LiveAccount["account_type"]) {
@@ -1894,26 +3026,45 @@ function ImportReview({
           />
         </div>
         {livePreview?.duplicateFile && (
-          <p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+          <p
+            role="alert"
+            className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800"
+          >
             This exact file was already imported for this account.
           </p>
         )}
         {(liveWarnings > 0 || warnings > 0) && (
-          <p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+          <p
+            role="alert"
+            className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800"
+          >
             Some rows need review. They remain visible and cannot silently
             change reports.
           </p>
         )}
         {liveRows.length > 0 && (
-          <div aria-live="polite" className="max-h-52 overflow-auto rounded-xl border border-slate-200">
+          <div
+            aria-live="polite"
+            className="max-h-52 overflow-auto rounded-xl border border-slate-200"
+          >
             <table className="min-w-[38rem] w-full text-left text-sm">
-              <caption className="sr-only">Imported activity rows and validation results</caption>
+              <caption className="sr-only">
+                Imported activity rows and validation results
+              </caption>
               <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
-                  <th scope="col" className="p-3">Row</th>
-                  <th scope="col" className="p-3">Status</th>
-                  <th scope="col" className="p-3">Activity</th>
-                  <th scope="col" className="p-3">Message</th>
+                  <th scope="col" className="p-3">
+                    Row
+                  </th>
+                  <th scope="col" className="p-3">
+                    Status
+                  </th>
+                  <th scope="col" className="p-3">
+                    Activity
+                  </th>
+                  <th scope="col" className="p-3">
+                    Message
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -1945,9 +3096,15 @@ function ImportReview({
               <caption className="sr-only">Parsed activity preview</caption>
               <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
-                  <th scope="col" className="p-3">Date</th>
-                  <th scope="col" className="p-3">Type</th>
-                  <th scope="col" className="p-3">Symbol</th>
+                  <th scope="col" className="p-3">
+                    Date
+                  </th>
+                  <th scope="col" className="p-3">
+                    Type
+                  </th>
+                  <th scope="col" className="p-3">
+                    Symbol
+                  </th>
                 </tr>
               </thead>
               <tbody>
