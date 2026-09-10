@@ -66,6 +66,10 @@ export class SupabaseImportsRepository implements ImportsRepository {
     const url = new URL('/rest/v1/imports', this.baseUrl);
     url.searchParams.set('account_id', `eq.${accountId}`);
     url.searchParams.set('file_sha256', `eq.${fileSha256}`);
+    // Discarded and undone statements are intentionally replayable. Their
+    // source rows remain available for audit, but they must not block a user
+    // from importing the same file again after correcting an import decision.
+    url.searchParams.set('status', 'not.in.(discarded,undone)');
     url.searchParams.set('select', 'id');
     url.searchParams.set('limit', '1');
     const response = await this.fetcher(url, { headers: { apikey: this.options.supabaseAnonKey, authorization: `Bearer ${accessToken}` } });

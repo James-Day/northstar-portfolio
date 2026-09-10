@@ -12,6 +12,7 @@ describe('Supabase imports repository', () => {
     const [url, init] = fetcher.mock.calls[0];
     expect(url.searchParams.get('account_id')).toBe('eq.account-id');
     expect(url.searchParams.get('file_sha256')).toBe(`eq.${'a'.repeat(64)}`);
+    expect(url.searchParams.get('status')).toBe('not.in.(discarded,undone)');
     expect(init.headers).toMatchObject({ authorization: 'Bearer user-token' });
   });
 
