@@ -1,0 +1,8 @@
+"Activity Date","Process Date","Settle Date","Instrument","Description","Trans Code","Quantity","Price","Amount"
+"1/2/2026","1/2/2026","1/5/2026","VTI","Vanguard Total Stock Market ETF - 0.25 shares","Buy","0.25","$300.00","($75.00)"
+"1/5/2026","1/5/2026","1/5/2026","","ACH Deposit","ACH","","","$500.00"
+"1/15/2026","1/15/2026","1/15/2026","VTI","Cash Div: R/D 2026-01-02 P/D 2026-01-15 - 0.25 shares at 0.95","CDIV","","","$0.24"
+"1/15/2026","1/15/2026","1/16/2026","VTI","Dividend reinvestment","Buy","0.0008","$300.00","($0.24)"
+"1/20/2026","1/20/2026","1/21/2026","VTI","Partial sale","Sell","0.10","$310.00","$31.00"
+"1/21/2026","1/21/2026","1/21/2026","VTI","ADR fee","AFEE","","","($0.02)"
+"1/22/2026","1/22/2026","1/22/2026","","ACH Withdrawal","ACH","","","($40.00)"
