@@ -19,4 +19,12 @@ describe('Supabase historical prices repository', () => {
     await expect(repository.persistDoltHubPage({ sourceRevision: 'rev-1', records: [] })).resolves.toMatchObject({ upserted: 0 });
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
+
+  it('persists evidence-backed corrections idempotently', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify([{ id: '22222222-2222-4222-8222-222222222222' }]), { status: 201 }));
+    const repository = new SupabaseHistoricalPricesRepository({ supabaseUrl: 'https://supabase.test', serviceRoleKey: 'service-secret', fetcher: fetcher as typeof fetch });
+    await expect(repository.persistCorrection({ instrumentId: 'instrument-a' as never, tradingDate: '2024-01-02' as never, correctedClose: '101.25' as never, evidence: 'Issuer filing page 4', correctionVersion: 'correction-1' })).resolves.toBe('22222222-2222-4222-8222-222222222222');
+    expect(fetcher.mock.calls[0][0].searchParams.get('on_conflict')).toBe('instrument_id,trading_date,correction_version');
+    expect(JSON.parse(fetcher.mock.calls[0][1].body)).toMatchObject({ instrument_id: 'instrument-a', corrected_close: '101.25', evidence: 'Issuer filing page 4' });
+  });
 });

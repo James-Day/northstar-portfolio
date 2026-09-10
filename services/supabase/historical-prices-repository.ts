@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import type { HistoricalPriceUpsert } from '@/services/market-data/historical-ingestion';
+import type { PriceCorrection } from '@/services/market-data/price-corrections';
 
 const revisionSchema = z.object({ id: z.string().uuid(), source: z.literal('dolthub'), source_revision: z.string() });
+const correctionSchema = z.object({ id: z.string().uuid() });
 
 export type SupabaseHistoricalPricesRepositoryOptions = {
   supabaseUrl: string;
@@ -44,6 +46,20 @@ export class SupabaseHistoricalPricesRepository {
     });
     if (!pricesResponse.ok) throw new Error(`Supabase daily price write failed with HTTP ${pricesResponse.status}.`);
     return { revisionId, upserted: input.records.length };
+  }
+
+  async persistCorrection(correction: PriceCorrection): Promise<string> {
+    const url = new URL('/rest/v1/price_corrections', this.baseUrl);
+    url.searchParams.set('on_conflict', 'instrument_id,trading_date,correction_version');
+    const response = await this.fetcher(url, {
+      method: 'POST',
+      headers: { ...this.headers(), 'content-type': 'application/json', prefer: 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify({ instrument_id: correction.instrumentId, trading_date: correction.tradingDate, corrected_close: correction.correctedClose, evidence: correction.evidence, correction_version: correction.correctionVersion }),
+    });
+    if (!response.ok) throw new Error(`Supabase price correction write failed with HTTP ${response.status}.`);
+    const rows = z.array(correctionSchema).parse(await response.json());
+    if (!rows[0]) throw new Error('Supabase did not return a price correction ID.');
+    return rows[0].id;
   }
 
   private headers() { return { apikey: this.options.serviceRoleKey, authorization: `Bearer ${this.options.serviceRoleKey}` }; }
