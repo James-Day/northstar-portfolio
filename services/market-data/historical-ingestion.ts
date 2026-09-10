@@ -2,6 +2,7 @@ import type { InstrumentAlias, InstrumentId, IsoDate } from '@/lib/domain/types'
 import { resolveInstrumentAlias } from '@/services/instruments/resolver';
 import { inspectPriceRecords } from '@/services/market-data/quality';
 import type { DoltHubDailyClose } from '@/services/market-data/dolthub';
+import { isUsEquityTradingDay } from '@/services/market-data/us-equity-calendar';
 
 export type HistoricalPriceUpsert = {
   instrumentId: InstrumentId;
@@ -16,6 +17,13 @@ export type HistoricalPriceIngestion = {
   sourceRevision: string;
   accepted: HistoricalPriceUpsert[];
   quarantined: Array<{ record: DoltHubDailyClose; reason: string }>;
+  continuityIssues: HistoricalContinuityIssue[];
+};
+
+export type HistoricalContinuityIssue = {
+  symbol: string;
+  kind: 'missing_trading_dates' | 'alias_gap';
+  dates: IsoDate[];
 };
 
 export type HistoricalPageSource = {
@@ -35,23 +43,57 @@ export async function ingestDoltHubHistory(input: {
   through: IsoDate;
   aliases: InstrumentAlias[];
   limit?: number;
-}): Promise<{ sourceRevision: string; pages: number; upserted: number; quarantined: HistoricalPriceIngestion['quarantined'] }> {
+}): Promise<{ sourceRevision: string; pages: number; upserted: number; quarantined: HistoricalPriceIngestion['quarantined']; continuityIssues: HistoricalContinuityIssue[] }> {
   let cursor: { tradingDate: IsoDate; symbol: string } | undefined;
   let sourceRevision: string | undefined;
   let pages = 0;
   let upserted = 0;
   const quarantined: HistoricalPriceIngestion['quarantined'] = [];
+  const continuityIssues: HistoricalContinuityIssue[] = [];
   do {
     const page = await input.source.getDailyClosePage({ symbols: input.symbols, from: input.from, through: input.through, limit: input.limit, cursor });
     if (!sourceRevision) sourceRevision = page.sourceRevision;
     if (sourceRevision !== page.sourceRevision) throw new Error('DoltHub source revision changed between historical pages; retry the ingestion.');
     const prepared = prepareHistoricalPriceIngestion(page.records, input.aliases, sourceRevision);
     quarantined.push(...prepared.quarantined);
+    continuityIssues.push(...prepared.continuityIssues);
     upserted += (await input.persistence.persistDoltHubPage({ sourceRevision, records: prepared.accepted })).upserted;
     pages += 1;
     cursor = page.nextCursor ?? undefined;
   } while (cursor);
-  return { sourceRevision: sourceRevision ?? '', pages, upserted, quarantined };
+  return { sourceRevision: sourceRevision ?? '', pages, upserted, quarantined, continuityIssues };
+}
+
+/** Finds calendar gaps and dates that cannot be resolved through an effective alias. */
+export function inspectHistoricalContinuity(records: DoltHubDailyClose[], aliases: InstrumentAlias[]): HistoricalContinuityIssue[] {
+  const issues: HistoricalContinuityIssue[] = [];
+  const bySymbol = new Map<string, DoltHubDailyClose[]>();
+  for (const record of records) {
+    const symbol = record.symbol.trim().toUpperCase();
+    const list = bySymbol.get(symbol) ?? [];
+    list.push(record);
+    bySymbol.set(symbol, list);
+    try {
+      if (!resolveInstrumentAlias(aliases, symbol, record.tradingDate)) issues.push({ symbol, kind: 'alias_gap', dates: [record.tradingDate] });
+    } catch {
+      issues.push({ symbol, kind: 'alias_gap', dates: [record.tradingDate] });
+    }
+  }
+  for (const [symbol, symbolRecords] of bySymbol) {
+    const dates = new Set(symbolRecords.map((record) => record.tradingDate));
+    const ordered = [...dates].sort();
+    if (ordered.length < 2) continue;
+    const missing: IsoDate[] = [];
+    const cursor = new Date(`${ordered[0]}T00:00:00.000Z`);
+    const end = new Date(`${ordered.at(-1)}T00:00:00.000Z`);
+    while (cursor < end) {
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+      const date = cursor.toISOString().slice(0, 10) as IsoDate;
+      if (cursor < end && isUsEquityTradingDay(date) && !dates.has(date)) missing.push(date);
+    }
+    if (missing.length) issues.push({ symbol, kind: 'missing_trading_dates', dates: missing });
+  }
+  return issues;
 }
 
 /**
@@ -84,7 +126,7 @@ export function prepareHistoricalPriceIngestion(
       quarantined.push({ record, reason: error instanceof Error ? error.message : 'Instrument alias resolution failed.' });
     }
   }
-  return { source: 'dolthub', sourceRevision, accepted: deduplicateAccepted(accepted), quarantined };
+  return { source: 'dolthub', sourceRevision, accepted: deduplicateAccepted(accepted), quarantined, continuityIssues: inspectHistoricalContinuity(records, aliases) };
 }
 
 function deduplicateAccepted(rows: HistoricalPriceUpsert[]): HistoricalPriceUpsert[] {
