@@ -157,6 +157,8 @@ export function PortfolioApp({
   const [userId, setUserId] = useState<string>();
   const [accounts, setAccounts] = useState<LiveAccount[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(false);
+  const [accountsError, setAccountsError] = useState<string>();
+  const [accountsRequestVersion, setAccountsRequestVersion] = useState(0);
   const [selectedAccountId, setSelectedAccountId] = useState<string>();
   const [livePreview, setLivePreview] = useState<LiveImportPreview>();
   const [stagedCsv, setStagedCsv] = useState<string>();
@@ -204,6 +206,7 @@ export function PortfolioApp({
     }
     let active = true;
     setAccountsLoading(true);
+    setAccountsError(undefined);
     void client
       .from("accounts")
       .select("id,name,account_type,brokerage,created_at")
@@ -211,12 +214,16 @@ export function PortfolioApp({
       .then(({ data, error }) => {
         if (!active) return;
         setAccountsLoading(false);
-        if (!error) setAccounts((data ?? []) as LiveAccount[]);
+        if (error) {
+          setAccountsError(error.message || "We could not load your accounts.");
+          return;
+        }
+        setAccounts((data ?? []) as LiveAccount[]);
       });
     return () => {
       active = false;
     };
-  }, [client, userId]);
+  }, [client, userId, accountsRequestVersion]);
 
   useEffect(() => {
     if (!selectedAccountId && accounts[0]) setSelectedAccountId(accounts[0].id);
@@ -671,6 +678,8 @@ export function PortfolioApp({
               summary={summary}
               accounts={accounts}
               isLoading={accountsLoading}
+              loadError={accountsError}
+              onRetry={() => setAccountsRequestVersion((value) => value + 1)}
               canCreate={Boolean(client && userId)}
               onCreate={createAccount}
             />
@@ -1010,12 +1019,16 @@ function Accounts({
   summary,
   accounts,
   isLoading,
+  loadError,
+  onRetry,
   canCreate,
   onCreate,
 }: {
   summary: ReturnType<typeof calculateSummary>;
   accounts: LiveAccount[];
   isLoading: boolean;
+  loadError?: string;
+  onRetry: () => void;
   canCreate: boolean;
   onCreate: (input: {
     name: string;
@@ -1097,7 +1110,12 @@ function Accounts({
           Add account
         </Button>
       </div>
-      {isLoading ? (
+      {loadError ? (
+        <section role="alert" className="flex flex-wrap items-center gap-3 rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-800 shadow-sm">
+          <span>{loadError}</span>
+          <button type="button" onClick={onRetry} className="font-bold underline underline-offset-2">Retry</button>
+        </section>
+      ) : isLoading ? (
         <section className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
           Loading your accounts…
         </section>
