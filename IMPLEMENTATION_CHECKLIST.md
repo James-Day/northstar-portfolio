@@ -95,7 +95,7 @@ Acceptance: valid users can sign in and return later; invalid credentials fail; 
 - [ ] Create, name and select Robinhood individual brokerage, traditional IRA and Roth IRA accounts.
 - [ ] Associate every import with a confirmed account; do not claim account detection from a CSV that lacks that information.
 - [x] Add opening-history contracts for cash, positions and lots with known/unknown basis and dates.
-- [ ] Record activity coverage separately from valuation freshness.
+- [x] Record activity coverage separately from valuation freshness.
 
 Acceptance: multiple accounts remain separate, fractional positions are supported, and unknown basis remains explicitly unknown.
 
@@ -300,6 +300,7 @@ Deferred: Plaid, PDFs/OCR, other brokerages, 401(k) imports, crypto/options/futu
 | 2026-09-10 | 02 — Typed portfolio module boundaries | Added the public `PortfolioModulePorts` composition contract and test for identity/billing, accounts, ingestion, ledger, calculations, market data, and reporting seams. Documented the dependency direction so adapters can evolve behind typed ports. `npm run typecheck`, `npm test`, and `git diff --check` passed. | Queue consumers, live service configuration, and database/browser integration remain. |
 | 2026-09-10 | 03 — Private signed statement upload boundary (partial) | Added an account-ownership check and server-only Supabase Storage signed-upload repository for the private `brokerage-statements` bucket, with path-traversal/file-name validation and failure handling. Repository tests cover authorized, unauthorized, and invalid-name cases. | Live Supabase Storage execution, upload completion, retention job, and import linkage remain. |
 | 2026-09-10 | 03/11 — Idempotent report publication | Added a generated publication key and unique index for report snapshots, then changed the service repository to use conflict-safe upserts so retried publication cannot duplicate the same account/date/import/price revision. Repository coverage verifies the conflict target and merge preference. | Migration still requires application to a configured project; report generation from persisted inputs remains. |
+| 2026-09-10 | 05 — Account activity coverage | Added a transactional Supabase trigger that derives each account’s activity coverage from its committed imports and recomputes it after commit or undo, keeping it independent from valuation price freshness. Local schema lint passed. | Live project migration and UI display remain. |
 | 2026-09-09 | 07 — Import workflow (partial) | Lifecycle and review-commit blocking rules added; `npm run typecheck`, `npm test` (25 passing), and `npm run build` passed | Lifecycle is not yet persisted or processed through queues |
 | 2026-09-09 | 08 — Corporate-action safeguards (partial) | Validated split and ticker-change lot handling added; `npm run typecheck`, `npm test` (28 passing), and `npm run build` passed | Corporate actions are not yet sourced, evidenced, or connected to stored price history |
 | 2026-09-09 | 08 — Internal-transfer linking (partial) | Reconciled-account transfer linking and unresolved-transfer rules added; `npm run typecheck`, `npm test` (30 passing), and `npm run build` passed | Transferred lots/basis require persisted cross-account transfer workflows |
