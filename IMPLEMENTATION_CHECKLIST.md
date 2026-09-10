@@ -1,6 +1,6 @@
 # Portfolio tracker implementation checklist
 
-Last audited: September 10, 2026. Source baseline: `60ba90a`.
+Last audited: September 10, 2026. Source baseline: `e674210`.
 
 ## How to use this checklist
 
@@ -13,7 +13,7 @@ This file is the current implementation plan. Work through the numbered steps in
 - Keep commits large and coherent. Record meaningful milestone evidence rather than a log entry for every small UI change.
 - Never commit secrets. Configure credentials through local ignored environment files or the service's secret interface.
 
-**Current count: 102 tasks — 33 checked, 69 unchecked, across 13 ordered steps.**
+**Current count: 102 tasks — 34 checked, 68 unchecked, across 13 ordered steps.**
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -31,8 +31,8 @@ The frontend uses React/TypeScript/Tailwind with **Vinext/Vite and Sites**. A se
 | Accounting | Tested decimal FIFO, fees, income, transfers, corporate-action helpers | One authoritative chronological replay into persisted positions |
 | Prices | DoltHub ingestion/writers; Marketstack cron composition, retry and metrics code | Verified seed, daily fetch deduplication, accurate durable quota accounting, live execution |
 | Reports | Valuation/return functions, snapshot publisher/read API, snapshot-backed UI | Database input loader, outbox-to-report execution, consolidated/detail reports |
-| Billing/privacy | Pure entitlement, trial, retention and deletion rules | Durable effects, Stripe HTTP integration, enforcement, export/deletion UI |
-| Tests | Typecheck and 160 tests across 50 files passed in this audit | Real database, storage and authenticated browser regression suites |
+| Billing/privacy | Pure entitlement, trial, retention and deletion rules; authenticated activity/report exports; idempotent deletion-plan persistence | Durable effects, Stripe HTTP integration, enforcement, export/deletion UI |
+| Tests | Typecheck and 220 tests across 64 files pass in the current audit | Real database, storage and authenticated browser regression suites |
 
 No hosted services, price datasets, provider credentials, or commercial licensing were reverified in this documentation audit. Previous local Supabase integration evidence is retained in [the historical log](docs/IMPLEMENTATION_HISTORY.md); it is not a fresh live test.
 
@@ -183,7 +183,7 @@ Owner: privacy/platform. Depends on working storage, reports and billing.
 
 - [x] **12.01** Pure 30-day raw-file retention rules and deletion lifecycle/cleanup contracts exist. Evidence: `services/privacy/`.
 - [ ] **12.02** Run scheduled private-object retention with durable audit, retries and verified deletion; retain normalized product activity as specified.
-- [ ] **12.03** Add safe self-service transaction/report CSV export, including spreadsheet-formula escaping and access after cancellation.
+- [x] **12.03** Add safe self-service transaction/report CSV export, including spreadsheet-formula escaping and access after cancellation. Evidence: `services/api/app.ts`, `services/privacy/export.ts`, `components/settings-panel.tsx`, and pagination/formula-escaping coverage in `services/api/app.test.ts`.
 - [ ] **12.04** Implement user/data deletion across auth, storage, accounts, reports and billing; revoke access and handle partially failed cleanup.
 - [ ] **12.05** Complete settings UI for exports, deletion and billing; publish accurate privacy/terms and retention explanations.
 - [ ] **12.06** Enforce rate limits, request validation, redacted logs, least-privilege roles and secret handling across all execution paths.
@@ -234,7 +234,9 @@ Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/sh
 | 2026-09-10 | 10.05 — Report period and scope controls (partial) | Commit `e54b993`; authenticated Overview supports 1 month, 3 months, YTD, 1 year and all-time chart windows, preserves unavailable points, and exposes a disabled consolidated scope until snapshots exist. Three focused tests and typecheck passed. | Allocation/detail cards and actual consolidated snapshots remain open. |
 | 2026-09-10 | 12.02 — Durable raw-file retention worker (partial) | Commit `2802a22`; durable claim/audit/retry/exhaustion RPCs, private Storage deletion/verification, crash recovery and safe path validation are implemented and tested. Seven focused retention tests and typecheck passed. | Scheduled deployment and live Storage execution remain open. |
 | 2026-09-10 | 11.02 — Atomic trial persistence | Added billing persistence contracts/repository and migration RPCs/triggers for one-time trial creation after a committed import, plus repository coverage. | Live Supabase billing execution and entitlement enforcement remain open. |
-| 2026-09-10 | 12.03/12.05 — Settings export and privacy actions (partial) | Added authenticated Settings navigation with account-scoped activity/report CSV downloads, formula-safe export messaging, Stripe billing portal action, retention explanation and deletion-request confirmation. Added `GET /v1/accounts/:accountId/report.csv` and an explicit `POST /v1/me/deletion-request` boundary that returns `deletion_unavailable` until a durable executor is configured. API tests cover report CSV shape and safe unavailable deletion behavior; typecheck passed. | Activity export is currently capped at the API page size; durable deletion executor, cancellation-access verification, live billing and published legal pages remain open. |
+| 2026-09-10 | 12.03/12.05 — Settings export and privacy actions (partial) | Added authenticated Settings navigation with account-scoped activity/report CSV downloads, formula-safe export messaging, Stripe billing portal action, retention explanation and deletion-request confirmation. Added `GET /v1/accounts/:accountId/report.csv` and an explicit `POST /v1/me/deletion-request` boundary that returns `deletion_unavailable` until a durable executor is configured. API tests cover report CSV shape and safe unavailable deletion behavior; typecheck passed. | At the time of this entry, activity export was capped at the API page size; this was completed by the later 12.03 export milestone. Durable deletion executor, cancellation-access verification, live billing and published legal pages remain open. |
+| 2026-09-10 | 12.03 — Complete self-service exports | Commit `8b1f249`; activity CSV export now paginates all account activity through a 100,000-row safety cap, preserves formula-safe escaping, and has multi-page API coverage. Report export and Settings download actions are also present. Full validation: 64 test files / 220 tests, typecheck and diff check passed. | Cancellation-access verification and live hosted authorization remain open. |
+| 2026-09-10 | 12.04 — Persist deletion plan (partial) | Commit `e674210`; idempotent user deletion requests and cleanup-plan items are persisted through an owned RPC with audit/outbox evidence. Focused deletion tests, typecheck and diff check passed. | Durable executor, auth/storage/account/report/billing cleanup, retries and revoked-access behavior remain open. |
 | 2026-09-10 | 09.02 — Snapshot publication dependency integrity | Commit `37433b1`; snapshot retries read back the exact immutable dependency tuple, validate account/report identifiers and dates, and order reader ties deterministically. Four focused repository tests passed. | Live snapshot execution and report queue deployment remain open. |
 
 Earlier implementation history is preserved in [docs/IMPLEMENTATION_HISTORY.md](docs/IMPLEMENTATION_HISTORY.md). Its old checkmarks/limits are historical, not current status. For each future milestone, record stable task IDs, commit, tests and remaining limits here; update counts only for this file's task lines.
