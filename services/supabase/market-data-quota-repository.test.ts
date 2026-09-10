@@ -13,7 +13,7 @@ describe('Supabase market-data quota repository', () => {
   it('reconciles a reservation and validates the returned accounting', async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify([{ reservation_id: '11111111-1111-4111-8111-111111111111', reserved_units: 12, consumed_units: 10, released_units: 2 }]), { status: 200 }));
     const repository = new SupabaseMarketDataQuotaRepository({ supabaseUrl: 'https://supabase.test', serviceRoleKey: 'service-secret', fetcher: fetcher as typeof fetch });
-    await expect(repository.reconcile({ reservationId: '11111111-1111-4111-8111-111111111111', consumedUnits: 10 })).resolves.toEqual({ reservation_id: '11111111-1111-4111-8111-111111111111', reserved_units: 12, consumed_units: 10, released_units: 2 });
+    await expect(repository.reconcile({ reservationId: '11111111-1111-4111-8111-111111111111', consumedUnits: 10 })).resolves.toEqual({ reservationId: '11111111-1111-4111-8111-111111111111', reservedUnits: 12, consumedUnits: 10, releasedUnits: 2 });
     expect(String(fetcher.mock.calls[0][0])).toContain('/rpc/reconcile_market_data_quota');
   });
 });
