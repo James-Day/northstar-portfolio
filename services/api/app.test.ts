@@ -175,6 +175,27 @@ describe('standalone API', () => {
     await expect(response.text()).resolves.toContain("'=formula");
   });
 
+  it('walks every activity page for a complete export', async () => {
+    const calls: Array<{ limit?: number; offset?: number }> = [];
+    const activity = (id: string, description: string) => ({ id, accountId: 'account-123', effectiveDate: '2026-01-01', entryType: 'buy', instrumentId: 'instrument-123', quantity: '1', unitPrice: '10', cashAmount: '-10', externalFlow: false, description, sourceRowId: null, sourceRow: null });
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123' }),
+      accountsRepository: { list: async () => [], get: async () => ({ id: 'account-123' } as never), create: async () => { throw new Error('unused'); } },
+      activityRepository: { list: async (_accountId, _token, input) => {
+        calls.push(input ?? {});
+        if (input?.offset === 0) return { items: [activity('11111111-1111-4111-8111-111111111111', 'first')], limit: 100, offset: 0, hasMore: true };
+        return { items: [activity('22222222-2222-4222-8222-222222222222', '+second')], limit: 100, offset: 1, hasMore: false };
+      } },
+    });
+    const response = await app.request('http://api.test/v1/accounts/account-123/activity.csv', { headers: { authorization: 'Bearer session-token' } });
+    expect(response.status).toBe(200);
+    expect(calls).toEqual([{ limit: 100, offset: 0 }, { limit: 100, offset: 1 }]);
+    const csv = await response.text();
+    expect(csv).toContain('buy,instrument-123');
+    expect(csv).toContain("'+second");
+    expect(csv.match(/buy,instrument-123/g)).toHaveLength(2);
+  });
+
   it('exports an owned persisted report as a rectangular CSV', async () => {
     const app = createApi({
       verifySession: async () => ({ id: 'user-123' }),

@@ -25,6 +25,9 @@ import {
 } from '@/services/billing/stripe-http';
 import { toCsv } from '@/services/privacy/export';
 
+const ACTIVITY_EXPORT_PAGE_SIZE = 100;
+const MAX_ACTIVITY_EXPORT_ROWS = 100_000;
+
 export type ApiBindings = {
   APP_ENV?: 'development' | 'staging' | 'production';
   APP_ORIGIN?: string;
@@ -223,8 +226,8 @@ export function createApi(dependencies: ApiDependencies = {}) {
     const accounts = accountsRepository ?? createAccountsRepository(context.env);
     if (!await accounts.get(authenticated.user.id, authenticated.accessToken, accountId)) return context.json({ error: 'not_found' }, 404);
     const repository = activityRepository ?? createActivityRepository(context.env);
-    const page = await repository.list(accountId, authenticated.accessToken, { limit: 100, offset: 0 });
-    const csv = toCsv(['date', 'type', 'instrument', 'quantity', 'unit_price', 'cash_amount', 'external_flow', 'description', 'source_row'], page.items.map((item) => [item.effectiveDate, item.entryType, item.instrumentId, item.quantity, item.unitPrice, item.cashAmount, item.externalFlow, item.description, item.sourceRow?.rowNumber ?? '']));
+    const activity = await readAllActivityForExport(repository, accountId, authenticated.accessToken);
+    const csv = toCsv(['date', 'type', 'instrument', 'quantity', 'unit_price', 'cash_amount', 'external_flow', 'description', 'source_row'], activity.map((item) => [item.effectiveDate, item.entryType, item.instrumentId, item.quantity, item.unitPrice, item.cashAmount, item.externalFlow, item.description, item.sourceRow?.rowNumber ?? '']));
     context.header('content-type', 'text/csv; charset=utf-8');
     context.header('content-disposition', `attachment; filename="portfolio-activity-${accountId}.csv"`);
     return context.body(csv);
@@ -373,6 +376,29 @@ export function createApi(dependencies: ApiDependencies = {}) {
   });
 
   return api;
+}
+
+/**
+ * Export is intentionally assembled from the same account-scoped reader used by
+ * the activity screen. Walking pages keeps the download complete without adding
+ * an unbounded Supabase request; the progress guard prevents a faulty repository
+ * from creating an infinite loop.
+ */
+async function readAllActivityForExport(
+  repository: { list(accountId: string, accessToken: string, input?: { limit?: number; offset?: number }): Promise<ActivityPage> },
+  accountId: string,
+  accessToken: string,
+) {
+  const items: ActivityPage['items'] = [];
+  let offset = 0;
+  while (true) {
+    const page = await repository.list(accountId, accessToken, { limit: ACTIVITY_EXPORT_PAGE_SIZE, offset });
+    if (page.items.length === 0 && page.hasMore) throw new Error('Activity export pagination made no progress.');
+    if (items.length + page.items.length > MAX_ACTIVITY_EXPORT_ROWS) throw new Error('Activity export exceeds the maximum supported row count.');
+    items.push(...page.items);
+    if (!page.hasMore) return items;
+    offset += page.items.length;
+  }
 }
 
 export const api = createApi();
