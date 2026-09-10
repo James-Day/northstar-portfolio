@@ -1,6 +1,7 @@
 import type { IsoDate } from '@/lib/domain/types';
 import type { DailyPrice, DailyPriceProvider } from '@/services/market-data/types';
 import { eligibleEodTradingDate } from '@/services/market-data/us-equity-calendar';
+import { RefreshMetricsCollector } from '@/services/market-data/refresh-metrics';
 
 export type DailyRefreshResult =
   | { status: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' }
@@ -21,6 +22,7 @@ export type DailyRefreshEvent =
   | { type: 'failed'; attempt: number; maxAttempts: number; message: string }
   | { type: 'persisted'; tradingDate: IsoDate; symbolCount: number; upserted: number };
 export type DailyRefreshTelemetry = { record: (event: DailyRefreshEvent) => void };
+export type DailyRefreshRunRecorder = { record(run: { tradingDate: IsoDate | null; status: 'persisted' | 'skipped' | 'failed'; attempts: number; failedAttempts: number; requestedSymbols: number; persistedRows: number; quotaUnits: number; errorMessage?: string | null }): Promise<string> };
 
 /**
  * Coordinates one shared EOD request for all active symbols. Persistence and
@@ -87,6 +89,28 @@ export async function runDailyPriceRefreshWithRetry(
     }
   }
   throw new Error('Daily refresh retry loop ended unexpectedly.');
+}
+
+/** Executes a refresh and records exactly one durable operational run outcome. */
+export async function runAndRecordDailyPriceRefresh(
+  now: Date,
+  activeSymbols: string[],
+  provider: DailyPriceProvider,
+  persistence: DailyPricePersistence,
+  recorder: DailyRefreshRunRecorder,
+  options: DailyRefreshRetryOptions = {},
+): Promise<DailyRefreshJobResult> {
+  const collector = new RefreshMetricsCollector();
+  try {
+    const result = await runDailyPriceRefreshWithRetry(now, activeSymbols, provider, persistence, options, collector);
+    const metrics = collector.getSnapshot();
+    await recorder.record({ tradingDate: result.status === 'persisted' ? result.tradingDate : null, status: result.status, attempts: metrics.attempts, failedAttempts: metrics.failedAttempts, requestedSymbols: metrics.requestedSymbols, persistedRows: result.status === 'persisted' ? result.upserted : 0, quotaUnits: metrics.requestedSymbols });
+    return result;
+  } catch (error) {
+    const metrics = collector.getSnapshot();
+    await recorder.record({ tradingDate: null, status: 'failed', attempts: metrics.attempts, failedAttempts: metrics.failedAttempts, requestedSymbols: metrics.requestedSymbols, persistedRows: 0, quotaUnits: metrics.requestedSymbols, errorMessage: error instanceof Error ? error.message : 'Daily refresh failed.' });
+    throw error;
+  }
 }
 
 function normalizeSymbols(symbols: string[]): string[] {

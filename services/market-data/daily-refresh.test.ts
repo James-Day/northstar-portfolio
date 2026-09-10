@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { decimalString } from '@/lib/domain/money';
 import { isoDate } from '@/lib/domain/types';
-import { prepareDailyPriceRefresh, runDailyPriceRefresh, runDailyPriceRefreshWithRetry } from '@/services/market-data/daily-refresh';
+import { prepareDailyPriceRefresh, runAndRecordDailyPriceRefresh, runDailyPriceRefresh, runDailyPriceRefreshWithRetry } from '@/services/market-data/daily-refresh';
 import type { DailyPriceProvider } from '@/services/market-data/types';
 
 const price = (symbol: string) => ({ symbol, tradingDate: isoDate('2026-07-06'), close: decimalString('100'), provider: 'marketstack' as const, providerMetadata: {} });
@@ -58,5 +58,13 @@ describe('daily price refresh preparation', () => {
     const telemetry = { record: vi.fn() };
     await runDailyPriceRefreshWithRetry(new Date('2026-07-06T22:00:00.000Z'), ['AAPL'], provider, persistence, { sleep: vi.fn().mockResolvedValue(undefined) }, telemetry);
     expect(telemetry.record.mock.calls.map(([event]) => event.type)).toEqual(['attempt', 'failed', 'attempt', 'persisted']);
+  });
+
+  it('records one durable outcome after a retried refresh', async () => {
+    const provider: DailyPriceProvider = { getDailyPrices: vi.fn().mockRejectedValueOnce(new Error('temporary')).mockResolvedValueOnce([price('AAPL')]) };
+    const persistence = { persist: vi.fn().mockResolvedValue({ upserted: 1 }) };
+    const recorder = { record: vi.fn().mockResolvedValue('run-id') };
+    await expect(runAndRecordDailyPriceRefresh(new Date('2026-07-06T22:00:00.000Z'), ['AAPL'], provider, persistence, recorder, { sleep: vi.fn().mockResolvedValue(undefined) })).resolves.toMatchObject({ status: 'persisted' });
+    expect(recorder.record).toHaveBeenCalledWith(expect.objectContaining({ status: 'persisted', attempts: 2, failedAttempts: 1, requestedSymbols: 2, quotaUnits: 2, persistedRows: 1 }));
   });
 });
