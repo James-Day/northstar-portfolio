@@ -1,6 +1,6 @@
 import type { IsoDate } from '@/lib/domain/types';
 import type { DailyPrice, DailyPriceProvider } from '@/services/market-data/types';
-import { eligibleEodTradingDate } from '@/services/market-data/us-equity-calendar';
+import { eligibleEodTradingDate, type UsEquityCalendarOverrides } from '@/services/market-data/us-equity-calendar';
 import { RefreshMetricsCollector } from '@/services/market-data/refresh-metrics';
 import type { MarketDataQuotaLedger, QuotaReservation } from '@/services/market-data/quota';
 
@@ -54,8 +54,9 @@ export async function prepareDailyPriceRefresh(
   quota?: DailyQuotaGuard,
   telemetry?: DailyRefreshTelemetry,
   reservationKey?: string,
+  calendarOverrides: UsEquityCalendarOverrides = {},
 ): Promise<DailyRefreshResult> {
-  const tradingDate = eligibleEodTradingDate(now);
+  const tradingDate = eligibleEodTradingDate(now, 18, calendarOverrides);
   if (!tradingDate) return { status: 'skipped', reason: 'before_close_or_non_trading_day' };
 
   const requestedSymbols = normalizeSymbols(activeSymbols);
@@ -104,13 +105,14 @@ export async function runDailyPriceRefresh(
   quota?: DailyQuotaGuard,
   telemetry?: DailyRefreshTelemetry,
   reservationKey?: string,
+  calendarOverrides: UsEquityCalendarOverrides = {},
 ): Promise<DailyRefreshJobResult> {
-  const tradingDate = eligibleEodTradingDate(now);
+  const tradingDate = eligibleEodTradingDate(now, 18, calendarOverrides);
   const requestedSymbols = normalizeSymbols(activeSymbols);
   const missingSymbols = tradingDate && 'getMissingSymbols' in persistence && typeof persistence.getMissingSymbols === 'function'
     ? await persistence.getMissingSymbols(requestedSymbols, tradingDate)
     : requestedSymbols;
-  const prepared = await prepareDailyPriceRefresh(now, missingSymbols, provider, quota, telemetry, reservationKey);
+  const prepared = await prepareDailyPriceRefresh(now, missingSymbols, provider, quota, telemetry, reservationKey, calendarOverrides);
   if (prepared.status === 'skipped' && prepared.reason === 'no_active_symbols' && requestedSymbols.length > 0 && missingSymbols.length === 0) {
     return { status: 'skipped', reason: 'already_fetched' };
   }
@@ -128,6 +130,7 @@ export async function runDailyPriceRefreshWithRetry(
   options: DailyRefreshRetryOptions = {},
   telemetry?: DailyRefreshTelemetry,
   quota?: DailyQuotaGuard,
+  calendarOverrides: UsEquityCalendarOverrides = {},
 ): Promise<DailyRefreshJobResult> {
   const maxAttempts = options.maxAttempts ?? 3;
   const baseDelayMs = options.baseDelayMs ?? 1_000;
@@ -139,7 +142,7 @@ export async function runDailyPriceRefreshWithRetry(
     attempt += 1;
     telemetry?.record({ type: 'attempt', attempt, maxAttempts, symbolCount: new Set(activeSymbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean)).size });
     try {
-      const result = await runDailyPriceRefresh(now, activeSymbols, provider, persistence, quota, telemetry, makeAttemptReservationKey(now, activeSymbols, attempt, quota));
+      const result = await runDailyPriceRefresh(now, activeSymbols, provider, persistence, quota, telemetry, makeAttemptReservationKey(now, activeSymbols, attempt, quota), calendarOverrides);
       if (result.status === 'skipped') telemetry?.record({ type: 'skipped', reason: result.reason });
       else telemetry?.record({ type: 'persisted', tradingDate: result.tradingDate, symbolCount: result.requestedSymbols.length, upserted: result.upserted });
       return result;
@@ -162,10 +165,11 @@ export async function runAndRecordDailyPriceRefresh(
   recorder: DailyRefreshRunRecorder,
   options: DailyRefreshRetryOptions = {},
   quota?: DailyQuotaGuard,
+  calendarOverrides: UsEquityCalendarOverrides = {},
 ): Promise<DailyRefreshJobResult> {
   const collector = new RefreshMetricsCollector();
   try {
-    const result = await runDailyPriceRefreshWithRetry(now, activeSymbols, provider, persistence, options, collector, quota);
+    const result = await runDailyPriceRefreshWithRetry(now, activeSymbols, provider, persistence, options, collector, quota, calendarOverrides);
     const metrics = collector.getSnapshot();
     await recorder.record({ tradingDate: result.status === 'persisted' ? result.tradingDate : null, status: result.status, attempts: metrics.attempts, failedAttempts: metrics.failedAttempts, requestedSymbols: metrics.requestedSymbols, persistedRows: result.status === 'persisted' ? result.upserted : 0, quotaUnits: metrics.requestedSymbols });
     return result;

@@ -6,6 +6,10 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 APP_ENV = "development"
 MARKETSTACK_MONTHLY_CAP = "100"
+# Optional comma-separated YYYY-MM-DD overrides for extraordinary exchange sessions.
+# Keep these in deployment configuration; do not change source code for one-off closures.
+MARKET_CALENDAR_CLOSED_DATES = ""
+MARKET_CALENDAR_OPEN_DATES = ""
 
 [triggers]
 # Run hourly on weekdays; the application guard selects the first eligible
