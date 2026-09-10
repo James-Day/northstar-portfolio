@@ -2,6 +2,7 @@ import type { IsoDate } from '@/lib/domain/types';
 import type { LedgerResult } from '@/services/ledger/fifo';
 import { buildReportSnapshotPayload } from '@/services/reporting/snapshot-builder';
 import type { ValuationHistory } from '@/services/calculations/valuation';
+import type { PriceDependency } from '@/services/market-data/price-corrections';
 
 export type SnapshotPublisher = {
   publish(input: { userId: string; accountId?: string | null; reportType: 'account_daily' | 'consolidated_daily' | 'dashboard'; asOfDate: IsoDate; importStateRevision: string; priceRevisionId?: string | null; payload: Record<string, unknown> }): Promise<string>;
@@ -18,6 +19,7 @@ export async function publishReportSnapshot(input: {
   history: ValuationHistory;
   activityCoveredThrough: IsoDate | null;
   pricesThrough: IsoDate | null;
+  priceDependencies?: PriceDependency[];
   ledger?: Pick<LedgerResult, 'netDeposits' | 'dividendIncome' | 'realizedGainLoss'>;
 }): Promise<string> {
   const payload = buildReportSnapshotPayload(input);

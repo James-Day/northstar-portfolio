@@ -1,6 +1,7 @@
 import type { IsoDate } from '@/lib/domain/types';
 import type { ValuationHistory } from '@/services/calculations/valuation';
 import type { LedgerResult } from '@/services/ledger/fifo';
+import type { PriceDependency } from '@/services/market-data/price-corrections';
 
 export type ReportSnapshotPayload = {
   activityCoveredThrough: IsoDate | null;
@@ -16,10 +17,11 @@ export type ReportSnapshotPayload = {
   valueHistory: Array<{ date: IsoDate; value: string | null }>;
   holdings: ValuationHistory['valuations'][number]['holdings'];
   unavailableDates: Array<{ date: IsoDate; reason: string }>;
+  priceDependencies: PriceDependency[];
 };
 
 /** Builds a reproducible report payload from exact-decimal valuation output. */
-export function buildReportSnapshotPayload(input: { history: ValuationHistory; activityCoveredThrough: IsoDate | null; pricesThrough: IsoDate | null; ledger?: Pick<LedgerResult, 'netDeposits' | 'dividendIncome' | 'realizedGainLoss'> & Partial<Pick<LedgerResult, 'sales'>> }): ReportSnapshotPayload {
+export function buildReportSnapshotPayload(input: { history: ValuationHistory; activityCoveredThrough: IsoDate | null; pricesThrough: IsoDate | null; priceDependencies?: PriceDependency[]; ledger?: Pick<LedgerResult, 'netDeposits' | 'dividendIncome' | 'realizedGainLoss'> & Partial<Pick<LedgerResult, 'sales'>> }): ReportSnapshotPayload {
   const latest = input.history.valuations.at(-1);
   return {
     activityCoveredThrough: input.activityCoveredThrough,
@@ -35,5 +37,6 @@ export function buildReportSnapshotPayload(input: { history: ValuationHistory; a
     valueHistory: input.history.valuations.map((valuation) => ({ date: valuation.date, value: valuation.totalValue })),
     holdings: latest?.holdings ?? [],
     unavailableDates: input.history.valuations.filter((valuation) => valuation.totalValue === null || valuation.return.return === null).map((valuation) => ({ date: valuation.date, reason: valuation.return.unavailableReason ?? 'missing_valuation' })),
+    priceDependencies: input.priceDependencies ?? [],
   };
 }

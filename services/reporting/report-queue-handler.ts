@@ -63,6 +63,7 @@ export async function recomputeReport(job: ReportJob, dependencies: ReportRecomp
     history,
     activityCoveredThrough: context.inputs.activityCoveredThrough,
     pricesThrough: context.inputs.pricesThrough,
+    priceDependencies: context.inputs.priceDependencies,
     ledger: context.inputs.ledger,
   });
   return { status: 'published', snapshotId };
