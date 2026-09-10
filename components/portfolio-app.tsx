@@ -91,7 +91,7 @@ type LiveImportSummary = {
 };
 type LiveFreshnessReport = { expectedDate: string; rows: Array<{ symbol: string; expectedDate: string; latestDate: string | null; status: 'current' | 'stale' | 'missing' }> };
 type LiveReportHolding = { instrumentId: string; displayName?: string; quantity: string; close: string | null; value: string | null };
-type LiveReportSnapshot = { asOfDate: string; payload: { totalValue: string | null; cash: string | null; timeWeightedReturn: string | null; activityCoveredThrough: string | null; pricesThrough: string | null; holdings: LiveReportHolding[] } };
+type LiveReportSnapshot = { asOfDate: string; payload: { totalValue: string | null; cash: string | null; timeWeightedReturn: string | null; netDeposits?: string | null; dividendIncome?: string | null; realizedGainLoss?: string | null; activityCoveredThrough: string | null; pricesThrough: string | null; holdings: LiveReportHolding[] } };
 
 const fmt = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -730,6 +730,8 @@ function Overview({
   const liveValue = reportSnapshot?.payload.totalValue;
   const liveCash = reportSnapshot?.payload.cash;
   const liveReturn = reportSnapshot?.payload.timeWeightedReturn;
+  const liveDividends = reportSnapshot?.payload.dividendIncome;
+  const liveRealized = reportSnapshot?.payload.realizedGainLoss;
   const hasLiveReport = Boolean(reportSnapshot);
   return (
     <>
@@ -824,11 +826,11 @@ function Overview({
           <div className="grid grid-cols-2 gap-5">
             <Metric
               label="Dividends"
-              value={precise.format(summary.dividends)}
+              value={liveDividends == null ? precise.format(summary.dividends) : precise.format(Number(liveDividends))}
             />
             <Metric
               label="Realized gains"
-              value={precise.format(summary.realized)}
+              value={liveRealized == null ? precise.format(summary.realized) : precise.format(Number(liveRealized))}
             />
             <Metric label="Cash balance" value={liveCash ? precise.format(Number(liveCash)) : precise.format(summary.cash)} />
             <Metric label="Price source" value="Not connected" small />
@@ -843,10 +845,10 @@ function Overview({
             <HandCoins size={20} className="text-[#185da8]" />
           </div>
           <p className="text-3xl font-bold tracking-tight">
-            {precise.format(summary.dividends)}
+            {liveDividends == null ? precise.format(summary.dividends) : precise.format(Number(liveDividends))}
           </p>
           <p className="mt-1 text-sm text-slate-500">
-            Synthetic dividends in this scenario
+            {liveDividends == null ? "Synthetic dividends in this scenario" : "Income recorded from your imported activity"}
           </p>
         </section>
       </div>
