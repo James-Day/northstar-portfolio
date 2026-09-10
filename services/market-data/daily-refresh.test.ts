@@ -87,7 +87,7 @@ describe('daily price refresh preparation', () => {
     const persistence = { persist: vi.fn().mockResolvedValue({ upserted: 1 }) };
     const telemetry = { record: vi.fn() };
     await runDailyPriceRefreshWithRetry(new Date('2026-07-06T22:00:00.000Z'), ['AAPL'], provider, persistence, { sleep: vi.fn().mockResolvedValue(undefined) }, telemetry);
-    expect(telemetry.record.mock.calls.map(([event]) => event.type)).toEqual(['attempt', 'failed', 'attempt', 'persisted']);
+    expect(telemetry.record.mock.calls.map(([event]) => event.type)).toEqual(['attempt', 'requested', 'failed', 'attempt', 'requested', 'persisted']);
   });
 
   it('records one durable outcome after a retried refresh', async () => {
@@ -96,5 +96,14 @@ describe('daily price refresh preparation', () => {
     const recorder = { record: vi.fn().mockResolvedValue('run-id') };
     await expect(runAndRecordDailyPriceRefresh(new Date('2026-07-06T22:00:00.000Z'), ['AAPL'], provider, persistence, recorder, { sleep: vi.fn().mockResolvedValue(undefined) })).resolves.toMatchObject({ status: 'persisted' });
     expect(recorder.record).toHaveBeenCalledWith(expect.objectContaining({ status: 'persisted', attempts: 2, failedAttempts: 1, requestedSymbols: 2, quotaUnits: 2, persistedRows: 1 }));
+  });
+
+  it('records zero quota units when the durable cache makes the run a skip', async () => {
+    const provider: DailyPriceProvider = { getDailyPrices: vi.fn() };
+    const persistence = { getMissingSymbols: vi.fn().mockResolvedValue([]), persist: vi.fn() };
+    const recorder = { record: vi.fn().mockResolvedValue('run-id') };
+    await expect(runAndRecordDailyPriceRefresh(new Date('2026-07-06T22:00:00.000Z'), ['AAPL', 'MSFT'], provider, persistence, recorder)).resolves.toEqual({ status: 'skipped', reason: 'already_fetched' });
+    expect(recorder.record).toHaveBeenCalledWith(expect.objectContaining({ status: 'skipped', attempts: 1, requestedSymbols: 0, quotaUnits: 0, persistedRows: 0 }));
+    expect(provider.getDailyPrices).not.toHaveBeenCalled();
   });
 });

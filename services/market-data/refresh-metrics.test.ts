@@ -7,8 +7,16 @@ describe('daily refresh metrics', () => {
     metrics.record({ type: 'attempt', attempt: 1, maxAttempts: 3, symbolCount: 4 });
     metrics.record({ type: 'failed', attempt: 1, maxAttempts: 3, message: 'temporary' });
     metrics.record({ type: 'attempt', attempt: 2, maxAttempts: 3, symbolCount: 4 });
+    metrics.record({ type: 'requested', symbolCount: 4 });
     metrics.record({ type: 'persisted', tradingDate: '2026-07-06' as never, symbolCount: 4, upserted: 4 });
-    expect(metrics.getSnapshot()).toEqual({ attempts: 2, failedAttempts: 1, skippedRuns: 0, requestedSymbols: 8, persistedRows: 4 });
+    expect(metrics.getSnapshot()).toEqual({ attempts: 2, failedAttempts: 1, skippedRuns: 0, requestedSymbols: 4, persistedRows: 4 });
+  });
+
+  it('does not charge skipped attempts as provider usage', () => {
+    const metrics = new RefreshMetricsCollector();
+    metrics.record({ type: 'attempt', attempt: 1, maxAttempts: 3, symbolCount: 100 });
+    metrics.record({ type: 'skipped', reason: 'already_fetched' });
+    expect(metrics.getSnapshot()).toMatchObject({ attempts: 1, skippedRuns: 1, requestedSymbols: 0 });
   });
 
   it('alerts when the configured reserve would be consumed', () => {

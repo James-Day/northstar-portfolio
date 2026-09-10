@@ -17,6 +17,10 @@ export class RefreshMetricsCollector implements DailyRefreshTelemetry {
   record(event: DailyRefreshEvent) {
     if (event.type === 'attempt') {
       this.snapshot.attempts += 1;
+    } else if (event.type === 'requested') {
+      // Only provider calls consume Marketstack quota. In particular, an
+      // attempt that exits through a weekend, cache, empty-symbol, or quota
+      // guard must not inflate durable usage.
       this.snapshot.requestedSymbols += event.symbolCount;
     } else if (event.type === 'failed') this.snapshot.failedAttempts += 1;
     else if (event.type === 'skipped') this.snapshot.skippedRuns += 1;

@@ -20,6 +20,8 @@ export type DailyRefreshRetryOptions = { maxAttempts?: number; baseDelayMs?: num
 export type DailyRefreshEvent =
   | { type: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'quota_exhausted' }
   | { type: 'attempt'; attempt: number; maxAttempts: number; symbolCount: number }
+  /** Emitted only immediately before a provider call, after all skip guards pass. */
+  | { type: 'requested'; symbolCount: number }
   | { type: 'failed'; attempt: number; maxAttempts: number; message: string }
   | { type: 'persisted'; tradingDate: IsoDate; symbolCount: number; upserted: number };
 export type DailyRefreshTelemetry = { record: (event: DailyRefreshEvent) => void };
@@ -39,6 +41,7 @@ export async function prepareDailyPriceRefresh(
   activeSymbols: string[],
   provider: DailyPriceProvider,
   quota?: DailyQuotaGuard,
+  telemetry?: DailyRefreshTelemetry,
 ): Promise<DailyRefreshResult> {
   const tradingDate = eligibleEodTradingDate(now);
   if (!tradingDate) return { status: 'skipped', reason: 'before_close_or_non_trading_day' };
@@ -47,6 +50,9 @@ export async function prepareDailyPriceRefresh(
   if (requestedSymbols.length === 0) return { status: 'skipped', reason: 'no_active_symbols' };
   if (quota && await quota.getUsedUnits(now) + requestedSymbols.length > quota.monthlyCap) return { status: 'skipped', reason: 'quota_exhausted' };
 
+  // This is the quota-bearing event. Skip paths and preflight failures must not
+  // be included in the durable provider usage counter.
+  telemetry?.record({ type: 'requested', symbolCount: requestedSymbols.length });
   const prices = await provider.getDailyPrices(requestedSymbols, tradingDate);
   validateProviderResponse(prices, requestedSymbols, tradingDate);
   return { status: 'ready_to_persist', tradingDate, requestedSymbols, prices };
@@ -59,13 +65,14 @@ export async function runDailyPriceRefresh(
   provider: DailyPriceProvider,
   persistence: DailyPricePersistence,
   quota?: DailyQuotaGuard,
+  telemetry?: DailyRefreshTelemetry,
 ): Promise<DailyRefreshJobResult> {
   const tradingDate = eligibleEodTradingDate(now);
   const requestedSymbols = normalizeSymbols(activeSymbols);
   const missingSymbols = tradingDate && 'getMissingSymbols' in persistence && typeof persistence.getMissingSymbols === 'function'
     ? await persistence.getMissingSymbols(requestedSymbols, tradingDate)
     : requestedSymbols;
-  const prepared = await prepareDailyPriceRefresh(now, missingSymbols, provider, quota);
+  const prepared = await prepareDailyPriceRefresh(now, missingSymbols, provider, quota, telemetry);
   if (prepared.status === 'skipped' && prepared.reason === 'no_active_symbols' && requestedSymbols.length > 0 && missingSymbols.length === 0) {
     return { status: 'skipped', reason: 'already_fetched' };
   }
@@ -94,7 +101,7 @@ export async function runDailyPriceRefreshWithRetry(
     attempt += 1;
     telemetry?.record({ type: 'attempt', attempt, maxAttempts, symbolCount: new Set(activeSymbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean)).size });
     try {
-      const result = await runDailyPriceRefresh(now, activeSymbols, provider, persistence, quota);
+      const result = await runDailyPriceRefresh(now, activeSymbols, provider, persistence, quota, telemetry);
       if (result.status === 'skipped') telemetry?.record({ type: 'skipped', reason: result.reason });
       else telemetry?.record({ type: 'persisted', tradingDate: result.tradingDate, symbolCount: result.requestedSymbols.length, upserted: result.upserted });
       return result;
