@@ -84,6 +84,16 @@ describe('standalone API', () => {
     });
   });
 
+  it('rejects oversized or control-character bearer tokens before session verification', async () => {
+    const verifySession = vi.fn();
+    const app = createApi({ verifySession });
+    const oversized = await app.request('http://api.test/v1/accounts', { headers: { authorization: `Bearer ${'x'.repeat(4097)}` } });
+    const control = await app.request('http://api.test/v1/accounts', { headers: { authorization: 'Bearer valid\u0001token' } });
+    expect(oversized.status).toBe(401);
+    expect(control.status).toBe(401);
+    expect(verifySession).not.toHaveBeenCalled();
+  });
+
   it('returns a truthful authenticated billing status', async () => {
     const app = createApi({
       verifySession: async () => ({ id: 'user-123' }),

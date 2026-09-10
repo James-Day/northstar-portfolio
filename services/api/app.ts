@@ -1270,5 +1270,7 @@ function parseIntegerQuery(value: string | undefined): number | undefined {
 
 function readBearerToken(request: Request): string | undefined {
   const match = request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i);
-  return match?.[1]?.trim() || undefined;
+  const token = match?.[1]?.trim();
+  if (!token || token.length > 4096 || /[\u0000-\u001f\u007f]/u.test(token)) return undefined;
+  return token;
 }
