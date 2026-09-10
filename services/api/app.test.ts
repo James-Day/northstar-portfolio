@@ -163,6 +163,18 @@ describe('standalone API', () => {
     await expect(response.json()).resolves.toEqual({ activity: { items: [], limit: 10, offset: 20, hasMore: false } });
   });
 
+  it('exports account activity as formula-safe CSV', async () => {
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123' }),
+      accountsRepository: { list: async () => [], get: async () => ({ id: 'account-123' } as never), create: async () => { throw new Error('unused'); } },
+      activityRepository: { list: async () => ({ items: [{ id: '11111111-1111-4111-8111-111111111111', accountId: 'account-123', effectiveDate: '2026-01-01', entryType: 'deposit', instrumentId: null, quantity: null, unitPrice: null, cashAmount: '25', externalFlow: true, description: '=formula', sourceRowId: null, sourceRow: null }], limit: 100, offset: 0, hasMore: false }) },
+    });
+    const response = await app.request('http://api.test/v1/accounts/account-123/activity.csv', { headers: { authorization: 'Bearer session-token' } });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('text/csv');
+    await expect(response.text()).resolves.toContain("'=formula");
+  });
+
   it('lists accounts only after verifying the caller and carries the same token into the RLS repository', async () => {
     const list = async (userId: string, token: string) => {
       expect(userId).toBe('user-123');

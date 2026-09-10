@@ -23,6 +23,7 @@ import {
   type BillingPlan,
   type StripeBillingHttpDependencies,
 } from '@/services/billing/stripe-http';
+import { toCsv } from '@/services/privacy/export';
 
 export type ApiBindings = {
   APP_ENV?: 'development' | 'staging' | 'production';
@@ -203,6 +204,20 @@ export function createApi(dependencies: ApiDependencies = {}) {
     }
     const repository = activityRepository ?? createActivityRepository(context.env);
     return context.json({ activity: await repository.list(accountId, authenticated.accessToken, { limit, offset }) });
+  });
+
+  api.get('/v1/accounts/:accountId/activity.csv', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    const accountId = context.req.param('accountId');
+    const accounts = accountsRepository ?? createAccountsRepository(context.env);
+    if (!await accounts.get(authenticated.user.id, authenticated.accessToken, accountId)) return context.json({ error: 'not_found' }, 404);
+    const repository = activityRepository ?? createActivityRepository(context.env);
+    const page = await repository.list(accountId, authenticated.accessToken, { limit: 100, offset: 0 });
+    const csv = toCsv(['date', 'type', 'instrument', 'quantity', 'unit_price', 'cash_amount', 'external_flow', 'description', 'source_row'], page.items.map((item) => [item.effectiveDate, item.entryType, item.instrumentId, item.quantity, item.unitPrice, item.cashAmount, item.externalFlow, item.description, item.sourceRow?.rowNumber ?? '']));
+    context.header('content-type', 'text/csv; charset=utf-8');
+    context.header('content-disposition', `attachment; filename="portfolio-activity-${accountId}.csv"`);
+    return context.body(csv);
   });
 
   api.post('/v1/accounts/:accountId/import-preview', async (context) => {
