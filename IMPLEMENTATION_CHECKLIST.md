@@ -13,7 +13,7 @@ This file is the current implementation plan. Work through the numbered steps in
 - Keep commits large and coherent. Record meaningful milestone evidence rather than a log entry for every small UI change.
 - Never commit secrets. Configure credentials through local ignored environment files or the service's secret interface.
 
-**Current count: 102 tasks — 44 checked, 58 unchecked, across 13 ordered steps.**
+**Current count: 102 tasks — 45 checked, 57 unchecked, across 13 ordered steps.**
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -109,7 +109,7 @@ Owner: ledger/calculations. Depends on steps 04–05.
 - [ ] **06.05** Build an authoritative loader/replay of only effective committed ledger events plus opening history; use deterministic same-day ordering and reconcile SQL normalization to engine contracts.
 - [x] **06.06** Rebuild/persist lot quantities and realized matches after buys, sales and undo. Evidence: deterministic account rebuild, FIFO sale consumption, proportional cost-basis matches, over-sale validation, and serialized commit/undo integration in commit `a103071`.
 - [ ] **06.07** Apply splits in chronological event order, before later trades. Current valuation applies actions after replaying all trades through a date, which can incorrectly split post-action purchases or process post-split sales against pre-split quantities. Test buy → split → buy/sell and repeated actions.
-- [ ] **06.08** Persist and execute reconciled cross-account cash/share transfers, preserve basis/dates, and keep unresolved transfers explicit. Preserve stable instrument identity across ticker aliases.
+- [x] **06.08** Persist and execute reconciled cross-account cash/share transfers, preserve basis/dates, and keep unresolved transfers explicit. Preserve stable instrument identity across ticker aliases. Evidence: deterministic transfer reconciliation, alias resolution, explicit unresolved states, owned repository and RLS table in commit `504a2a4`.
 - [ ] **06.09** Gate: database-derived cash, positions, FIFO gains, fees, DRIP, transfers and splits reconcile to independent fixtures before and after undo. Analytical gains are labeled “not tax reporting.”
 
 ## 07 — Establish trusted historical prices
@@ -248,6 +248,8 @@ Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/sh
 | 2026-09-10 | 09.02 — Snapshot publication dependency integrity | Commit `37433b1`; snapshot retries read back the exact immutable dependency tuple, validate account/report identifiers and dates, and order reader ties deterministically. Four focused repository tests passed. | Live snapshot execution and report queue deployment remain open. |
 | 2026-09-10 | 06.06 — Persisted FIFO lot rebuild | Commit `a103071`; account lot rebuild persists FIFO sale matches, validates over-sales, and runs after serialized commit/undo. Two focused migration tests and typecheck passed. | Live Supabase migration execution and end-to-end report reconciliation remain open. |
 | 2026-09-10 | 12.04 — Durable deletion executor boundary (partial) | Commit `3c9b956`; ordered cleanup execution covers private files, accounts, reports, billing, profiles and auth through injectable adapters, with durable claim/retry/stale-claim/exhaustion RPCs and focused tests. | Live Auth/Storage/Stripe execution, scheduled deployment and verification of revoked access remain open. |
+| 2026-09-10 | 06.08 — Internal transfer reconciliation | Commit `504a2a4`; persisted cash/share transfers resolve through stable ticker aliases, preserve explicit unresolved states, and write account-owned reconciliation results under RLS. Five focused tests and typecheck passed. | Live Supabase migration/execution and end-to-end consolidated report validation remain open. |
+| 2026-09-10 | 10.05 — Portfolio detail metrics (partial) | Commit `0efe479`; report/dashboard payloads now expose net deposits, invested value, allocation percentages, explicit incomplete valuation states and FIFO realized-lot detail. Seven focused tests and typecheck passed. | Consolidated snapshots, dividend detail presentation and live authenticated browser verification remain open. |
 | 2026-09-10 | 05.03 — Verified private statement object binding | Commit `1c8f694`; authenticated object-binding verifies account ownership, private Storage access, 10 MB/byte-size limits and SHA-256 before persisting import metadata through an RLS-backed RPC. Focused tests (38) and typecheck passed. | Live Supabase Storage/RLS execution and queued import processing remain open. |
 | 2026-09-10 | 09.05 — Report outbox-to-queue wiring (partial) | Commit `ff69ddb`; scheduled transactional outbox dispatch claims report events, publishes typed jobs to `REPORT_QUEUE`, uses `waitUntil` for cron work, and retries safely. Queue tests (9) and typecheck passed. | Durable report input loaders, all import/undo/price-correction triggers, live queue bindings and end-to-end snapshot execution remain open. |
 
