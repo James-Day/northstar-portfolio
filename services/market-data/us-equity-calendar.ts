@@ -2,12 +2,21 @@ import { isoDate, type IsoDate } from '@/lib/domain/types';
 
 const NEW_YORK = 'America/New_York';
 
+export type UsEquityCalendarOverrides = {
+  /** Explicit full-day closures supplied by an operator or exchange feed. */
+  closedDates?: ReadonlySet<IsoDate>;
+  /** Explicit sessions that should remain open despite a standard holiday rule. */
+  openDates?: ReadonlySet<IsoDate>;
+};
+
 /**
  * Covers standard full-day NYSE holidays. Extraordinary closures and early
  * closes are intentionally not treated as full closures and must be added as
  * explicit overrides when they occur.
  */
-export function isUsEquityTradingDay(date: IsoDate): boolean {
+export function isUsEquityTradingDay(date: IsoDate, overrides: UsEquityCalendarOverrides = {}): boolean {
+  if (overrides.closedDates?.has(date)) return false;
+  if (overrides.openDates?.has(date)) return true;
   const value = parseDate(date);
   const weekday = value.getUTCDay();
   if (weekday === 0 || weekday === 6) return false;
@@ -15,14 +24,14 @@ export function isUsEquityTradingDay(date: IsoDate): boolean {
 }
 
 /** Returns the New York trading date only after the regular session has closed. */
-export function eligibleEodTradingDate(now: Date, minimumHourEastern = 18): IsoDate | null {
+export function eligibleEodTradingDate(now: Date, minimumHourEastern = 18, overrides: UsEquityCalendarOverrides = {}): IsoDate | null {
   if (!Number.isInteger(minimumHourEastern) || minimumHourEastern < 16 || minimumHourEastern > 23) {
     throw new Error('EOD refresh hour must be an Eastern hour from 16 through 23.');
   }
   const eastern = easternDateTime(now);
   if (eastern.hour < minimumHourEastern) return null;
   const date = isoDate(`${eastern.year}-${String(eastern.month).padStart(2, '0')}-${String(eastern.day).padStart(2, '0')}`);
-  return isUsEquityTradingDay(date) ? date : null;
+  return isUsEquityTradingDay(date, overrides) ? date : null;
 }
 
 function standardUsEquityHolidays(year: number): Set<IsoDate> {

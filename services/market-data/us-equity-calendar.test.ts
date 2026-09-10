@@ -21,4 +21,11 @@ describe('U.S. equity market calendar', () => {
     expect(eligibleEodTradingDate(new Date('2026-12-25T23:00:00.000Z'))).toBeNull();
     expect(() => eligibleEodTradingDate(new Date(), 15)).toThrow('from 16 through 23');
   });
+
+  it('supports explicit extraordinary closure and session overrides', () => {
+    const closed = new Set([isoDate('2026-09-08')]);
+    expect(isUsEquityTradingDay(isoDate('2026-09-08'), { closedDates: closed })).toBe(false);
+    expect(eligibleEodTradingDate(new Date('2026-09-08T22:00:00Z'), 18, { closedDates: closed })).toBeNull();
+    expect(isUsEquityTradingDay(isoDate('2026-07-04'), { openDates: new Set([isoDate('2026-07-04')]) })).toBe(true);
+  });
 });
