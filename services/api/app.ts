@@ -98,6 +98,7 @@ export type ApiDependencies = {
       accountId: string,
       accessToken: string,
     ): Promise<ReportSnapshot | undefined>;
+    getLatestConsolidated?(accessToken: string): Promise<ReportSnapshot | undefined>;
   };
   signedUploadRepository?: SignedUploadRepository;
   activityRepository?: {
@@ -514,6 +515,27 @@ export function createApi(dependencies: ApiDependencies = {}) {
       context.req.param('accountId'),
       authenticated.accessToken,
     );
+    if (!snapshot) return context.json({ error: 'not_found' }, 404);
+    return context.json({ snapshot });
+  });
+
+  api.get('/v1/reports/consolidated', async (context) => {
+    const authenticated = await requireSession(
+      context.req.raw,
+      context.env,
+      verifySession,
+    );
+    if (authenticated instanceof Response) return authenticated;
+    const gate = await requireBillingAccess(
+      billingPersistence ?? createBillingRepository(context.env),
+      authenticated.user.id,
+      authenticated.accessToken,
+    );
+    if (gate) return context.json(gate.body, gate.status);
+    const reader = reportSnapshotReader ?? createReportSnapshotReader(context.env);
+    if (!reader?.getLatestConsolidated)
+      return context.json({ error: 'reporting_unavailable' }, 503);
+    const snapshot = await reader.getLatestConsolidated(authenticated.accessToken);
     if (!snapshot) return context.json({ error: 'not_found' }, 404);
     return context.json({ snapshot });
   });

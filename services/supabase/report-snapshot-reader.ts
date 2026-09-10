@@ -24,4 +24,18 @@ export class SupabaseReportSnapshotReader {
     const row = z.array(rowSchema).parse(await response.json())[0];
     return row ? { id: row.id, userId: row.user_id, accountId: row.account_id, reportType: row.report_type, asOfDate: row.as_of_date, importStateRevision: row.import_state_revision, priceRevisionId: row.price_revision_id, payload: row.payload, publishedAt: row.published_at } : undefined;
   }
+
+  /** Reads the caller's latest consolidated snapshot; RLS still enforces ownership. */
+  async getLatestConsolidated(accessToken: string): Promise<ReportSnapshot | undefined> {
+    const url = new URL('/rest/v1/report_snapshots', this.baseUrl);
+    url.searchParams.set('select', 'id,user_id,account_id,report_type,as_of_date,import_state_revision,price_revision_id,payload,published_at');
+    url.searchParams.set('account_id', 'is.null');
+    url.searchParams.set('report_type', 'eq.consolidated_daily');
+    url.searchParams.set('order', 'as_of_date.desc,published_at.desc,id.desc');
+    url.searchParams.set('limit', '1');
+    const response = await this.fetcher(url, { headers: { apikey: this.options.anonKey, authorization: `Bearer ${accessToken}` } });
+    if (!response.ok) throw new Error(`Supabase consolidated report snapshot query failed with HTTP ${response.status}.`);
+    const row = z.array(rowSchema).parse(await response.json())[0];
+    return row ? { id: row.id, userId: row.user_id, accountId: row.account_id, reportType: row.report_type, asOfDate: row.as_of_date, importStateRevision: row.import_state_revision, priceRevisionId: row.price_revision_id, payload: row.payload, publishedAt: row.published_at } : undefined;
+  }
 }

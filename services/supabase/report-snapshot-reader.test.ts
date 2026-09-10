@@ -9,4 +9,12 @@ describe('Supabase report snapshot reader', () => {
     expect(fetcher.mock.calls[0][1].headers.authorization).toBe('Bearer user-token');
     expect(String(fetcher.mock.calls[0][0])).toContain('order=as_of_date.desc%2Cpublished_at.desc%2Cid.desc');
   });
+
+  it('reads a consolidated snapshot through the caller-scoped RLS token', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify([{ id: '11111111-1111-4111-8111-111111111111', user_id: '22222222-2222-4222-8222-222222222222', account_id: null, report_type: 'consolidated_daily', as_of_date: '2026-07-06', import_state_revision: 'consolidated:rev-1', price_revision_id: null, payload: { totalValue: '200' }, published_at: '2026-07-06T23:00:00Z' }])));
+    const reader = new SupabaseReportSnapshotReader({ supabaseUrl: 'https://supabase.test', anonKey: 'public-key', fetcher: fetcher as typeof fetch });
+    await expect(reader.getLatestConsolidated('user-token')).resolves.toMatchObject({ accountId: null, reportType: 'consolidated_daily', payload: { totalValue: '200' } });
+    expect(String(fetcher.mock.calls[0][0])).toContain('account_id=is.null');
+    expect(String(fetcher.mock.calls[0][0])).toContain('report_type=eq.consolidated_daily');
+  });
 });

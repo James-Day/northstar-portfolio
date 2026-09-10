@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createApi } from '@/services/api/app';
 import { ImportOperationRejectedError } from '@/services/supabase/imports-repository';
 import { parseOpeningHistory } from '@/services/accounts/opening-history';
@@ -15,6 +15,28 @@ describe('standalone API', () => {
     processedWebhookIds: [],
     lastWebhookCreatedAt: null,
     lastWebhookId: null,
+  });
+
+  it('serves a consolidated snapshot through the authenticated reader contract', async () => {
+    const reader = {
+      getLatest: vi.fn(),
+      getLatestConsolidated: vi.fn().mockResolvedValue({
+        reportType: 'consolidated_daily',
+        accountId: null,
+      }),
+    };
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123' }),
+      reportSnapshotReader: reader as never,
+    });
+    const response = await app.request('http://api.test/v1/reports/consolidated', {
+      headers: { authorization: 'Bearer session-token' },
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      snapshot: { reportType: 'consolidated_daily', accountId: null },
+    });
+    expect(reader.getLatestConsolidated).toHaveBeenCalledWith('session-token');
   });
 
   it('enforces the API rate-limit boundary before route work and returns safe headers', async () => {
