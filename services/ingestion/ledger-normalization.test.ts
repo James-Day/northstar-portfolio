@@ -27,4 +27,31 @@ describe('Robinhood ledger normalization', () => {
     const rows = parseRobinhoodActivityCsv('Activity Date,Trans Code,Instrument,Quantity,Amount\n2026-01-02,Buy,VTI,1,($100)');
     expect(() => normalizeRobinhoodRowsForLedger(rows, new Map())).toThrow('no resolved instrument for VTI');
   });
+
+  it('normalizes trades, dividends, interest, fees, IRA flows, and transfers without changing signs', () => {
+    const rows = parseRobinhoodActivityCsv([
+      'Activity Date,Trans Code,Instrument,Quantity,Price,Amount,Description',
+      '2026-01-02,Buy,VTI,1,$100,($100),Bought VTI',
+      '2026-01-03,Sell,VTI,0.5,$120,$60,Sold VTI',
+      '2026-01-04,CDIV,VTI,,,($2.50),Cash dividend',
+      '2026-01-05,SLIP,,,, $0.10,Interest',
+      '2026-01-06,AFEE,,,,($1.25),Regulatory fee',
+      '2026-01-07,IRA Contribution,,,,$500,IRA contribution',
+      '2026-01-08,IRA Distribution,,,,($50),IRA distribution',
+      '2026-01-09,Transfer In,,,,$20,Transfer in',
+      '2026-01-10,Transfer Out,,,,($5),Transfer out',
+    ].join('\n'));
+    const entries = normalizeRobinhoodRowsForLedger(rows, new Map([['VTI', 'instrument-vti']]));
+    expect(entries).toMatchObject([
+      { entryType: 'buy', instrumentId: 'instrument-vti', quantity: '1', cashAmount: '-100', externalFlow: false },
+      { entryType: 'sell', instrumentId: 'instrument-vti', quantity: '0.5', cashAmount: '60', externalFlow: false },
+      { entryType: 'dividend', instrumentId: 'instrument-vti', cashAmount: '2.5', externalFlow: false },
+      { entryType: 'interest', cashAmount: '0.1', externalFlow: false },
+      { entryType: 'fee', cashAmount: '-1.25', externalFlow: false },
+      { entryType: 'deposit', cashAmount: '500', externalFlow: true },
+      { entryType: 'withdrawal', cashAmount: '-50', externalFlow: true },
+      { entryType: 'transfer_in', cashAmount: '20', externalFlow: false },
+      { entryType: 'transfer_out', cashAmount: '-5', externalFlow: false },
+    ]);
+  });
 });
