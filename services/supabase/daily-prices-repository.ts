@@ -16,6 +16,30 @@ export class SupabaseDailyPricesRepository {
     this.fetcher = options.fetcher ?? ((input, init) => fetch(input, init));
   }
 
+  /** Returns only symbols without a stored close for the requested date. */
+  async getMissingSymbols(symbols: string[], tradingDate: string): Promise<string[]> {
+    const requested = [...new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))];
+    if (requested.length === 0) return [];
+    const aliasUrl = new URL('/rest/v1/instrument_aliases', this.baseUrl);
+    aliasUrl.searchParams.set('select', 'instrument_id,symbol');
+    aliasUrl.searchParams.set('symbol', 'in.(' + requested.join(',') + ')');
+    const aliasResponse = await this.fetcher(aliasUrl, { headers: this.headers() });
+    if (!aliasResponse.ok) throw new Error(`Supabase instrument-alias lookup failed with HTTP ${aliasResponse.status}.`);
+    const aliases = z.array(z.object({ instrument_id: z.string().uuid(), symbol: z.string() })).parse(await aliasResponse.json());
+    const instrumentIds = [...new Set(aliases.map((alias) => alias.instrument_id))];
+    if (instrumentIds.length === 0) return requested;
+    const priceUrl = new URL('/rest/v1/daily_prices', this.baseUrl);
+    priceUrl.searchParams.set('select', 'instrument_id');
+    priceUrl.searchParams.set('instrument_id', 'in.(' + instrumentIds.join(',') + ')');
+    priceUrl.searchParams.set('trading_date', `eq.${tradingDate}`);
+    const priceResponse = await this.fetcher(priceUrl, { headers: this.headers() });
+    if (!priceResponse.ok) throw new Error(`Supabase daily price lookup failed with HTTP ${priceResponse.status}.`);
+    const rows = z.array(z.object({ instrument_id: z.string().uuid() })).parse(await priceResponse.json());
+    const presentIds = new Set(rows.map((row) => row.instrument_id));
+    const presentSymbols = new Set(aliases.filter((alias) => presentIds.has(alias.instrument_id)).map((alias) => alias.symbol.toUpperCase()));
+    return requested.filter((symbol) => !presentSymbols.has(symbol));
+  }
+
   async persist(input: { tradingDate: string; prices: DailyPrice[] }): Promise<{ upserted: number }> {
     if (input.prices.length === 0) return { upserted: 0 };
     const sourceRevision = input.prices.map((price) => `${price.provider}:${String(price.providerMetadata.requestedDate ?? input.tradingDate)}`).join('|');

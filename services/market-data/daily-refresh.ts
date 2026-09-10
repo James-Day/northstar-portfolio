@@ -4,26 +4,30 @@ import { eligibleEodTradingDate } from '@/services/market-data/us-equity-calenda
 import { RefreshMetricsCollector } from '@/services/market-data/refresh-metrics';
 
 export type DailyRefreshResult =
-  | { status: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'quota_exhausted' }
+  | { status: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'quota_exhausted' }
   | { status: 'ready_to_persist'; tradingDate: IsoDate; requestedSymbols: string[]; prices: DailyPrice[] };
 
 export type DailyPricePersistence = {
   persist(input: { tradingDate: IsoDate; prices: DailyPrice[] }): Promise<{ upserted: number }>;
+  getMissingSymbols?(symbols: string[], tradingDate: IsoDate): Promise<string[]>;
 };
 
 export type DailyRefreshJobResult =
-  | { status: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'quota_exhausted' }
+  | { status: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'quota_exhausted' }
   | { status: 'persisted'; tradingDate: IsoDate; requestedSymbols: string[]; upserted: number };
 
 export type DailyRefreshRetryOptions = { maxAttempts?: number; baseDelayMs?: number; sleep?: (milliseconds: number) => Promise<void> };
 export type DailyRefreshEvent =
-  | { type: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'quota_exhausted' }
+  | { type: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'quota_exhausted' }
   | { type: 'attempt'; attempt: number; maxAttempts: number; symbolCount: number }
   | { type: 'failed'; attempt: number; maxAttempts: number; message: string }
   | { type: 'persisted'; tradingDate: IsoDate; symbolCount: number; upserted: number };
 export type DailyRefreshTelemetry = { record: (event: DailyRefreshEvent) => void };
 export type DailyRefreshRunRecorder = { record(run: { tradingDate: IsoDate | null; status: 'persisted' | 'skipped' | 'failed'; attempts: number; failedAttempts: number; requestedSymbols: number; persistedRows: number; quotaUnits: number; errorMessage?: string | null }): Promise<string> };
 export type DailyQuotaGuard = { getUsedUnits(now: Date): Promise<number>; monthlyCap: number };
+
+/** Optional durable cache lookup used to avoid re-requesting a completed EOD close. */
+export type DailyPriceCache = { getMissingSymbols(symbols: string[], tradingDate: IsoDate): Promise<string[]> };
 
 /**
  * Coordinates one shared EOD request for all active symbols. Persistence and
@@ -56,7 +60,15 @@ export async function runDailyPriceRefresh(
   persistence: DailyPricePersistence,
   quota?: DailyQuotaGuard,
 ): Promise<DailyRefreshJobResult> {
-  const prepared = await prepareDailyPriceRefresh(now, activeSymbols, provider, quota);
+  const tradingDate = eligibleEodTradingDate(now);
+  const requestedSymbols = normalizeSymbols(activeSymbols);
+  const missingSymbols = tradingDate && 'getMissingSymbols' in persistence && typeof persistence.getMissingSymbols === 'function'
+    ? await persistence.getMissingSymbols(requestedSymbols, tradingDate)
+    : requestedSymbols;
+  const prepared = await prepareDailyPriceRefresh(now, missingSymbols, provider, quota);
+  if (prepared.status === 'skipped' && prepared.reason === 'no_active_symbols' && requestedSymbols.length > 0 && missingSymbols.length === 0) {
+    return { status: 'skipped', reason: 'already_fetched' };
+  }
   if (prepared.status === 'skipped') return prepared;
   const persisted = await persistence.persist({ tradingDate: prepared.tradingDate, prices: prepared.prices });
   return { status: 'persisted', tradingDate: prepared.tradingDate, requestedSymbols: prepared.requestedSymbols, upserted: persisted.upserted };

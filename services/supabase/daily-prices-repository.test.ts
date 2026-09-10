@@ -2,6 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { SupabaseDailyPricesRepository } from '@/services/supabase/daily-prices-repository';
 
 describe('Supabase daily prices repository', () => {
+  it('finds missing symbols without spending provider quota', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ instrument_id: '11111111-1111-4111-8111-111111111111', symbol: 'AAPL' }, { instrument_id: '22222222-2222-4222-8222-222222222222', symbol: 'VTI' }]), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ instrument_id: '11111111-1111-4111-8111-111111111111' }]), { status: 200 }));
+    const repository = new SupabaseDailyPricesRepository({ supabaseUrl: 'https://supabase.test', serviceRoleKey: 'service-secret', fetcher: fetcher as typeof fetch });
+    await expect(repository.getMissingSymbols(['vti', 'AAPL'], '2026-07-06')).resolves.toEqual(['VTI']);
+    expect(String(fetcher.mock.calls[1][0])).toContain('trading_date=eq.2026-07-06');
+  });
   it('resolves symbols to effective instrument IDs before upserting', async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify([{ id: '11111111-1111-4111-8111-111111111111', source: 'marketstack', source_revision: 'marketstack:2026-07-06' }])))

@@ -45,6 +45,28 @@ describe('daily price refresh preparation', () => {
     expect(persistence.persist).toHaveBeenCalledWith({ tradingDate: '2026-07-06', prices: [price('AAPL')] });
   });
 
+  it('skips symbols that already have a durable close for the trading date', async () => {
+    const provider: DailyPriceProvider = { getDailyPrices: vi.fn().mockResolvedValue([]) };
+    const persistence = {
+      getMissingSymbols: vi.fn().mockResolvedValue([]),
+      persist: vi.fn(),
+    };
+    await expect(runDailyPriceRefresh(new Date('2026-07-06T22:00:00.000Z'), ['AAPL'], provider, persistence)).resolves.toEqual({ status: 'skipped', reason: 'already_fetched' });
+    expect(persistence.getMissingSymbols).toHaveBeenCalledWith(['AAPL'], '2026-07-06');
+    expect(provider.getDailyPrices).not.toHaveBeenCalled();
+    expect(persistence.persist).not.toHaveBeenCalled();
+  });
+
+  it('requests only symbols missing from the durable daily-price cache', async () => {
+    const provider: DailyPriceProvider = { getDailyPrices: vi.fn().mockResolvedValue([price('VTI')]) };
+    const persistence = {
+      getMissingSymbols: vi.fn().mockResolvedValue(['VTI']),
+      persist: vi.fn().mockResolvedValue({ upserted: 1 }),
+    };
+    await expect(runDailyPriceRefresh(new Date('2026-07-06T22:00:00.000Z'), ['AAPL', 'VTI'], provider, persistence)).resolves.toMatchObject({ status: 'persisted', requestedSymbols: ['VTI'] });
+    expect(provider.getDailyPrices).toHaveBeenCalledWith(['VTI'], '2026-07-06');
+  });
+
   it('does not persist when the date is not eligible', async () => {
     const persistence = { persist: vi.fn() };
     await expect(runDailyPriceRefresh(new Date('2026-07-04T22:00:00.000Z'), ['AAPL'], { getDailyPrices: vi.fn() }, persistence)).resolves.toEqual({ status: 'skipped', reason: 'before_close_or_non_trading_day' });
