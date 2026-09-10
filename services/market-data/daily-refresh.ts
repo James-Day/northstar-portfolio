@@ -14,6 +14,8 @@ export type DailyRefreshJobResult =
   | { status: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' }
   | { status: 'persisted'; tradingDate: IsoDate; requestedSymbols: string[]; upserted: number };
 
+export type DailyRefreshRetryOptions = { maxAttempts?: number; baseDelayMs?: number; sleep?: (milliseconds: number) => Promise<void> };
+
 /**
  * Coordinates one shared EOD request for all active symbols. Persistence and
  * retry are separate infrastructure concerns, so a failed provider call is
@@ -46,6 +48,32 @@ export async function runDailyPriceRefresh(
   if (prepared.status === 'skipped') return prepared;
   const persisted = await persistence.persist({ tradingDate: prepared.tradingDate, prices: prepared.prices });
   return { status: 'persisted', tradingDate: prepared.tradingDate, requestedSymbols: prepared.requestedSymbols, upserted: persisted.upserted };
+}
+
+/** Retries a refresh with bounded exponential backoff; the final error remains visible to the job runner. */
+export async function runDailyPriceRefreshWithRetry(
+  now: Date,
+  activeSymbols: string[],
+  provider: DailyPriceProvider,
+  persistence: DailyPricePersistence,
+  options: DailyRefreshRetryOptions = {},
+): Promise<DailyRefreshJobResult> {
+  const maxAttempts = options.maxAttempts ?? 3;
+  const baseDelayMs = options.baseDelayMs ?? 1_000;
+  const sleep = options.sleep ?? ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 5) throw new Error('Daily refresh attempts must be an integer from 1 through 5.');
+  if (!Number.isInteger(baseDelayMs) || baseDelayMs < 0) throw new Error('Daily refresh backoff must be a non-negative integer.');
+  let attempt = 0;
+  while (attempt < maxAttempts) {
+    attempt += 1;
+    try {
+      return await runDailyPriceRefresh(now, activeSymbols, provider, persistence);
+    } catch (error) {
+      if (attempt >= maxAttempts) throw error;
+      await sleep(baseDelayMs * 2 ** (attempt - 1));
+    }
+  }
+  throw new Error('Daily refresh retry loop ended unexpectedly.');
 }
 
 function normalizeSymbols(symbols: string[]): string[] {

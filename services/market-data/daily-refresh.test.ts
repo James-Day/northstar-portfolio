@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { decimalString } from '@/lib/domain/money';
 import { isoDate } from '@/lib/domain/types';
-import { prepareDailyPriceRefresh, runDailyPriceRefresh } from '@/services/market-data/daily-refresh';
+import { prepareDailyPriceRefresh, runDailyPriceRefresh, runDailyPriceRefreshWithRetry } from '@/services/market-data/daily-refresh';
 import type { DailyPriceProvider } from '@/services/market-data/types';
 
 const price = (symbol: string) => ({ symbol, tradingDate: isoDate('2026-07-06'), close: decimalString('100'), provider: 'marketstack' as const, providerMetadata: {} });
@@ -41,5 +41,14 @@ describe('daily price refresh preparation', () => {
     const persistence = { persist: vi.fn() };
     await expect(runDailyPriceRefresh(new Date('2026-07-04T22:00:00.000Z'), ['AAPL'], { getDailyPrices: vi.fn() }, persistence)).resolves.toEqual({ status: 'skipped', reason: 'before_close_or_non_trading_day' });
     expect(persistence.persist).not.toHaveBeenCalled();
+  });
+
+  it('retries transient provider failures with exponential delays', async () => {
+    const provider: DailyPriceProvider = { getDailyPrices: vi.fn().mockRejectedValueOnce(new Error('temporary')).mockResolvedValueOnce([price('AAPL')]) };
+    const persistence = { persist: vi.fn().mockResolvedValue({ upserted: 1 }) };
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    await expect(runDailyPriceRefreshWithRetry(new Date('2026-07-06T22:00:00.000Z'), ['AAPL'], provider, persistence, { baseDelayMs: 25, sleep })).resolves.toMatchObject({ status: 'persisted', upserted: 1 });
+    expect(sleep).toHaveBeenCalledWith(25);
+    expect(provider.getDailyPrices).toHaveBeenCalledTimes(2);
   });
 });
