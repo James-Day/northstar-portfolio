@@ -307,6 +307,12 @@ export function PortfolioApp({
   const [billingStatus, setBillingStatus] = useState<LiveBillingStatus>();
   const authGeneration = useRef(0);
 
+  function selectReportScope(scope: 'account' | 'consolidated') {
+    setReportScope(scope);
+    setReportSnapshot(undefined);
+    setReportError(undefined);
+  }
+
   function clearAccountWorkspaceState() {
     setOpeningHistory(undefined);
     setLivePreview(undefined);
@@ -627,7 +633,7 @@ export function PortfolioApp({
   }, [apiConfig, client, selectedAccountId, userId, freshnessRequestVersion]);
 
   useEffect(() => {
-    if (!client || !apiConfig || !userId || !selectedAccountId) {
+    if (!client || !apiConfig || !userId || (!selectedAccountId && reportScope === 'account')) {
       setReportSnapshot(undefined);
       return;
     }
@@ -638,8 +644,11 @@ export function PortfolioApp({
       .getSession()
       .then(async ({ data }) => {
         if (!data.session?.access_token) return;
+        const reportUrl = reportScope === 'consolidated'
+          ? `${apiConfig.baseUrl}/v1/reports/consolidated`
+          : `${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/report`;
         const response = await fetch(
-          `${apiConfig.baseUrl}/v1/accounts/${selectedAccountId}/report`,
+          reportUrl,
           { headers: { authorization: `Bearer ${data.session.access_token}` } },
         );
         if (response.status === 404) {
@@ -675,7 +684,7 @@ export function PortfolioApp({
     return () => {
       active = false;
     };
-  }, [apiConfig, client, selectedAccountId, userId, reportRequestVersion]);
+  }, [apiConfig, client, reportScope, selectedAccountId, userId, reportRequestVersion]);
 
   useEffect(() => {
     if (!client || !apiConfig || !userId || !selectedAccountId) {
@@ -1229,7 +1238,7 @@ export function PortfolioApp({
               reportPeriod={reportPeriod}
               onSelectReportPeriod={setReportPeriod}
               reportScope={reportScope}
-              onSelectReportScope={setReportScope}
+              onSelectReportScope={selectReportScope}
               openingHistory={openingHistory}
               isLiveAccount={Boolean(client && userId && selectedAccountId)}
             />
@@ -1458,8 +1467,8 @@ function Overview({
                 className="ml-2 h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm outline-none focus:border-[#185da8] focus:ring-2 focus:ring-[#185da8]/20"
               >
                 <option value="account">This account</option>
-                <option value="consolidated" disabled>
-                  All accounts (coming soon)
+                <option value="consolidated">
+                  All accounts
                 </option>
               </select>
             </label>
