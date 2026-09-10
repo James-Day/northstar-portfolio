@@ -12,6 +12,7 @@ export type ReportSnapshotPayload = {
   netDeposits: string | null;
   dividendIncome: string | null;
   realizedGainLoss: string | null;
+  valueHistory: Array<{ date: IsoDate; value: string | null }>;
   holdings: ValuationHistory['valuations'][number]['holdings'];
   unavailableDates: Array<{ date: IsoDate; reason: string }>;
 };
@@ -29,6 +30,7 @@ export function buildReportSnapshotPayload(input: { history: ValuationHistory; a
     netDeposits: input.ledger?.netDeposits ?? null,
     dividendIncome: input.ledger?.dividendIncome ?? null,
     realizedGainLoss: input.ledger?.realizedGainLoss ?? null,
+    valueHistory: input.history.valuations.map((valuation) => ({ date: valuation.date, value: valuation.totalValue })),
     holdings: latest?.holdings ?? [],
     unavailableDates: input.history.valuations.filter((valuation) => valuation.totalValue === null || valuation.return.return === null).map((valuation) => ({ date: valuation.date, reason: valuation.return.unavailableReason ?? 'missing_valuation' })),
   };

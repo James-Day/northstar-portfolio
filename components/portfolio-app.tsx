@@ -91,7 +91,7 @@ type LiveImportSummary = {
 };
 type LiveFreshnessReport = { expectedDate: string; rows: Array<{ symbol: string; expectedDate: string; latestDate: string | null; status: 'current' | 'stale' | 'missing' }> };
 type LiveReportHolding = { instrumentId: string; displayName?: string; quantity: string; close: string | null; value: string | null };
-type LiveReportSnapshot = { asOfDate: string; payload: { totalValue: string | null; cash: string | null; timeWeightedReturn: string | null; netDeposits?: string | null; dividendIncome?: string | null; realizedGainLoss?: string | null; activityCoveredThrough: string | null; pricesThrough: string | null; holdings: LiveReportHolding[] } };
+type LiveReportSnapshot = { asOfDate: string; payload: { totalValue: string | null; cash: string | null; timeWeightedReturn: string | null; netDeposits?: string | null; dividendIncome?: string | null; realizedGainLoss?: string | null; valueHistory?: Array<{ date: string; value: string | null }>; activityCoveredThrough: string | null; pricesThrough: string | null; holdings: LiveReportHolding[] } };
 
 const fmt = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -733,6 +733,9 @@ function Overview({
   const liveDividends = reportSnapshot?.payload.dividendIncome;
   const liveRealized = reportSnapshot?.payload.realizedGainLoss;
   const hasLiveReport = Boolean(reportSnapshot);
+  const chartData = hasLiveReport
+    ? (reportSnapshot?.payload.valueHistory ?? []).map((point) => ({ date: point.date, value: point.value === null ? null : Number(point.value) }))
+    : demoPrices;
   return (
     <>
       <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
@@ -783,7 +786,7 @@ function Overview({
           </div>
           <div className="mt-8 h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={demoPrices}>
+              <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="value" x1="0" x2="0" y1="0" y2="1">
                     <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.4} />
@@ -816,6 +819,7 @@ function Overview({
               </AreaChart>
             </ResponsiveContainer>
           </div>
+          {hasLiveReport && chartData.length === 0 && <p className="mt-2 text-xs text-slate-300">No persisted valuation history is available yet.</p>}
         </section>
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-sm font-semibold text-slate-500">Example return</p>
