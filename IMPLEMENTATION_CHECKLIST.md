@@ -163,7 +163,7 @@ Owner: product UI. Depends on step 09.
 - [ ] **10.05** Finish value/return period controls, consolidated/account selection, allocation, invested capital/net deposits, dividend and realized-lot detail views.
 - [x] **10.06** Complete opening-history and actionable warning flows; distinguish no holdings, missing report, stale report, partial history and unavailable prices without synthetic fallback. Evidence: typed warning classifier and authenticated Overview actions for import, opening-history review and retry in commits `4176951` and `dda6349`.
 - [ ] **10.07** Verify dialog focus/keyboard/screen-reader behavior, accessible tables, mobile layouts and 200% enlargement across authenticated flows.
-- [ ] **10.08** Audit any retained WebMCP hooks against actual authorized app actions/state; remove unsupported claims or obsolete hooks.
+- [x] **10.08** Audit any retained WebMCP hooks against actual authorized app actions/state; no WebMCP hooks or unsupported action claims are retained. Evidence: `docs/WEBMCP_AUDIT.md`.
 - [ ] **10.09** Gate: authenticated browser fixture flows reconcile displayed numbers to stored records; every enabled action works and logout/account switching cannot leak prior account values.
 
 ## 11 — Implement real trial and subscription lifecycle
