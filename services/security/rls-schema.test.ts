@@ -14,6 +14,39 @@ function tableNames(sql: string) {
   return [...sql.matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?public\.([a-z0-9_]+)/g)].map((match) => match[1]);
 }
 
+const ownerPolicyContracts: Record<string, RegExp> = {
+  profiles: /create\s+policy\s+profiles_owner[\s\S]*?on\s+public\.profiles[\s\S]*?for\s+all[\s\S]*?using\s*\(\s*id\s*=\s*auth\.uid\(\)[\s\S]*?with\s+check\s*\(\s*id\s*=\s*auth\.uid\(\)/,
+  accounts: /create\s+policy\s+accounts_owner[\s\S]*?on\s+public\.accounts[\s\S]*?for\s+all[\s\S]*?using\s*\(\s*user_id\s*=\s*auth\.uid\(\)[\s\S]*?with\s+check\s*\(\s*user_id\s*=\s*auth\.uid\(\)/,
+  imports: /create\s+policy\s+imports_owner[\s\S]*?on\s+public\.imports[\s\S]*?auth\.uid\(\)/,
+  import_source_rows: /create\s+policy\s+import_source_rows_owner[\s\S]*?on\s+public\.import_source_rows[\s\S]*?auth\.uid\(\)/,
+  ledger_entries: /create\s+policy\s+ledger_entries_owner[\s\S]*?on\s+public\.ledger_entries[\s\S]*?auth\.uid\(\)/,
+  lots: /create\s+policy\s+lots_owner[\s\S]*?on\s+public\.lots[\s\S]*?auth\.uid\(\)/,
+  report_snapshots: /create\s+policy\s+report_snapshots_owner[\s\S]*?on\s+public\.report_snapshots[\s\S]*?auth\.uid\(\)/,
+  billing_customers: /create\s+policy\s+billing_customer_owner[\s\S]*?on\s+public\.billing_customers[\s\S]*?for\s+select[\s\S]*?user_id\s*=\s*auth\.uid\(\)/,
+  audit_events: /create\s+policy\s+audit_events_owner[\s\S]*?on\s+public\.audit_events[\s\S]*?for\s+select[\s\S]*?user_id\s*=\s*auth\.uid\(\)/,
+  account_opening_history: /create\s+policy\s+account_opening_history_owner[\s\S]*?on\s+public\.account_opening_history[\s\S]*?auth\.uid\(\)/,
+  lot_matches: /create\s+policy\s+lot_matches_owner[\s\S]*?on\s+public\.lot_matches[\s\S]*?auth\.uid\(\)/,
+  import_issue_resolutions: /create\s+policy\s+import_issue_resolutions_owner[\s\S]*?on\s+public\.import_issue_resolutions[\s\S]*?auth\.uid\(\)/,
+  internal_transfer_reconciliations: /create\s+policy\s+internal_transfer_reconciliations_owner[\s\S]*?on\s+public\.internal_transfer_reconciliations[\s\S]*?auth\.uid\(\)/,
+  raw_file_retention: /create\s+policy\s+raw_file_retention_owner[\s\S]*?on\s+public\.raw_file_retention[\s\S]*?auth\.uid\(\)/,
+  raw_file_retention_audit: /create\s+policy\s+raw_file_retention_audit_owner[\s\S]*?on\s+public\.raw_file_retention_audit[\s\S]*?auth\.uid\(\)/,
+  billing_webhook_events: /create\s+policy\s+billing_webhook_events_owner[\s\S]*?on\s+public\.billing_webhook_events[\s\S]*?for\s+select[\s\S]*?user_id\s*=\s*auth\.uid\(\)/,
+  user_deletion_requests: /create\s+policy\s+user_deletion_requests_owner[\s\S]*?on\s+public\.user_deletion_requests[\s\S]*?for\s+select[\s\S]*?user_id\s*=\s*auth\.uid\(\)/,
+  user_deletion_plan_items: /create\s+policy\s+user_deletion_plan_items_owner[\s\S]*?on\s+public\.user_deletion_plan_items[\s\S]*?for\s+select[\s\S]*?user_id\s*=\s*auth\.uid\(\)/,
+};
+
+const serviceOwnedTables = [
+  'job_outbox',
+  'queue_rejections',
+  'market_data_job_runs',
+  'market_data_quota_buckets',
+  'market_data_quota_reservations',
+  'historical_seed_jobs',
+  'historical_seed_mappings',
+  'historical_seed_quarantine',
+  'billing_webhook_events',
+];
+
 describe('database security migration contract', () => {
   it('enables RLS on every public table declared by migrations', async () => {
     const sql = await migrationSql();
@@ -29,20 +62,29 @@ describe('database security migration contract', () => {
 
   it('explicitly removes client privileges from service-owned tables', async () => {
     const sql = await migrationSql();
-    const serviceTables = [
-      'job_outbox',
-      'queue_rejections',
-      'market_data_job_runs',
-      'market_data_quota_buckets',
-      'market_data_quota_reservations',
-      'historical_seed_jobs',
-      'historical_seed_mappings',
-      'historical_seed_quarantine',
-    ];
 
-    for (const name of serviceTables) {
+    for (const name of serviceOwnedTables) {
       expect(sql, `${name} must revoke client privileges`).toMatch(
         new RegExp(`revoke\\s+all\\s+on\\s+[^;]*public\\.${name}[^;]*from\\s+public\\s*,\\s*anon\\s*,\\s*authenticated`),
+      );
+    }
+  });
+
+  it('requires every user-owned table to have an auth.uid-scoped policy', async () => {
+    const sql = await migrationSql();
+    for (const [name, contract] of Object.entries(ownerPolicyContracts)) {
+      expect(sql, `${name} must have an owner-scoped policy`).toMatch(contract);
+    }
+  });
+
+  it('does not leave a guessed-ID write path on derived service projections', async () => {
+    const sql = await migrationSql();
+    for (const name of ['report_snapshots', 'lot_matches', 'internal_transfer_reconciliations']) {
+      expect(sql, `${name} must explicitly revoke direct client writes`).toMatch(
+        new RegExp(`revoke\\s+all\\s+on\\s+[^;]*public\\.${name}[^;]*from\\s+public\\s*,\\s*anon\\s*,\\s*authenticated`),
+      );
+      expect(sql, `${name} must grant only authenticated reads`).toMatch(
+        new RegExp(`grant\\s+select\\s+on\\s+public\\.${name}\\s+to\\s+authenticated`),
       );
     }
   });
