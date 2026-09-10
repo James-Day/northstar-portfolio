@@ -3,6 +3,29 @@ import { createApi } from '@/services/api/app';
 import { ImportOperationRejectedError } from '@/services/supabase/imports-repository';
 
 describe('standalone API', () => {
+  it('accepts a signed Stripe webhook using the untouched request body and injects processing', async () => {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const body = JSON.stringify({ id: 'evt_api_123', type: 'customer.subscription.updated', created: timestamp, data: { object: { id: 'sub_123' } } });
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode('whsec_test'), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const bytes = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${timestamp}.${body}`));
+    const signature = [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    let received: unknown;
+    const app = createApi({ billing: { createCheckoutSession: async () => ({ url: '' }), createBillingPortalSession: async () => ({ url: '' }), handleVerifiedWebhook: async (event) => { received = event; } } });
+    const response = await app.request('http://api.test/v1/billing/stripe/webhook', { method: 'POST', headers: { 'stripe-signature': `t=${timestamp},v1=${signature}`, 'content-type': 'application/json' }, body }, { STRIPE_WEBHOOK_SECRET: 'whsec_test' });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ received: true });
+    expect(received).toMatchObject({ id: 'evt_api_123', type: 'customer.subscription.updated' });
+  });
+
+  it('rejects unsigned Stripe webhook requests before invoking billing', async () => {
+    let invoked = false;
+    const app = createApi({ billing: { createCheckoutSession: async () => ({ url: '' }), createBillingPortalSession: async () => ({ url: '' }), handleVerifiedWebhook: async () => { invoked = true; } } });
+    const response = await app.request('http://api.test/v1/billing/stripe/webhook', { method: 'POST', body: '{}' }, { STRIPE_WEBHOOK_SECRET: 'whsec_test' });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'invalid_webhook' });
+    expect(invoked).toBe(false);
+  });
+
   it('serves a deployment-safe health response without exposing bindings', async () => {
     const app = createApi();
     const response = await app.request('http://api.test/health', undefined, {

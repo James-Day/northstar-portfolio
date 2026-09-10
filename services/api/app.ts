@@ -13,6 +13,7 @@ import { SupabasePriceFreshnessReportRepository } from '@/services/supabase/pric
 import { SupabaseReportSnapshotReader, type ReportSnapshot } from '@/services/supabase/report-snapshot-reader';
 import { SupabaseSignedUploadRepository, type SignedUploadRepository } from '@/services/supabase/signed-upload-repository';
 import { SupabaseActivityRepository, type ActivityPage } from '@/services/supabase/activity-repository';
+import { StripeSignatureError, verifyStripeWebhook, type StripeBillingHttpDependencies } from '@/services/billing/stripe-http';
 
 export type ApiBindings = {
   APP_ENV?: 'development' | 'staging' | 'production';
@@ -22,6 +23,7 @@ export type ApiBindings = {
   SUPABASE_SERVICE_ROLE_KEY?: string;
   MARKETSTACK_API_KEY?: string;
   MARKETSTACK_MONTHLY_CAP?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
 };
 
 export type ApiDependencies = {
@@ -32,6 +34,7 @@ export type ApiDependencies = {
   reportSnapshotReader?: { getLatest(accountId: string, accessToken: string): Promise<ReportSnapshot | undefined> };
   signedUploadRepository?: SignedUploadRepository;
   activityRepository?: { list(accountId: string, accessToken: string, input?: { limit?: number; offset?: number }): Promise<ActivityPage> };
+  billing?: StripeBillingHttpDependencies;
 };
 
 export function createApi(dependencies: ApiDependencies = {}) {
@@ -47,6 +50,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
   const reportSnapshotReader = dependencies.reportSnapshotReader;
   const signedUploadRepository = dependencies.signedUploadRepository;
   const activityRepository = dependencies.activityRepository;
+  const billing = dependencies.billing;
 
   api.use('*', async (context, next) => {
     const origin = context.req.header('origin');
@@ -69,6 +73,19 @@ export function createApi(dependencies: ApiDependencies = {}) {
       environment: context.env.APP_ENV ?? 'development',
     }),
   );
+
+  api.post('/v1/billing/stripe/webhook', async (context) => {
+    if (!billing) return context.json({ error: 'billing_unavailable' }, 503);
+    const rawBody = await context.req.text();
+    try {
+      const event = await verifyStripeWebhook(rawBody, context.req.header('stripe-signature'), context.env.STRIPE_WEBHOOK_SECRET);
+      await billing.handleVerifiedWebhook(event);
+      return context.json({ received: true });
+    } catch (error) {
+      if (error instanceof StripeSignatureError) return context.json({ error: 'invalid_webhook' }, 400);
+      throw error;
+    }
+  });
 
   api.get('/v1/me', async (context) => {
     try {
