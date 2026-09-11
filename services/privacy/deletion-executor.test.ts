@@ -20,6 +20,7 @@ describe('user deletion executor', () => {
     expect(result).toEqual({ claimed: 6, completed: 6, retrying: 0, exhausted: 0 });
     expect(order).toEqual(['deletePrivateObject', 'deleteAccount', 'deleteReportSnapshots', 'cancelBillingCustomer', 'deleteProfile', 'deleteAuthUser']);
     expect(f.repository.complete).toHaveBeenCalledTimes(6);
+    expect(f.repository.complete).toHaveBeenCalledWith('file', expect.any(Date), 1);
   });
 
   it('records a bounded retry and continues independent plan items after a transient failure', async () => {
@@ -27,8 +28,8 @@ describe('user deletion executor', () => {
     (f.effects.deletePrivateObject as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('storage unavailable'));
     const result = await runUserDeletion({ repository: f.repository, effects: f.effects, maxAttempts: 8, now: () => new Date('2026-01-01T00:00:00Z') });
     expect(result).toEqual({ claimed: 2, completed: 1, retrying: 1, exhausted: 0 });
-    expect(f.repository.fail).toHaveBeenCalledWith('bad', expect.objectContaining({ error: 'storage unavailable', retryAt: new Date('2026-01-01T00:00:05Z') }));
-    expect(f.repository.complete).toHaveBeenCalledWith('reports', expect.any(Date));
+    expect(f.repository.fail).toHaveBeenCalledWith('bad', expect.objectContaining({ error: 'storage unavailable', attempt: 1, retryAt: new Date('2026-01-01T00:00:05Z') }));
+    expect(f.repository.complete).toHaveBeenCalledWith('reports', expect.any(Date), 1);
   });
 
   it('does not perform a malformed side effect and preserves the failure boundary', async () => {

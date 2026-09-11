@@ -13,8 +13,9 @@ export type DeletionPlanItem = {
 
 export type DeletionPlanRepository = {
   claim(limit: number, now: Date, maxAttempts: number): Promise<DeletionPlanItem[]>;
-  complete(id: string, at: Date): Promise<void>;
-  fail(id: string, input: { failedAt: Date; retryAt: Date; error: string; maxAttempts: number }): Promise<'retrying' | 'exhausted' | 'ignored'>;
+  /** The attempt fences completion against a stale worker that lost its lease. */
+  complete(id: string, at: Date, attempt?: number): Promise<void>;
+  fail(id: string, input: { failedAt: Date; retryAt: Date; error: string; maxAttempts: number; attempt?: number }): Promise<'retrying' | 'exhausted' | 'ignored'>;
 };
 
 export type DeletionSideEffects = {
@@ -88,10 +89,10 @@ export async function runUserDeletion(input: {
   for (const item of items) {
     try {
       await executeItem(item, input.effects);
-      await input.repository.complete(item.id, now());
+      await input.repository.complete(item.id, now(), item.attempt);
       result.completed += 1;
     } catch (error) {
-      const outcome = await input.repository.fail(item.id, { failedAt: now(), retryAt: retryAt(current, item.attempt), error: errorMessage(error), maxAttempts });
+      const outcome = await input.repository.fail(item.id, { failedAt: now(), retryAt: retryAt(current, item.attempt), error: errorMessage(error), maxAttempts, attempt: item.attempt });
       if (outcome === 'exhausted') result.exhausted += 1;
       else if (outcome === 'retrying') result.retrying += 1;
     }

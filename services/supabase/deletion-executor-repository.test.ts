@@ -17,9 +17,11 @@ describe('Supabase deletion executor repository', () => {
       .mockResolvedValueOnce(response([]))
       .mockResolvedValueOnce(response([{ outcome: 'retrying' }]));
     const repository = new SupabaseDeletionExecutorRepository({ supabaseUrl: 'https://db.test', serviceRoleKey: 'secret', fetcher: fetcher as typeof fetch });
-    await expect(repository.complete('11111111-1111-4111-8111-111111111111', new Date('2026-01-01T00:00:00Z'))).resolves.toBeUndefined();
-    await expect(repository.fail('11111111-1111-4111-8111-111111111111', { failedAt: new Date('2026-01-01T00:00:00Z'), retryAt: new Date('2026-01-01T00:00:05Z'), error: 'temporary', maxAttempts: 8 })).resolves.toBe('retrying');
+    await expect(repository.complete('11111111-1111-4111-8111-111111111111', new Date('2026-01-01T00:00:00Z'), 2)).resolves.toBeUndefined();
+    await expect(repository.fail('11111111-1111-4111-8111-111111111111', { failedAt: new Date('2026-01-01T00:00:00Z'), retryAt: new Date('2026-01-01T00:00:05Z'), error: 'temporary', maxAttempts: 8, attempt: 2 })).resolves.toBe('retrying');
     expect(String(fetcher.mock.calls[0][0])).toContain('/rpc/complete_user_deletion_plan_item');
     expect(String(fetcher.mock.calls[1][0])).toContain('/rpc/fail_user_deletion_plan_item');
+    expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toMatchObject({ p_attempts: 2 });
+    expect(JSON.parse(String(fetcher.mock.calls[1][1]?.body))).toMatchObject({ p_attempts: 2 });
   });
 });
