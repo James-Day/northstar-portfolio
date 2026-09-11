@@ -29,4 +29,16 @@ describe('DoltHub provenance compliance', () => {
     approved.license.rightsReview = 'approved';
     expect(evaluateDoltHubProvenanceCompliance(approved, { paidLaunch: true }).canUseForPaidStorageAndDisplay).toBe(true);
   });
+
+  it('fails closed when provenance links are not secure HTTPS URLs', () => {
+    const malformed = structuredClone(dolthubStocksProvenanceManifest);
+    malformed.repository.url = 'http://example.test';
+    malformed.displayPolicy.licenseLink = 'javascript:alert(1)';
+    const result = evaluateDoltHubProvenanceCompliance(malformed);
+    expect(result.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'license-recorded', status: 'pass' }),
+      expect.objectContaining({ id: 'upstream-provenance-recorded', status: 'fail' }),
+      expect.objectContaining({ id: 'display-attribution-and-notice', status: 'fail' }),
+    ]));
+  });
 });

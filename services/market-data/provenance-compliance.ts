@@ -14,6 +14,10 @@ export type ProvenanceComplianceResult = {
   checks: ProvenanceComplianceCheck[];
 };
 
+function isHttpsUrl(value: unknown): value is string {
+  return typeof value === 'string' && /^https:\/\/[^\s]+$/i.test(value);
+}
+
 /**
  * Evaluates the source manifest at the product boundary. A passing manifest
  * check proves that obligations are recorded; it does not provide legal advice
@@ -26,12 +30,12 @@ export function evaluateDoltHubProvenanceCompliance(
   const checks: ProvenanceComplianceCheck[] = [
     {
       id: 'license-recorded',
-      status: source.license.spdxId && source.license.url ? 'pass' : 'fail',
+      status: source.license.spdxId && isHttpsUrl(source.license.url) ? 'pass' : 'fail',
       detail: 'License identifier and canonical license URL are recorded.',
     },
     {
       id: 'upstream-provenance-recorded',
-      status: source.repository.url && source.repository.branch && source.repository.table ? 'pass' : 'fail',
+      status: isHttpsUrl(source.repository.url) && source.repository.branch && source.repository.table ? 'pass' : 'fail',
       detail: 'Repository, branch, table, and retrieval boundary are recorded.',
     },
     {
@@ -46,7 +50,7 @@ export function evaluateDoltHubProvenanceCompliance(
     },
     {
       id: 'display-attribution-and-notice',
-      status: source.displayPolicy.attributionRequired && Boolean(source.displayPolicy.attributionText) && Boolean(source.displayPolicy.sourceLink) && Boolean(source.displayPolicy.licenseLink) ? 'pass' : 'fail',
+      status: source.displayPolicy.attributionRequired && Boolean(source.displayPolicy.attributionText) && isHttpsUrl(source.displayPolicy.sourceLink) && isHttpsUrl(source.displayPolicy.licenseLink) ? 'pass' : 'fail',
       detail: 'Display policy includes attribution text and links to the source and license.',
     },
     {

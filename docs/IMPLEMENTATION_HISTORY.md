@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-10 | 07.04 — Harden provenance link safety (partial) | Provenance compliance now requires HTTPS URLs for the license, upstream repository and display attribution links, with focused coverage for malformed or executable link schemes. | Exact dataset rights review and paid-use approval remain pending. |
+
 | 2026-09-10 | 12.07 — Actionable operational monitoring boundary (partial) | Operational status now emits stable component codes, severity, actionable next steps, import/recovery signals, and rejects invalid negative or fractional durable counters. Focused monitoring tests and typecheck pass. | Hosted metrics, backup/restore execution and alert delivery remain required. |
 
 | 2026-09-13 | 08.07 - Fail-closed development smoke boundary (partial) | Added `validateMarketstackDevelopmentSmokeRequest` with focused coverage to normalize exactly one symbol/date, reject production or recurring schedules, validate trading dates, and require an explicit allowance ceiling without exposing secrets. | A user-supplied free key, current allowance confirmation, local Supabase write, and live smoke evidence remain required; no network call or plan change was performed. |
