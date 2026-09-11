@@ -31,6 +31,7 @@ describe('authenticated CI integration contract', () => {
     expect(workflow).toMatch(/npm run test:e2e -- tests\/e2e\/authenticated-workspace\.spec\.ts/);
     expect(workflow).toMatch(/kill "\$\{app_pid\}"/);
     expect(workflow).toMatch(/wait "\$\{app_pid\}"/);
+    expect(workflow).toMatch(/rm -f "\$\{RUNNER_TEMP\}\/auth-a\.json" "\$\{RUNNER_TEMP\}\/auth-b\.json" "\$\{RUNNER_TEMP\}\/statement\.csv"/);
     expect(workflow).toMatch(/kill "\$\{api_pid\}"/);
     expect(workflow).toMatch(/wait "\$\{api_pid\}"/);
   });

@@ -55,6 +55,7 @@ jobs:
               kill "${app_pid}" 2>/dev/null || true
               wait "${app_pid}" 2>/dev/null || true
             fi
+            rm -f "${RUNNER_TEMP}/auth-a.json" "${RUNNER_TEMP}/auth-b.json" "${RUNNER_TEMP}/statement.csv" "${env_file}"
             npx --yes supabase stop --no-backup >/dev/null 2>&1 || true
           }
           trap cleanup EXIT
