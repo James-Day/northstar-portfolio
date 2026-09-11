@@ -15,7 +15,7 @@ This file is the current implementation plan. Work through the numbered steps in
 
 **Current count: 102 tasks — 64 checked, 38 unchecked, across 13 ordered steps.**
 
-**Progress view:** 86 tasks have implementation or verification evidence (67 complete and 19 partial); 16 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
+**Progress view:** 87 tasks have implementation or verification evidence (67 complete and 20 partial); 15 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -198,7 +198,7 @@ Owner: integration/platform. Depends on all earlier acceptance gates.
 
 - [ ] **13.01** Run real database/RLS/storage and authenticated Playwright suites in CI alongside unit/typecheck/build; install required browser/runtime dependencies.
 - [ ] **13.02** Verify signup → account → upload → resolve/review → commit → accurate dashboard → trial → billing with representative brokerage and IRA files.
-- [ ] **13.03** Run adversarial regression cases: cross-user IDs, session expiry, concurrent import/undo, duplicate DRIP, split chronology, unavailable prices, queue replay, quota concurrency and webhook ordering.
+- [ ] **13.03** Run adversarial regression cases: cross-user IDs, session expiry, concurrent import/undo, duplicate DRIP, split chronology, unavailable prices, queue replay, quota concurrency and webhook ordering. Local boundary coverage now includes all named cases, including guessed import IDs, expired private API sessions and overlapping commit/undo requests in `services/adversarial-regression.test.ts`; staging execution against real RLS, queues, quota reservations and Stripe remains required.
 - [ ] **13.04** Configure and verify hosted Supabase/auth, API origins, Worker queues/cron/secrets, storage, retention and Stripe in staging; document deployed revisions.
 - [ ] **13.05** Choose final product name/domain, check conflicts, and apply/verify logo/favicon consistently. Northstar remains the working name.
 - [ ] **13.06** Confirm production market-data storage/display rights and an approved commercial plan before paid launch; free Marketstack remains development-only unless verified rights establish otherwise. Do not upgrade automatically.
@@ -217,6 +217,7 @@ Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/sh
 
 | Date | Scope | Evidence | Limits |
 | --- | --- | --- | --- |
+| 2026-09-10 | 13.03 — Local adversarial regression matrix (partial) | Expanded `services/adversarial-regression.test.ts` with API-level guessed-ID isolation, expired-session rejection and serialized overlapping commit/undo coverage; existing cases cover duplicate DRIP, split chronology, unavailable prices, queue replay, quota concurrency and webhook ordering. Focused API/import/adversarial suite: 3 files / 62 tests passed; typecheck and diff check passed. | Real multi-user RLS/storage, queue redelivery, database lock/quota races and Stripe staging ordering still require isolated hosted execution. |
 | 2026-09-10 | Checklist re-audit at `60ba90a` | Read API/UI, migrations, queue/price/report/ledger/billing paths and test/CI setup; reran typecheck and Vitest: 50 files / 160 tests passed. Replaced stale status summary, split implementation from integration gates, added concrete correctness work, and reordered dependencies. | Documentation only; no fixes, hosted/database/storage/provider/browser execution or license clearance claimed. |
 | 2026-09-10 | 04.04 — Safe replay of undone imports | Commit `fe0bf6a`; active-import-only file-hash checks, fingerprint cleanup for undone derived rows, and regression coverage added. Import repository tests (7), typecheck and diff check passed. | Account-level commit serialization and unknown-result idempotency remain open. |
 | 2026-09-10 | 08.04 — Skip cached daily closes | Commit `c427531`; daily refresh now asks persistence for missing symbols before provider calls and reports `already_fetched` when all closes exist. Focused market-data/Supabase tests (13) and typecheck passed. | Atomic concurrent claims, exact quota reservation/accounting and live provider execution remain open. |

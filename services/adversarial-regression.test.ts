@@ -3,6 +3,7 @@ import { decimalString } from "@/lib/domain/money";
 import { isoDate } from "@/lib/domain/types";
 import { createApi } from "@/services/api/app";
 import { verifySupabaseSession } from "@/services/auth/server-session";
+import { ImportOperationRejectedError } from "@/services/supabase/imports-repository";
 import { excludeOverlappingActivities, type FingerprintableActivity } from "@/services/ingestion/deduplication";
 import { valueLedgerHistory } from "@/services/calculations/valuation";
 import { prepareDailyPriceRefresh } from "@/services/market-data/daily-refresh";
@@ -41,6 +42,29 @@ describe("adversarial regression coverage", () => {
     expect(activity).not.toHaveBeenCalled();
   });
 
+  it("does not disclose another user's import by guessed ID", async () => {
+    const get = vi.fn().mockResolvedValue(undefined);
+    const app = createApi({
+      verifySession: async () => ({ id: "user-a", accessToken: "session-a" }),
+      importsRepository: {
+        get,
+        hasFileHash: async () => false,
+        stage: async () => ({ id: "unused", status: "ready_for_review" as const }),
+        list: async () => [],
+        discard: async () => undefined,
+        commit: async () => undefined,
+        undo: async () => undefined,
+      },
+    });
+
+    const response = await app.request("http://api.test/v1/imports/import-owned-by-user-b", {
+      headers: { authorization: "Bearer session-a" },
+    });
+
+    expect(response.status).toBe(404);
+    expect(get).toHaveBeenCalledWith("import-owned-by-user-b", "session-a");
+  });
+
   it("rejects an expired session before any private work is attempted", async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 401 }));
     const user = await verifySupabaseSession(
@@ -51,6 +75,73 @@ describe("adversarial regression coverage", () => {
 
     expect(user).toBeUndefined();
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects an expired session at the API boundary before reading private activity", async () => {
+    const activity = vi.fn();
+    const app = createApi({
+      verifySession: async () => undefined,
+      activityRepository: { list: activity },
+    });
+
+    const response = await app.request("http://api.test/v1/accounts/account-a/activity", {
+      headers: { authorization: "Bearer expired-token" },
+    });
+
+    expect(response.status).toBe(401);
+    expect(activity).not.toHaveBeenCalled();
+  });
+
+  it("serializes overlapping commit and undo attempts into one valid transition", async () => {
+    let status: "ready_for_review" | "committed" | "undone" = "ready_for_review";
+    let tail = Promise.resolve();
+    const serialize = async <T>(operation: () => T): Promise<T> => {
+      const previous = tail;
+      let release!: () => void;
+      tail = new Promise<void>((resolve) => { release = resolve; });
+      await previous;
+      try { return operation(); } finally { release(); }
+    };
+    const summary = {
+      id: "import-a", accountId: "account-a", status: "committed" as const,
+      fileName: "activity.csv", sourceRowCount: 1, usableRowCount: 1,
+      warningCount: 0, activityFrom: "2026-01-02", activityThrough: "2026-01-02",
+      createdAt: "2026-01-03T00:00:00.000Z", committedAt: "2026-01-03T00:00:00.000Z",
+    };
+    const imports = {
+      get: async () => undefined,
+      hasFileHash: async () => false,
+      stage: async () => ({ id: "unused", status: "ready_for_review" as const }),
+      list: async () => [],
+      discard: async () => undefined,
+      commit: async () => serialize(() => {
+        if (status !== "ready_for_review") throw new ImportOperationRejectedError();
+        status = "committed";
+        return summary;
+      }),
+      undo: async () => serialize(() => {
+        if (status !== "committed") throw new ImportOperationRejectedError();
+        status = "undone";
+        return { ...summary, status: "undone" as const };
+      }),
+    };
+    const app = createApi({
+      verifySession: async () => ({ id: "user-a", accessToken: "session-a" }),
+      importsRepository: imports,
+    });
+
+    const [commit, undo] = await Promise.all([
+      app.request("http://api.test/v1/imports/import-a/commit", { method: "POST", headers: { authorization: "Bearer session-a" } }),
+      app.request("http://api.test/v1/imports/import-a/undo", { method: "POST", headers: { authorization: "Bearer session-a" } }),
+    ]);
+
+    // Depending on which request acquires the account lock first, undo either
+    // follows the commit successfully or is rejected while the import is
+    // still review-ready. Both outcomes are safe; neither may produce a
+    // server error or duplicate a ledger transition.
+    expect([commit.status, undo.status].every((value) => value === 200 || value === 409)).toBe(true);
+    expect([commit.status, undo.status]).toContain(200);
+    expect(status).toMatch(/committed|undone/);
   });
 
   it("deduplicates one repeated DRIP while preserving a second legitimate reinvestment", () => {
