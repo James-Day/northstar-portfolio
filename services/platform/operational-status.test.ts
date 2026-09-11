@@ -39,6 +39,11 @@ describe('operational status', () => {
     expect(() => summarizeOperationalStatus({ queues: { failedJobs: -1 } })).toThrow('non-negative integer');
   });
 
+  it('rejects malformed lower-priority counters even when a critical signal is present', () => {
+    expect(() => summarizeOperationalStatus({ marketData: { quotaExhausted: true, staleSymbols: -1 } })).toThrow('staleSymbols must be a non-negative integer');
+    expect(() => summarizeOperationalStatus({ imports: { failedImports: 1, unsupportedRows: 0.5 } })).toThrow('unsupportedRows must be a non-negative integer');
+  });
+
   it('rejects invalid freshness thresholds', () => {
     expect(() => summarizeOperationalStatus({ marketData: { maxSuccessAgeMs: 0 } })).toThrow('freshness threshold');
   });

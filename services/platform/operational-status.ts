@@ -30,10 +30,20 @@ export function summarizeOperationalStatus(input: {
     return value ?? 0;
   };
   const market = input.marketData;
+  // Validate every supplied counter before any severity branch can short-circuit.
+  // Otherwise a high-priority signal (such as quota exhaustion) could hide a
+  // malformed lower-priority counter and produce an untrustworthy status.
+  count(market?.failedRuns, 'failedRuns');
+  count(market?.staleSymbols, 'staleSymbols');
+  count(market?.publicationPendingSymbols, 'publicationPendingSymbols');
+  count(market?.unresolvedInstrumentCount, 'unresolvedInstrumentCount');
   const now = input.now ?? new Date();
   const maxSuccessAgeMs = market?.maxSuccessAgeMs ?? 36 * 60 * 60 * 1000;
   if (!Number.isInteger(maxSuccessAgeMs) || maxSuccessAgeMs < 1) throw new Error('Market-data success freshness threshold must be a positive integer.');
   const imports = input.imports;
+  count(imports?.failedImports, 'failedImports');
+  count(imports?.pendingReviews, 'pendingReviews');
+  count(imports?.unsupportedRows, 'unsupportedRows');
   if (count(imports?.failedImports, 'failedImports') > 0) add('imports', 'critical', 'imports.failed', `${imports?.failedImports} import(s) failed and need review.`, 'Open import history, inspect the failure, and retry or discard the staged file.');
   else if (count(imports?.pendingReviews, 'pendingReviews') > 0) add('imports', 'warning', 'imports.pending_review', `${imports?.pendingReviews} import(s) are waiting for user review.`, 'Open the import review queue and resolve warnings before committing.');
   else if (count(imports?.unsupportedRows, 'unsupportedRows') > 0) add('imports', 'warning', 'imports.unsupported_rows', `${imports?.unsupportedRows} imported row(s) are unsupported and may affect completeness.`, 'Review unsupported rows and provide opening history or a supported source.');
@@ -44,12 +54,18 @@ export function summarizeOperationalStatus(input: {
   else if (count(market?.unresolvedInstrumentCount, 'unresolvedInstrumentCount') > 0) add('market_data', 'warning', 'market_data.unresolved_instrument', `${market?.unresolvedInstrumentCount} active instrument(s) have no current ticker alias.`, 'Resolve the instrument alias before requesting a price.');
   else if (market?.lastSuccessfulAt && now.getTime() - market.lastSuccessfulAt.getTime() > maxSuccessAgeMs) add('market_data', 'warning', 'market_data.refresh_overdue', 'No successful market-data refresh has completed within the expected freshness window.', 'Inspect the scheduled refresh and provider telemetry before publishing reports.');
   const queues = input.queues;
+  count(queues?.failedJobs, 'failedJobs');
+  count(queues?.pendingJobs, 'pendingJobs');
   if (count(queues?.failedJobs, 'failedJobs') > 0) add('queues', 'critical', 'queues.failed_jobs', `${queues?.failedJobs} queued job(s) require replay or investigation.`, 'Inspect the failed job and replay it only after confirming idempotency.');
   else if (count(queues?.pendingJobs, 'pendingJobs') > 100) add('queues', 'warning', 'queues.backlog', 'The queue backlog exceeds the operating threshold.', 'Inspect queue age and worker health before adding capacity or replaying work.');
   const retention = input.retention;
+  count(retention?.exhaustedItems, 'exhaustedItems');
+  count(retention?.pendingItems, 'pendingItems');
   if (count(retention?.exhaustedItems, 'exhaustedItems') > 0) add('retention', 'critical', 'retention.exhausted', `${retention?.exhaustedItems} private-file deletion(s) exhausted retries.`, 'Investigate the deletion error and resume the fenced cleanup worker.');
   else if (count(retention?.pendingItems, 'pendingItems') > 100) add('retention', 'warning', 'retention.backlog', 'Private-file retention backlog exceeds the operating threshold.', 'Inspect cleanup worker throughput and oldest pending object age.');
   const reports = input.reports;
+  count(reports?.failedPublishes, 'failedPublishes');
+  count(reports?.staleJobs, 'staleJobs');
   if (count(reports?.failedPublishes, 'failedPublishes') > 0) add('reports', 'critical', 'reports.publish_failed', `${reports?.failedPublishes} report publication(s) failed and need retry.`, 'Inspect the report job, correct its dependency, and replay the current revision.');
   else if (count(reports?.staleJobs, 'staleJobs') > 0) add('reports', 'warning', 'reports.stale_jobs', `${reports?.staleJobs} stale report job(s) were safely skipped.`, 'Allow the current report revision to run and confirm the dashboard freshness timestamp.');
   const recovery = input.recovery;
