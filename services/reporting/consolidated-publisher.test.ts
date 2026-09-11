@@ -154,4 +154,27 @@ describe('consolidated report publisher', () => {
     })).rejects.toThrow('Conflicting corporate actions');
     expect(publish).not.toHaveBeenCalled();
   });
+
+  it('applies one identical split action once across duplicate account inputs', async () => {
+    const publish = vi.fn().mockResolvedValue('snapshot-split');
+    const input = (accountId: string): PersistedReportInputs => ({
+      valuation: {
+        dates: [
+          { date: isoDate('2026-02-01'), canChainFromPrevious: false },
+          { date: isoDate('2026-02-02'), canChainFromPrevious: true },
+        ],
+        events: [],
+        openingLots: [{ id: `${accountId}-lot`, instrumentId: 'instrument-split' as never, acquiredOn: isoDate('2026-01-30'), quantity: decimalString('1'), totalCostBasis: decimalString('100') }],
+        closes: [
+          { instrumentId: 'instrument-split' as never, tradingDate: isoDate('2026-02-01'), close: decimalString('100'), source: 'dolthub', sourceRevision: 'r1' },
+          { instrumentId: 'instrument-split' as never, tradingDate: isoDate('2026-02-02'), close: decimalString('50'), source: 'dolthub', sourceRevision: 'r1' },
+        ],
+        corporateActions: [{ instrumentId: 'instrument-split' as never, type: 'split', status: 'validated', ratioNumerator: decimalString('2'), ratioDenominator: decimalString('1'), effectiveDate: isoDate('2026-02-02') }],
+      },
+      ledger: { cash: decimalString('0'), openLots: [], realizedGainLoss: decimalString('0'), dividendIncome: decimalString('0'), netDeposits: decimalString('0'), sales: [] },
+      activityCoveredThrough: isoDate('2026-02-02'), pricesThrough: isoDate('2026-02-02'), importStateRevision: `ledger:${accountId}`,
+    });
+    await publishConsolidatedReportSnapshot({ publisher: { publish }, userId: 'user-1', accounts: [{ accountId: 'a', inputs: input('a') }, { accountId: 'b', inputs: input('b') }] });
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({ totalValue: '200', holdings: [{ instrumentId: 'instrument-split', quantity: '4', close: '50', value: '200' }] }) }));
+  });
 });
