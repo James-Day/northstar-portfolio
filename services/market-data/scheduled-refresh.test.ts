@@ -27,4 +27,30 @@ describe('scheduled price refresh composition', () => {
     releaseProvider();
     await expect(first).resolves.toMatchObject({ status: 'persisted' });
   });
+
+  it('normalizes claim keys across symbol order and the New York trading date', async () => {
+    const claimStore = new MemoryRefreshClaimStore();
+    let releaseProvider!: () => void;
+    const provider = { getDailyPrices: vi.fn(() => new Promise<DailyPrice[]>((resolve) => { releaseProvider = () => resolve([
+      { symbol: 'AAPL', tradingDate: isoDate('2026-07-06'), close: decimalString('100'), provider: 'marketstack', providerMetadata: {} },
+      { symbol: 'MSFT', tradingDate: isoDate('2026-07-06'), close: decimalString('200'), provider: 'marketstack', providerMetadata: {} },
+    ]); })) };
+    const first = runScheduledPriceRefresh(new Date('2026-07-06T22:00:00Z'), {
+      symbols: { list: vi.fn().mockResolvedValue(['AAPL', 'MSFT', 'AAPL']) },
+      provider,
+      persistence: { persist: vi.fn().mockResolvedValue({ upserted: 1 }) },
+      recorder: { record: vi.fn().mockResolvedValue('run') },
+      claimStore,
+    });
+    await vi.waitFor(() => expect(provider.getDailyPrices).toHaveBeenCalledTimes(1));
+    await expect(runScheduledPriceRefresh(new Date('2026-07-07T00:30:00Z'), {
+      symbols: { list: vi.fn().mockResolvedValue(['MSFT', 'AAPL']) },
+      provider,
+      persistence: { persist: vi.fn().mockResolvedValue({ upserted: 2 }) },
+      recorder: { record: vi.fn().mockResolvedValue('run') },
+      claimStore,
+    })).resolves.toEqual({ status: 'skipped', reason: 'already_running' });
+    releaseProvider();
+    await expect(first).resolves.toMatchObject({ status: 'persisted' });
+  });
 });
