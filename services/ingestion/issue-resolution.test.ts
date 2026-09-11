@@ -57,4 +57,19 @@ describe("import issue resolution", () => {
       ),
     ).toBe(1);
   });
+
+  it("does not let a mismatched resolution kind or issue code clear a blocker", () => {
+    const resolution = {
+      id: "r",
+      importId: "i",
+      sourceRowId: "a",
+      issueCode: "missing_instrument_alias" as const,
+      resolutionKind: "non_reportable" as const,
+      note: "Incorrectly paired",
+      resolvedBy: "u",
+      resolvedAt: "now",
+    };
+    expect(unresolvedMaterialIssueCount([{ id: "a", status: "unsupported" }], [resolution])).toBe(1);
+    expect(unresolvedMaterialIssueCount([{ id: "a", status: "invalid" }], [resolution])).toBe(1);
+  });
 });

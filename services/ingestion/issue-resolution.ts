@@ -79,6 +79,7 @@ export function unresolvedMaterialIssueCount(
       !resolutions.some(
         (resolution) =>
           resolution.sourceRowId === row.id &&
+          resolution.issueCode === "unsupported_row" &&
           resolution.resolutionKind === "non_reportable",
       ),
   ).length;
