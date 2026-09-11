@@ -20,11 +20,11 @@ describe('applyFifoLedger', () => {
 
   it('records dividend income once when a dividend is reinvested', () => {
     const result = applyFifoLedger([
-      { id: 'dividend-1', date, type: 'dividend', amount: d('10') },
+      { id: 'dividend-1', date, type: 'dividend', instrumentId: 'vti', amount: d('10') },
       { id: 'drip-1', date, type: 'drip_buy', instrumentId: 'vti', quantity: d('0.1'), grossAmount: d('10'), fee: d('0') },
     ]);
     expect(result.dividendIncome).toBe('10');
-    expect(result.dividendEvents).toEqual([{ eventId: 'dividend-1', date, amount: '10' }]);
+    expect(result.dividendEvents).toEqual([{ eventId: 'dividend-1', date, instrumentId: 'vti', amount: '10' }]);
     expect(result.cash).toBe('0');
     expect(result.openLots[0]).toMatchObject({ totalCostBasis: '10', remainingQuantity: '0.1' });
   });

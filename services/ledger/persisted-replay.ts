@@ -106,10 +106,11 @@ function toLedgerEvent(row: z.infer<typeof rowSchema>): LedgerEvent {
   const date = isoDate(row.effective_date);
   const amount = magnitude(row.cash_amount);
   const type = row.entry_type as Exclude<z.infer<typeof rowSchema>['entry_type'], 'opening_position'>;
+  if (row.entry_type === 'dividend') return { id: row.id, date, type: 'dividend', instrumentId: row.instrument_id ?? undefined, amount };
   if (row.entry_type === 'buy' || row.entry_type === 'drip_buy' || row.entry_type === 'sell') {
     if (!row.instrument_id || !row.quantity) throw new Error(`Ledger entry ${row.id} is missing instrument or quantity.`);
     const quantity = positive(row.quantity, `${row.entry_type} quantity`);
-    if (row.entry_type === 'sell') return { id: row.id, date, type: 'sell', instrumentId: row.instrument_id, quantity, grossAmount: amount, fee: decimalString('0') };
+  if (row.entry_type === 'sell') return { id: row.id, date, type: 'sell', instrumentId: row.instrument_id, quantity, grossAmount: amount, fee: decimalString('0') };
     return { id: row.id, date, type: row.entry_type, instrumentId: row.instrument_id, quantity, grossAmount: amount, fee: decimalString('0') };
   }
   if (row.entry_type === 'fee') return { id: row.id, date, type: 'fee', amount };

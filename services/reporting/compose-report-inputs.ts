@@ -43,7 +43,7 @@ export function composePersistedReportInputs(input: {
   const dateSet = new Set(dates.map((date) => date.date));
   const instrumentSet = new Set<string>([
     ...input.replay.openingLots.map((lot) => lot.instrumentId),
-    ...input.replay.events.flatMap((event) => 'instrumentId' in event ? [event.instrumentId] : []),
+    ...input.replay.events.flatMap((event) => 'instrumentId' in event && event.instrumentId ? [event.instrumentId] : []),
   ]);
   const narrowedCloses = input.closes
     .filter((close) => dateSet.has(close.tradingDate) && instrumentSet.has(close.instrumentId))

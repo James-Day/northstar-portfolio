@@ -179,6 +179,7 @@ type LiveRealizedSale = {
 type LiveDividend = {
   eventId: string;
   date: string;
+  instrumentId?: string;
   amount: string;
 };
 type LiveReportSnapshot = {
@@ -2133,7 +2134,7 @@ function ReportDetails({
           <ul aria-label="Dividend events" className="divide-y divide-slate-100">
             {dividendEvents.map((dividend) => (
               <li key={dividend.eventId} className="flex items-center justify-between gap-3 py-3 text-sm">
-                <span className="text-slate-500">{dividend.date}</span>
+                <span className="text-slate-500">{dividend.date}{dividend.instrumentId ? ` · ${dividend.instrumentId}` : ''}</span>
                 <span className="font-bold text-emerald-600">{precise.format(Number(dividend.amount))}</span>
               </li>
             ))}

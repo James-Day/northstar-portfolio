@@ -34,9 +34,9 @@ describe('report snapshot builder', () => {
         netDeposits: '0' as never,
         dividendIncome: '10' as never,
         realizedGainLoss: '0' as never,
-        dividendEvents: [{ eventId: 'dividend-1', date: isoDate('2026-01-01'), amount: '10' as never }],
+        dividendEvents: [{ eventId: 'dividend-1', date: isoDate('2026-01-01'), instrumentId: 'instrument-vti', amount: '10' as never }],
       },
     });
-    expect(payload.dividends).toEqual([{ eventId: 'dividend-1', date: '2026-01-01', amount: '10' }]);
+    expect(payload.dividends).toEqual([{ eventId: 'dividend-1', date: '2026-01-01', instrumentId: 'instrument-vti', amount: '10' }]);
   });
 });
