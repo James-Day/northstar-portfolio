@@ -16,6 +16,14 @@ MARKET_CALENDAR_OPEN_DATES = ""
 # after-close run in New York time and skips weekends/holidays.
 crons = ["0 * * * 1-5"]
 
+[[durable_objects.bindings]]
+name = "RATE_LIMIT_COUNTER"
+class_name = "RateLimitCounterDurableObject"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RateLimitCounterDurableObject"]
+
 # Durable work queues are declared up front so imports and report publication
 # can move out of request time without changing the public API contract.
 [[queues.producers]]
