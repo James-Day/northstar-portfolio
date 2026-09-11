@@ -24,9 +24,13 @@ crons = ["0 * * * 1-5"]
 name = "RATE_LIMIT_COUNTER"
 class_name = "RateLimitCounterDurableObject"
 
+[[durable_objects.bindings]]
+name = "REFRESH_CLAIM"
+class_name = "RefreshClaimDurableObject"
+
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["RateLimitCounterDurableObject"]
+new_sqlite_classes = ["RateLimitCounterDurableObject", "RefreshClaimDurableObject"]
 
 # Durable work queues are declared up front so imports and report publication
 # can move out of request time without changing the public API contract.
