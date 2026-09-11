@@ -10,6 +10,10 @@ async function signIn(page: import('@playwright/test').Page, userEmail: string, 
   await page.getByLabel('Email').fill(userEmail);
   await page.getByLabel('Password').fill(userPassword);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  if ((await page.url()).includes('/sign-in')) {
+    const status = await page.getByRole('status').textContent().catch(() => null);
+    if (status) throw new Error(`Sign-in client error: ${status}`);
+  }
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole('heading', { name: 'Portfolio overview' })).toBeVisible();
 }

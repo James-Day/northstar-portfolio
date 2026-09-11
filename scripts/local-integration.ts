@@ -122,8 +122,14 @@ async function main() {
     if (withApp || withBrowser) {
       console.log('Starting API and frontend processes…');
       apps = await startApps(credentials, withBrowser);
-      await Promise.all(apps.map((app) => waitForLocalHttp(app)));
+      await Promise.all(apps.map((app) => waitForLocalHttp(app, fetch, withBrowser ? { attempts: 60, delayMs: 500 } : undefined)));
       if (withBrowser) {
+        const sessionProbe = await fetch('http://localhost:3000/api/auth/session', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ accessToken: users[0]?.accessToken }),
+        });
+        console.log(`Local browser session endpoint preflight: HTTP ${sessionProbe.status}.`);
         const browserEnv: NodeJS.ProcessEnv = {
           ...process.env,
           E2E_AUTH_EMAIL: users[0]?.email,

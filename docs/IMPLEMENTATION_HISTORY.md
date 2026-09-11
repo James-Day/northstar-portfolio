@@ -4,7 +4,7 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
-| 2026-09-11 | 02.08/10.09 — Add local authenticated browser harness (partial) | Added `npm run integration:local -- --browser`, ephemeral public Supabase configuration, external-server Playwright support, and browser coverage for three account types, account switching, cross-user visibility, and sign-out. The harness starts real local services and reaches Playwright. | Local sign-in currently remains on `/sign-in` during the private session handoff; browser acceptance and displayed-number reconciliation remain open. |
+| 2026-09-11 | 02.08/10.09 — Harden local authenticated browser harness (partial) | Added `npm run integration:local -- --browser`, ephemeral public Supabase configuration, external-server Playwright support, 30-second first-compile readiness, server session preflight (HTTP 200), and browser coverage for three account types, account switching, cross-user visibility, and sign-out. The harness starts real local services and reaches all Playwright tests. | The browser redirect still does not complete into `/dashboard` after the successful session handoff; browser acceptance and displayed-number reconciliation remain open. |
 
 | 2026-09-11 | 01.07 — Refresh baseline gate evidence | `npm run baseline:gate` passed with typecheck, 146 Vitest files/563 tests, production build, and generated-browser secret scan. | This was run from the current checkout; a fresh-clone execution, database-isolation reset in the same gate, and live browser acceptance remain open. |
 
