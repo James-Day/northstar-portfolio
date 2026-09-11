@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { ReportSnapshotInput } from '@/services/supabase/report-snapshots-repository';
 
-const rowSchema = z.object({ id: z.string().uuid(), user_id: z.string().uuid(), account_id: z.string().uuid().nullable(), report_type: z.enum(['account_daily', 'consolidated_daily', 'dashboard']), as_of_date: z.string(), import_state_revision: z.string(), price_revision_id: z.string().uuid().nullable(), payload: z.record(z.string(), z.unknown()), published_at: z.string() });
+const rowSchema = z.object({ id: z.string().uuid(), user_id: z.string().uuid(), account_id: z.string().uuid().nullable(), report_type: z.enum(['account_daily', 'consolidated_daily', 'dashboard']), as_of_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), import_state_revision: z.string().min(1), price_revision_id: z.string().uuid().nullable(), payload: z.record(z.string(), z.unknown()), published_at: z.string().datetime() });
 export type ReportSnapshot = Omit<ReportSnapshotInput, 'userId' | 'accountId' | 'reportType' | 'asOfDate' | 'importStateRevision' | 'priceRevisionId'> & { id: string; userId: string; accountId: string | null; reportType: ReportSnapshotInput['reportType']; asOfDate: string; importStateRevision: string; priceRevisionId: string | null; publishedAt: string };
 export type SupabaseReportSnapshotReaderOptions = { supabaseUrl: string; anonKey: string; fetcher?: typeof fetch };
 

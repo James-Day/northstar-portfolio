@@ -30,4 +30,10 @@ describe('Supabase report snapshot reader', () => {
     const reader = new SupabaseReportSnapshotReader({ supabaseUrl: 'https://supabase.test', anonKey: 'public-key', fetcher: fetcher as typeof fetch });
     await expect(reader.getLatestConsolidated('22222222-2222-4222-8222-222222222222', 'user-token')).resolves.toBeUndefined();
   });
+
+  it('rejects snapshots with malformed chronology or dependency metadata', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify([{ id: '11111111-1111-4111-8111-111111111111', user_id: '22222222-2222-4222-8222-222222222222', account_id: '33333333-3333-4333-8333-333333333333', report_type: 'account_daily', as_of_date: '07/06/2026', import_state_revision: '', price_revision_id: null, payload: {}, published_at: 'yesterday' }])));
+    const reader = new SupabaseReportSnapshotReader({ supabaseUrl: 'https://supabase.test', anonKey: 'public-key', fetcher: fetcher as typeof fetch });
+    await expect(reader.getLatest('33333333-3333-4333-8333-333333333333', 'user-token')).rejects.toThrow();
+  });
 });
