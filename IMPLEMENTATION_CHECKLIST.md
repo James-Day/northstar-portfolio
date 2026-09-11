@@ -98,7 +98,7 @@ Owner: platform/ingestion. Depends on step 04; queue consumers must use the corr
 - [x] **05.04** Wire Cloudflare queue entrypoint and durable import handler; persist processing/progress/failure state and let browser review poll durable results. Evidence: import queue handler, Supabase claim/progress/complete/fail RPCs, Worker queue binding and durable import repository in commit `b77c092`.
 - [x] **05.05** Dispatch the transactional outbox with claim/retry/idempotency semantics. The dispatcher claims with `FOR UPDATE SKIP LOCKED`, translates `import.committed`/`import.undone` to typed report jobs, verifies ownership, and records retry/failure state.
 - [x] **05.06** Persist rejected-job/error evidence before acknowledgment; implement dead-letter inspection and safe replay. Evidence: queue failure recorder, RLS/service-only rejection repository, durable rejection/replay RPCs and queue integration in commit `b77c092`.
-- [ ] **05.07** Gate: real storage isolation and queued import tests pass; retry/crash never loses an upload, commits twice or silently drops failed work.
+- [ ] **05.07** Gate: real storage isolation and queued import tests pass; retry/crash never loses an upload, commits twice or silently drops failed work. Partial evidence: `services/storage-queue-acceptance.test.ts` proves owner-scoped private-object reads, preserves the uploaded object across a failed queue delivery, records failure evidence before retry, resumes from durable progress, and converges duplicate delivery to one completion. Live Supabase Storage isolation and deployed queue redelivery remain open.
 
 ## 06 — Reconcile persisted accounting and opening history
 
