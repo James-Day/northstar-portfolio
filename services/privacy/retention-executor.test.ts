@@ -24,7 +24,7 @@ describe('raw file retention executor', () => {
     const now = new Date('2026-02-01T00:00:00Z');
     const result = await runRawFileRetention({ repository, storage, now: () => now, retryDelayMs: 90_000 });
     expect(result).toMatchObject({ claimed: 1, deleted: 0, retrying: 1 });
-    expect(repository.markFailure).toHaveBeenCalledWith(expect.any(String), { at: now, retryAt: new Date('2026-02-01T00:01:30Z'), error: 'temporary storage outage', maxAttempts: 8 });
+    expect(repository.markFailure).toHaveBeenCalledWith(expect.any(String), { at: now, retryAt: new Date('2026-02-01T00:01:30Z'), error: 'temporary storage outage', maxAttempts: 8, attempt: 1 });
   });
 
   it('keeps processing the batch and records exhausted attempts', async () => {

@@ -7,8 +7,9 @@ export type RetentionCandidate = RawFileRecord & {
 
 export type RetentionClaimRepository = {
   claim(now: Date, limit: number, maxAttempts: number): Promise<RetentionCandidate[]>;
-  markDeleted(id: string, at: Date): Promise<void>;
-  markFailure(id: string, input: { at: Date; retryAt: Date; error: string; maxAttempts: number }): Promise<'retrying' | 'exhausted'>;
+  /** Completion/failure must be fenced to the claim attempt after crash recovery. */
+  markDeleted(id: string, at: Date, attempt?: number): Promise<void>;
+  markFailure(id: string, input: { at: Date; retryAt: Date; error: string; maxAttempts: number; attempt?: number }): Promise<'retrying' | 'exhausted'>;
 };
 
 /** The storage adapter is deliberately tiny so deletion can be tested without Supabase. */
@@ -66,7 +67,7 @@ export async function runRawFileRetention(options: RetentionRunOptions): Promise
     try {
       await options.storage.delete(candidate.objectPath);
       if (!await options.storage.verifyDeleted(candidate.objectPath)) throw new Error('Private object still exists after deletion.');
-      await options.repository.markDeleted(candidate.id, at);
+      await options.repository.markDeleted(candidate.id, at, candidate.attempt);
       result.deleted += 1;
     } catch (error) {
       const outcome = await options.repository.markFailure(candidate.id, {
@@ -74,6 +75,7 @@ export async function runRawFileRetention(options: RetentionRunOptions): Promise
         retryAt: new Date(at.getTime() + retryDelayMs),
         error: errorMessage(error),
         maxAttempts,
+        attempt: candidate.attempt,
       });
       if (outcome === 'exhausted') result.exhausted += 1;
       else result.retrying += 1;

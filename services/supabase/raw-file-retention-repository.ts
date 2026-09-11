@@ -30,9 +30,9 @@ export class SupabaseRawFileRetentionRepository implements RetentionClaimReposit
     const rows = z.array(candidateSchema).parse(await (await this.rpc('claim_raw_file_retention', { p_limit: limit, p_now: now.toISOString(), p_max_attempts: maxAttempts })).json());
     return rows.map((row) => ({ id: row.id, importId: row.import_id, objectPath: safePath(row.object_path), uploadedAt: new Date(row.uploaded_at), deletedAt: row.deleted_at ? new Date(row.deleted_at) : null, attempt: row.attempts }));
   }
-  async markDeleted(id: string, at: Date): Promise<void> { await this.rpc('complete_raw_file_retention', { p_id: id, p_deleted_at: at.toISOString() }); }
-  async markFailure(id: string, input: { at: Date; retryAt: Date; error: string; maxAttempts: number }): Promise<'retrying' | 'exhausted'> {
-    return outcomeSchema.parse(await (await this.rpc('fail_raw_file_retention', { p_id: id, p_failed_at: input.at.toISOString(), p_available_at: input.retryAt.toISOString(), p_error: input.error, p_max_attempts: input.maxAttempts })).json());
+  async markDeleted(id: string, at: Date, attempt?: number): Promise<void> { await this.rpc('complete_raw_file_retention', { p_id: id, ...(attempt === undefined ? {} : { p_attempts: attempt }), p_deleted_at: at.toISOString() }); }
+  async markFailure(id: string, input: { at: Date; retryAt: Date; error: string; maxAttempts: number; attempt?: number }): Promise<'retrying' | 'exhausted'> {
+    return outcomeSchema.parse(await (await this.rpc('fail_raw_file_retention', { p_id: id, ...(input.attempt === undefined ? {} : { p_attempts: input.attempt }), p_failed_at: input.at.toISOString(), p_available_at: input.retryAt.toISOString(), p_error: input.error, p_max_attempts: input.maxAttempts })).json());
   }
 }
 
