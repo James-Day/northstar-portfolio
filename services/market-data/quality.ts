@@ -55,7 +55,9 @@ export function inspectPriceRecords(records: CandidatePrice[], extremeMoveThresh
       const ratio = close.div(previous.close).minus(1).abs();
       if (ratio.gte(extremeMoveThreshold)) addIssue(record, { instrumentId: record.instrumentId, tradingDate: record.tradingDate, reason: 'extreme_close_change', detail: `Close changed ${ratio.times(100).toFixed(2)}% from the prior stored close.` });
     }
-    previousByInstrument.set(record.instrumentId, record);
+    // Invalid/non-positive closes are quarantined and must not become the
+    // baseline for the next valid observation.
+    if (close.gt(0)) previousByInstrument.set(record.instrumentId, record);
   }
 
   const accepted: CandidatePrice[] = [];

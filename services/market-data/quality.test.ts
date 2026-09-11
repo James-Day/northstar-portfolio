@@ -34,4 +34,13 @@ describe('price quality', () => {
     expect(result.accepted).toEqual([{ instrumentId: 'good', tradingDate: '2026-01-02', close: '42' }]);
     expect(result.quarantined[0]?.issues).toEqual([expect.objectContaining({ reason: 'invalid_close' })]);
   });
+
+  it('does not compare a valid close against a quarantined non-positive close', () => {
+    const result = inspectPriceRecords([
+      { instrumentId: 'fund', tradingDate: isoDate('2026-01-02'), close: d('0') },
+      { instrumentId: 'fund', tradingDate: isoDate('2026-01-03'), close: d('100') },
+    ]);
+    expect(result.accepted).toEqual([{ instrumentId: 'fund', tradingDate: '2026-01-03', close: '100' }]);
+    expect(result.quarantined).toEqual([expect.objectContaining({ tradingDate: '2026-01-02', issues: [expect.objectContaining({ reason: 'invalid_close' })] })]);
+  });
 });
