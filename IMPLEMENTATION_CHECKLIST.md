@@ -15,7 +15,7 @@ This file is the current implementation plan. Work through the numbered steps in
 
 **Current count: 102 tasks — 63 checked, 39 unchecked, across 13 ordered steps.**
 
-**Progress view:** 85 tasks have implementation or verification evidence (63 complete and 22 partial); 17 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
+**Progress view:** 85 tasks have implementation or verification evidence (64 complete and 21 partial); 17 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -136,7 +136,7 @@ Owner: market data/platform. Depends on steps 06–07.
 - [x] **08.03** Durable run metrics, monthly usage reader, preflight cap and freshness classifiers/read API/UI exist. These are foundations, not a proven hard quota guarantee.
 - [x] **08.04** Skip already-fetched symbol/trading-date closes before calling the provider. Daily-price persistence exposes a missing-symbol lookup, the refresh coordinator returns an explicit `already_fetched` skip, and tests cover fully and partially cached batches. Durable concurrent claims remain part of 08.05.
 - [x] **08.05** Fix request accounting: skipped runs currently emit attempt symbol counts that become quota units; reserve budget atomically before actual calls, reconcile attempts/failures and prevent concurrent overspend. Evidence: `services/market-data/quota.ts`, `services/market-data/daily-refresh.ts`, `services/supabase/market-data-quota-repository.ts`, and `supabase/migrations/20260910200000_market_data_quota_reservations.sql`; focused success/failure/exhaustion tests pass.
-- [ ] **08.06** Add paginated active-position/alias reads and provider-sized batches, explicit unresolved aliases, delayed-publication handling and gap backfills. Verify extraordinary calendar closures and session overrides.
+- [x] **08.06** Add paginated active-position/alias reads and provider-sized batches, explicit unresolved aliases, delayed-publication handling and gap backfills. Verify extraordinary calendar closures and session overrides. Evidence: `services/supabase/active-symbols-repository.ts`, `services/market-data/marketstack.ts`, `services/market-data/historical-ingestion.ts`, `services/market-data/calendar-config.ts`, `services/market-data/us-equity-calendar.ts`, scheduled/daily refresh tests, and commits `be38fc0`, `193e8fe`, `a68a5f1`, `600905f`, `db42444`.
 - [ ] **08.07** Configure a free development key, confirm its current allowance, and run a deliberately tiny live fetch into the database. Keep automatic schedules off until 08.04–08.05 pass; no purchase/upgrade.
 - [ ] **08.08** Deliver quota/failure/stale-price alerts and durable recovery visibility; test provider outage and partial responses without fabricating closes.
 - [ ] **08.09** Gate: two users with one shared holding cause one symbol/date fetch; repeated/concurrent cron and dashboard loads add no redundant calls; free cap is enforced across retries.
