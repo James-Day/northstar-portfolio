@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-11 | 13.06 — Production market-data approval boundary (partial) | Added a fail-closed approval record template and contract tests requiring exact dataset rights evidence, attribution/change/share-alike review, an independent reviewer, and an explicitly recorded commercial provider plan before paid launch. | Rights approval and commercial-plan activation remain pending; free Marketstack stays development-only. |
+
 | 2026-09-11 | 13.04 — Staging configuration contract (partial) | Added contract tests covering secret-free environment templates, Supabase/Stripe/Marketstack declarations, Cloudflare queue and Durable Object bindings, cron configuration, and the staging-versus-production evidence boundary. | Hosted staging deployment, live RLS/Storage/cron/Stripe verification and deployed revision evidence remain required. |
 
 | 2026-09-11 | 01.07 — Fresh baseline gate rerun (partial) | `npm run baseline:gate` passed with typecheck, 141 Vitest files/539 tests, production build, and generated-browser secret scan. | Fresh-checkout migration/database isolation and hosted browser acceptance remain required. |
