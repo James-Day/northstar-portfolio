@@ -44,4 +44,11 @@ describe('SupabaseSignedUploadRepository', () => {
     await expect(repository.bind?.('user-1', 'session-1', 'account-1', 'import-1', 'user-1/account-1/object.csv', 'a'.repeat(64), 9)).rejects.toThrow('hash');
     expect(fetcher).toHaveBeenCalledOnce();
   });
+
+  it('rejects an object path belonging to another account before touching storage', async () => {
+    const fetcher = vi.fn();
+    const repository = new SupabaseSignedUploadRepository({ supabaseUrl: 'https://supabase.test', supabaseAnonKey: 'anon', accounts: { get: vi.fn().mockResolvedValue({ id: 'account-1' }) } as never, fetcher: fetcher as typeof fetch });
+    await expect(repository.bind?.('user-1', 'session-1', 'account-1', 'import-1', 'user-1/account-2/object.csv', 'a'.repeat(64), 128)).rejects.toThrow('path');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 });
