@@ -156,6 +156,16 @@ export function createStripeApi(
       params.set("client_reference_id", input.userId);
       params.set("metadata[user_id]", input.userId);
       params.set("subscription_data[metadata][user_id]", input.userId);
+      // Reuse the server-mapped customer when one exists. A first Checkout
+      // can create the customer; the verified webhook links it before later
+      // Checkout or Portal requests can use it.
+      if (options.resolveCustomerId) {
+        const customer = await options.resolveCustomerId(
+          input.userId,
+          input.accessToken,
+        );
+        if (customer) params.set("customer", validateStripeCustomerId(customer));
+      }
       const payload = await request("checkout/sessions", params);
       if (typeof payload.url !== "string" || !payload.url)
         throw new Error("Stripe did not return a Checkout URL.");
@@ -175,7 +185,7 @@ export function createStripeApi(
           "No Stripe customer exists for this account.",
         );
       const params = new URLSearchParams({
-        customer,
+        customer: validateStripeCustomerId(customer),
         return_url: input.returnUrl,
       });
       const payload = await request("billing_portal/sessions", params);
@@ -247,6 +257,12 @@ export class BillingConfigurationError extends Error {
     super(message);
     this.name = "BillingConfigurationError";
   }
+}
+
+function validateStripeCustomerId(customerId: string): string {
+  if (!/^cus_[A-Za-z0-9]+$/.test(customerId))
+    throw new BillingConfigurationError("Stripe customer mapping is invalid.");
+  return customerId;
 }
 
 /**

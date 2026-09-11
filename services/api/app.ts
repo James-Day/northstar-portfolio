@@ -46,9 +46,11 @@ import {
   resolveBillingPriceId,
   validateStripeSessionUrl,
   verifyStripeWebhook,
+  createStripeApi,
   type BillingPlan,
   type StripeBillingHttpDependencies,
 } from '@/services/billing/stripe-http';
+import { createStripeWebhookHandler } from '@/services/billing/stripe-webhook-handler';
 import { toCsv } from '@/services/privacy/export';
 import { resolveEntitlementAccess } from '@/services/billing/entitlements';
 import type { BillingPersistence } from '@/services/billing/persistence';
@@ -82,6 +84,7 @@ export type ApiBindings = {
   MARKETSTACK_API_KEY?: string;
   MARKETSTACK_MONTHLY_CAP?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_SECRET_KEY?: string;
   STRIPE_MONTHLY_PRICE_ID?: string;
   STRIPE_ANNUAL_PRICE_ID?: string;
 };
@@ -223,7 +226,8 @@ export function createApi(dependencies: ApiDependencies = {}) {
   );
 
   api.post('/v1/billing/stripe/webhook', async (context) => {
-    if (!billing) return context.json({ error: 'billing_unavailable' }, 503);
+    const billingClient = billing ?? createBillingIntegration(context.env);
+    if (!billingClient) return context.json({ error: 'billing_unavailable' }, 503);
     const rawBody = await readRequestText(
       context.req.raw,
       MAX_WEBHOOK_BODY_BYTES,
@@ -234,7 +238,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
         context.req.header('stripe-signature'),
         context.env.STRIPE_WEBHOOK_SECRET,
       );
-      await billing.handleVerifiedWebhook(event);
+      await billingClient.handleVerifiedWebhook(event);
       return context.json({ received: true });
     } catch (error) {
       if (error instanceof StripeSignatureError)
@@ -250,7 +254,8 @@ export function createApi(dependencies: ApiDependencies = {}) {
       verifySession,
     );
     if (authenticated instanceof Response) return authenticated;
-    if (!billing) return context.json({ error: 'billing_unavailable' }, 503);
+    const billingClient = billing ?? createBillingIntegration(context.env);
+    if (!billingClient) return context.json({ error: 'billing_unavailable' }, 503);
     const body = (await readOptionalJsonRequest(
       context.req.raw,
       MAX_JSON_BODY_BYTES,
@@ -265,7 +270,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
         monthly: context.env.STRIPE_MONTHLY_PRICE_ID,
         annual: context.env.STRIPE_ANNUAL_PRICE_ID,
       });
-      const result = await billing.createCheckoutSession({
+      const result = await billingClient.createCheckoutSession({
         userId: authenticated.user.id,
         accessToken: authenticated.accessToken,
         priceId,
@@ -293,9 +298,10 @@ export function createApi(dependencies: ApiDependencies = {}) {
       verifySession,
     );
     if (authenticated instanceof Response) return authenticated;
-    if (!billing) return context.json({ error: 'billing_unavailable' }, 503);
+    const billingClient = billing ?? createBillingIntegration(context.env);
+    if (!billingClient) return context.json({ error: 'billing_unavailable' }, 503);
     try {
-      const result = await billing.createBillingPortalSession({
+      const result = await billingClient.createBillingPortalSession({
         userId: authenticated.user.id,
         accessToken: authenticated.accessToken,
         returnUrl: buildBillingReturnUrl(
@@ -1242,6 +1248,40 @@ function createBillingRepository(
     supabaseAnonKey: bindings.SUPABASE_ANON_KEY,
     serviceRoleKey: bindings.SUPABASE_SERVICE_ROLE_KEY,
   });
+}
+
+/** Build the server-only Stripe + Supabase billing boundary from Worker bindings. */
+function createBillingIntegration(
+  bindings: ApiBindings,
+): StripeBillingHttpDependencies | undefined {
+  if (
+    !bindings.STRIPE_SECRET_KEY?.trim() ||
+    !bindings.SUPABASE_URL ||
+    !bindings.SUPABASE_ANON_KEY ||
+    !bindings.SUPABASE_SERVICE_ROLE_KEY
+  )
+    return undefined;
+  const repository = new SupabaseBillingRepository({
+    supabaseUrl: bindings.SUPABASE_URL,
+    supabaseAnonKey: bindings.SUPABASE_ANON_KEY,
+    serviceRoleKey: bindings.SUPABASE_SERVICE_ROLE_KEY,
+  });
+  const stripe = createStripeApi({
+    secretKey: bindings.STRIPE_SECRET_KEY,
+    resolveCustomerId: (userId, accessToken) =>
+      repository.findStripeCustomerIdByUserId(userId, accessToken),
+  });
+  const webhook = createStripeWebhookHandler({
+    billing: repository,
+    resolveUserIdByStripeCustomerId: (customerId) =>
+      repository.findUserIdByStripeCustomerId(customerId),
+  });
+  return {
+    ...stripe,
+    handleVerifiedWebhook: async (event) => {
+      await webhook(event);
+    },
+  };
 }
 
 async function requireBillingAccess(

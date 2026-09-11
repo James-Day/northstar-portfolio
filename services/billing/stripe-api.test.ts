@@ -71,6 +71,16 @@ describe("Stripe API adapter", () => {
     expect(body.get("customer")).toBe("cus_123");
   });
 
+  it("reuses only the server-resolved customer on a later Checkout", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ url: "https://checkout.stripe.com/c/pay/test" }), { status: 200 }));
+    const lookup = vi.fn(async () => "cus_123");
+    const billing = createStripeApi({ secretKey: "sk_test_123", fetcher, resolveCustomerId: lookup });
+    await billing.createCheckoutSession({ userId: "user-1", accessToken: "token", priceId: "price_annual", successUrl: "https://app.test/success", cancelUrl: "https://app.test/cancel" });
+    const body = new URLSearchParams(String((fetcher.mock.calls[0][1] as RequestInit).body));
+    expect(lookup).toHaveBeenCalledWith("user-1", "token");
+    expect(body.get("customer")).toBe("cus_123");
+  });
+
   it("cancels billable subscriptions across pages and skips already-canceled records", async () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: "sub_active", status: "active" }, { id: "sub_done", status: "canceled" }], has_more: true }), { status: 200 }))

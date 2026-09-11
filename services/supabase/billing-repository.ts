@@ -108,6 +108,22 @@ export class SupabaseBillingRepository implements BillingPersistence {
     return mapCustomer(rows[0], userId);
   }
 
+  async linkStripeCustomer(userId: string, customerId: string): Promise<void> {
+    if (!this.options.serviceRoleKey?.trim())
+      throw new Error(
+        "SUPABASE_SERVICE_ROLE_KEY is required for Stripe customer writes.",
+      );
+    const response = await this.rpc(
+      "link_stripe_customer",
+      { p_user_id: userId, p_customer_id: customerId },
+      this.serviceHeaders(),
+    );
+    if (!response.ok)
+      throw new Error(
+        `Supabase Stripe customer link failed with HTTP ${response.status}.`,
+      );
+  }
+
   /**
    * Looks up ownership using the service-only Stripe customer mapping. This
    * is intentionally separate from the user-scoped entitlement read so a

@@ -10,10 +10,20 @@ const entitlement = { status: 'active' as const, trialStartedAt: null, trialEnds
 describe('Stripe webhook durable adapter', () => {
   it('maps subscription status and persists the complete verified payload', async () => {
     const apply = vi.fn(async () => entitlement);
-    const handler = createStripeWebhookHandler({ billing: { applyVerifiedWebhook: apply }, resolveUserIdByStripeCustomerId: async () => undefined });
+    const link = vi.fn(async () => undefined);
+    const handler = createStripeWebhookHandler({ billing: { applyVerifiedWebhook: apply, linkStripeCustomer: link }, resolveUserIdByStripeCustomerId: async () => undefined });
     const event = base('customer.subscription.updated', { metadata: { user_id: 'user-1' }, status: 'active', customer: 'cus_1' });
     await expect(handler(event)).resolves.toEqual({ status: 'applied', userId: 'user-1', eventType: 'subscription_active' });
     expect(apply).toHaveBeenCalledWith('user-1', { id: 'evt_123', type: 'subscription_active', createdAt: new Date(1_767_000_000 * 1000) }, event.raw);
+    expect(link).toHaveBeenCalledWith('user-1', 'cus_1');
+  });
+
+  it('does not link malformed customer identifiers supplied by an event', async () => {
+    const apply = vi.fn(async () => entitlement);
+    const link = vi.fn(async () => undefined);
+    const handler = createStripeWebhookHandler({ billing: { applyVerifiedWebhook: apply, linkStripeCustomer: link }, resolveUserIdByStripeCustomerId: async () => 'user-1' });
+    await handler(base('invoice.paid', { customer: 'not-a-customer' }));
+    expect(link).not.toHaveBeenCalled();
   });
 
   it('uses server-owned customer mapping when metadata is absent', async () => {

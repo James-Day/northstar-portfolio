@@ -43,4 +43,13 @@ describe('SupabaseBillingRepository', () => {
     expect(String(fetcher.mock.calls[0][0])).toContain('stripe_customer_id=eq.cus_123');
     expect(fetcher.mock.calls[0][1]).toMatchObject({ headers: { apikey: 'service', authorization: 'Bearer service' } });
   });
+
+  it('links a Checkout-created customer through the service-only RPC', async () => {
+    const fetcher = mockFetcher([]);
+    const repository = new SupabaseBillingRepository({ supabaseUrl: 'https://supabase.test', supabaseAnonKey: 'anon', serviceRoleKey: 'service', fetcher });
+    await repository.linkStripeCustomer(customer.user_id, 'cus_123');
+    expect(String(fetcher.mock.calls[0][0])).toContain('/rpc/link_stripe_customer');
+    expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({ p_user_id: customer.user_id, p_customer_id: 'cus_123' });
+    expect(fetcher.mock.calls[0][1]).toMatchObject({ headers: { apikey: 'service', authorization: 'Bearer service' } });
+  });
 });

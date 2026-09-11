@@ -10,7 +10,7 @@ export class UnresolvedStripeCustomerError extends Error {
 }
 
 export type StripeWebhookHandlerDependencies = {
-  billing: Pick<BillingPersistence, 'applyVerifiedWebhook'>;
+  billing: Pick<BillingPersistence, 'applyVerifiedWebhook' | 'linkStripeCustomer'>;
   /** Resolve a Stripe customer id against the server-owned billing mapping. */
   resolveUserIdByStripeCustomerId(customerId: string): Promise<string | undefined>;
 };
@@ -33,6 +33,10 @@ export function createStripeWebhookHandler(dependencies: StripeWebhookHandlerDep
     const userId = await resolveUserId(event, dependencies.resolveUserIdByStripeCustomerId);
     if (!userId) throw new UnresolvedStripeCustomerError(event.id);
 
+    const customerId = stripeCustomerIdFromEvent(event);
+    if (customerId && dependencies.billing.linkStripeCustomer)
+      await dependencies.billing.linkStripeCustomer(userId, customerId);
+
     await dependencies.billing.applyVerifiedWebhook(userId, {
       id: event.id,
       type: eventType,
@@ -40,6 +44,12 @@ export function createStripeWebhookHandler(dependencies: StripeWebhookHandlerDep
     }, event.raw);
     return { status: 'applied', userId, eventType };
   };
+}
+
+function stripeCustomerIdFromEvent(event: VerifiedStripeEvent): string | undefined {
+  const object = asRecord(event.data.object);
+  const customer = stringAt(object, 'customer');
+  return customer && /^cus_[A-Za-z0-9]+$/.test(customer) ? customer : undefined;
 }
 
 function toBillingEvent(event: VerifiedStripeEvent): BillingWebhook['type'] | undefined {
