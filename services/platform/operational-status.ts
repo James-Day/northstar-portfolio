@@ -38,8 +38,10 @@ export function summarizeOperationalStatus(input: {
   count(market?.publicationPendingSymbols, 'publicationPendingSymbols');
   count(market?.unresolvedInstrumentCount, 'unresolvedInstrumentCount');
   const now = input.now ?? new Date();
+  if (!Number.isFinite(now.getTime())) throw new Error('Operational status timestamp must be valid.');
   const maxSuccessAgeMs = market?.maxSuccessAgeMs ?? 36 * 60 * 60 * 1000;
   if (!Number.isInteger(maxSuccessAgeMs) || maxSuccessAgeMs < 1) throw new Error('Market-data success freshness threshold must be a positive integer.');
+  if (market?.lastSuccessfulAt && !Number.isFinite(market.lastSuccessfulAt.getTime())) throw new Error('Market-data success timestamp must be valid.');
   const imports = input.imports;
   count(imports?.failedImports, 'failedImports');
   count(imports?.pendingReviews, 'pendingReviews');
@@ -71,6 +73,7 @@ export function summarizeOperationalStatus(input: {
   const recovery = input.recovery;
   const maxBackupAgeMs = recovery?.maxBackupAgeMs ?? 24 * 60 * 60 * 1000;
   if (!Number.isInteger(maxBackupAgeMs) || maxBackupAgeMs < 1) throw new Error('Backup freshness threshold must be a positive integer.');
+  if (recovery?.lastBackupAt && !Number.isFinite(recovery.lastBackupAt.getTime())) throw new Error('Backup timestamp must be valid.');
   if (recovery?.restoreDrillDue) add('recovery', 'critical', 'recovery.restore_drill_due', 'The backup/restore drill is due or has not been accepted.', 'Run the isolated restore drill and attach reviewed evidence before launch.');
   else if (recovery?.lastBackupAt && now.getTime() - recovery.lastBackupAt.getTime() > maxBackupAgeMs) add('recovery', 'critical', 'recovery.backup_overdue', 'No recent backup completed within the recovery-point target.', 'Verify the managed backup export and investigate the missing backup before accepting new risk.');
   const severity = signals.some((signal) => signal.severity === 'critical') ? 'critical' : signals.some((signal) => signal.severity === 'warning') ? 'warning' : 'ok';

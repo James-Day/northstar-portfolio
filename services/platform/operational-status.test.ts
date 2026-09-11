@@ -47,4 +47,10 @@ describe('operational status', () => {
   it('rejects invalid freshness thresholds', () => {
     expect(() => summarizeOperationalStatus({ marketData: { maxSuccessAgeMs: 0 } })).toThrow('freshness threshold');
   });
+
+  it('fails closed on invalid freshness timestamps instead of reporting healthy', () => {
+    expect(() => summarizeOperationalStatus({ marketData: { lastSuccessfulAt: new Date('invalid') } })).toThrow('success timestamp');
+    expect(() => summarizeOperationalStatus({ recovery: { lastBackupAt: new Date('invalid') } })).toThrow('Backup timestamp');
+    expect(() => summarizeOperationalStatus({ now: new Date('invalid') })).toThrow('status timestamp');
+  });
 });
