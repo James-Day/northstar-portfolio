@@ -1704,7 +1704,7 @@ function Overview({
           </p>
         </section>
       )}
-      <div className="mb-7 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,.85fr)]">
+      <div className="mb-7 min-w-0 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,.85fr)]">
         <section className="overflow-hidden rounded-3xl bg-[#152b4a] p-6 text-white shadow-[0_18px_55px_rgba(21,43,74,.16)] md:p-8">
           <div className="flex items-start justify-between">
             <div>
@@ -1780,7 +1780,7 @@ function Overview({
             </p>
           )}
         </section>
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-sm font-semibold text-slate-500">
             {showDemo ? 'Example return' : 'Your return'}
           </p>
@@ -1831,12 +1831,12 @@ function Overview({
           </div>
         </section>
       </div>
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(300px,.75fr)]">
+      <div className="min-w-0 grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(300px,.75fr)]">
         <Holdings
           liveHoldings={reportSnapshot?.payload.holdings}
           isLiveAccount={isLiveAccount}
         />
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-lg font-bold">
               {showDemo ? 'Example income' : 'Dividend income'}
@@ -1954,10 +1954,10 @@ function ReportDetails({
   const sales = realizedSales ?? [];
   const dividendEvents = dividends ?? [];
   return (
-    <div className="mt-6 grid gap-6 xl:grid-cols-2">
+    <div className="mt-6 min-w-0 grid gap-6 xl:grid-cols-2">
       <section
         aria-label="Capital and allocation"
-        className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+        className="min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
       >
         <div className="mb-5 flex items-center justify-between gap-3">
           <div>
@@ -2034,7 +2034,7 @@ function ReportDetails({
       </section>
       <section
         aria-label="Realized lot detail"
-        className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+        className="min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
       >
         <div className="mb-5">
           <h2 className="text-lg font-bold">Realized lot detail</h2>
@@ -2107,7 +2107,7 @@ function ReportDetails({
       </section>
       <section
         aria-label="Dividend detail"
-        className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+        className="min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
       >
         <div className="mb-5">
           <h2 className="text-lg font-bold">Dividend detail</h2>
@@ -2161,7 +2161,7 @@ function Holdings({
     );
   if (liveHoldings)
     return (
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="mb-5">
           <h2 className="text-lg font-bold">Your holdings</h2>
           <p className="mt-0.5 text-sm text-slate-500">
@@ -2224,7 +2224,7 @@ function Holdings({
       </section>
     );
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="min-w-0 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
         <h2 className="text-lg font-bold">Example holdings</h2>
         <p className="mt-0.5 text-sm text-slate-500">

@@ -37,3 +37,15 @@ test('configured dashboard does not render private data while signed out', async
     await expect(page.getByText(/connected accounts and portfolio reports are private/i)).toBeVisible();
   }
 });
+
+test('public surfaces remain keyboard reachable and fit a narrow viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  for (const path of ['/', '/sign-in', '/demo']) {
+    await page.goto(path);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    expect(overflow, `${path} should not overflow horizontally at 375px`).toBe(false);
+    const firstLink = page.getByRole('link').first();
+    await firstLink.focus();
+    await expect(firstLink).toBeFocused();
+  }
+});
