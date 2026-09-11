@@ -1,0 +1,14 @@
+{
+  "manifestVersion": 1,
+  "status": "pending_independent_review",
+  "purpose": "Candidate cases for independent comparison of DoltHub unadjusted closes. Null expectedClose values are intentional until an operator records a second-source value and evidence.",
+  "cases": [
+    { "symbol": "AAPL", "tradingDate": "2024-01-02", "expectedClose": null, "category": "large_cap", "evidence": { "status": "pending", "sourceName": "", "sourceUrl": "", "retrievedOn": "2026-09-13", "locator": "", "reviewer": "" } },
+    { "symbol": "SPY", "tradingDate": "2024-01-02", "expectedClose": null, "category": "etf", "evidence": { "status": "pending", "sourceName": "", "sourceUrl": "", "retrievedOn": "2026-09-13", "locator": "", "reviewer": "" } },
+    { "symbol": "FB", "tradingDate": "2022-06-08", "expectedClose": null, "category": "ticker_transition", "evidence": { "status": "pending", "sourceName": "", "sourceUrl": "", "retrievedOn": "2026-09-13", "locator": "", "reviewer": "" } },
+    { "symbol": "META", "tradingDate": "2022-06-09", "expectedClose": null, "category": "ticker_transition", "evidence": { "status": "pending", "sourceName": "", "sourceUrl": "", "retrievedOn": "2026-09-13", "locator": "", "reviewer": "" } },
+    { "symbol": "OLD", "tradingDate": "2020-12-31", "expectedClose": null, "category": "delisted", "evidence": { "status": "pending", "sourceName": "", "sourceUrl": "", "retrievedOn": "2026-09-13", "locator": "", "reviewer": "" } },
+    { "symbol": "XYZ", "tradingDate": "2020-08-31", "expectedClose": null, "category": "split_boundary", "evidence": { "status": "pending", "sourceName": "", "sourceUrl": "", "retrievedOn": "2026-09-13", "locator": "", "reviewer": "" } }
+  ]
+}
+
