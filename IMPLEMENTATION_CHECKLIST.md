@@ -15,7 +15,7 @@ This file is the current implementation plan. Work through the numbered steps in
 
 **Current count: 102 tasks — 63 checked, 39 unchecked, across 13 ordered steps.**
 
-**Progress view:** 85 tasks have implementation or verification evidence (65 complete and 20 partial); 17 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
+**Progress view:** 85 tasks have implementation or verification evidence (66 complete and 19 partial); 17 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -139,7 +139,7 @@ Owner: market data/platform. Depends on steps 06–07.
 - [x] **08.06** Add paginated active-position/alias reads and provider-sized batches, explicit unresolved aliases, delayed-publication handling and gap backfills. Verify extraordinary calendar closures and session overrides. Evidence: `services/supabase/active-symbols-repository.ts`, `services/market-data/marketstack.ts`, `services/market-data/historical-ingestion.ts`, `services/market-data/calendar-config.ts`, `services/market-data/us-equity-calendar.ts`, scheduled/daily refresh tests, and commits `be38fc0`, `193e8fe`, `a68a5f1`, `600905f`, `db42444`.
 - [ ] **08.07** Configure a free development key, confirm its current allowance, and run a deliberately tiny live fetch into the database. Keep automatic schedules off until 08.04–08.05 pass; no purchase/upgrade.
 - [x] **08.08** Deliver quota/failure/stale-price alerts and durable recovery visibility; test provider outage and partial responses without fabricating closes. Evidence: `services/market-data/refresh-metrics.ts`, `services/platform/operational-status.ts`, durable `market_data_job_runs` telemetry, stale-price/read APIs, and focused provider failure/partial-response/quota tests.
-- [ ] **08.09** Gate: two users with one shared holding cause one symbol/date fetch; repeated/concurrent cron and dashboard loads add no redundant calls; free cap is enforced across retries.
+- [x] **08.09** Gate: two users with one shared holding cause one symbol/date fetch; repeated/concurrent cron and dashboard loads add no redundant calls; free cap is enforced across retries. Evidence: duplicate-lot coalescing in `services/supabase/active-symbols-repository.ts`, Durable Object refresh claims in `services/market-data/refresh-claim-do.ts`, database-backed dashboard reads, and focused active-symbol/claim/scheduler/quota tests.
 
 ## 09 — Generate reproducible reports automatically
 
