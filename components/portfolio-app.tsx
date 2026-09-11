@@ -1768,7 +1768,7 @@ function Overview({
             </p>
           )}
           <div className="mt-8 h-44 min-w-0 w-full">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1} initialDimension={{ width: 1, height: 176 }}>
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="value" x1="0" x2="0" y1="0" y2="1">

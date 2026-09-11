@@ -66,6 +66,6 @@ describe('authenticated workspace accessibility contract', () => {
 
   it('keeps the portfolio chart inside a measurable, shrinkable container', () => {
     expect(portfolioApp).toMatch(/className="mt-8 h-44 min-w-0 w-full"/);
-    expect(portfolioApp).toMatch(/<ResponsiveContainer[^>]*minWidth=\{0\}[^>]*minHeight=\{1\}/);
+    expect(portfolioApp).toMatch(/<ResponsiveContainer[^>]*minWidth=\{0\}[^>]*minHeight=\{1\}[^>]*initialDimension=\{\{ width: 1, height: 176 \}\}/);
   });
 });
