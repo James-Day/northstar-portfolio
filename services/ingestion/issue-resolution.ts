@@ -70,17 +70,20 @@ export function parseIssueResolution(
 }
 
 export function unresolvedMaterialIssueCount(
-  rows: Array<{ status: string; id?: string }>,
+  rows: Array<{ status: string; id?: string; issueCode?: ImportIssueCode }>,
   resolutions: ImportIssueResolution[],
 ): number {
   return rows.filter(
-    (row) =>
-      (row.status === "unsupported" || row.status === "invalid") &&
-      !resolutions.some(
-        (resolution) =>
-          resolution.sourceRowId === row.id &&
-          resolution.issueCode === "unsupported_row" &&
-          resolution.resolutionKind === "non_reportable",
-      ),
+    (row) => {
+      const issueCode = row.issueCode ?? ((row.status === "unsupported" || row.status === "invalid") ? "unsupported_row" : undefined);
+      if (!issueCode) return false;
+      return !resolutions.some((resolution) => {
+        const sourceMatches = resolution.sourceRowId === (row.id ?? null);
+        if (!sourceMatches || resolution.issueCode !== issueCode) return false;
+        return (issueCode === "unsupported_row" && resolution.resolutionKind === "non_reportable") ||
+          (issueCode === "missing_instrument_alias" && resolution.resolutionKind === "alias_confirmed") ||
+          (issueCode === "incomplete_history" && resolution.resolutionKind === "history_acknowledged");
+      });
+    },
   ).length;
 }

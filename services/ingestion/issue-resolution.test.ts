@@ -72,4 +72,24 @@ describe("import issue resolution", () => {
     expect(unresolvedMaterialIssueCount([{ id: "a", status: "unsupported" }], [resolution])).toBe(1);
     expect(unresolvedMaterialIssueCount([{ id: "a", status: "invalid" }], [resolution])).toBe(1);
   });
+
+  it("keeps alias and incomplete-history blockers until their specific acknowledgements exist", () => {
+    const resolutions = [{
+      id: "alias-resolution",
+      importId: "i",
+      sourceRowId: "alias-row",
+      issueCode: "missing_instrument_alias" as const,
+      resolutionKind: "alias_confirmed" as const,
+      note: "Confirmed against the statement symbol",
+      resolvedBy: "u",
+      resolvedAt: "now",
+    }];
+    expect(unresolvedMaterialIssueCount([
+      { id: "alias-row", status: "supported", issueCode: "missing_instrument_alias" },
+      { id: "history-row", status: "supported", issueCode: "incomplete_history" },
+    ], resolutions)).toBe(1);
+    expect(unresolvedMaterialIssueCount([
+      { id: "alias-row", status: "supported", issueCode: "missing_instrument_alias" },
+    ], resolutions)).toBe(0);
+  });
 });
