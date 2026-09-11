@@ -54,6 +54,13 @@ describe('parseRobinhoodActivityCsv', () => {
     expect(rows[1]).toMatchObject({ status: 'supported', activity: { type: 'dividend', amount: '2.5' } });
   });
 
+  it('accepts a leading blank line without shifting source row numbers', () => {
+    const rows = parseRobinhoodActivityCsv('\n\nActivity Date,Trans Code,Instrument,Quantity,Price,Amount\n2026-01-02,Buy,VTI,1,$100.00,($100.00)');
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ rowNumber: 4, status: 'supported', activity: { effectiveDate: '2026-01-02', type: 'buy', symbol: 'VTI' } });
+  });
+
   it('preserves unfamiliar codes as visible unsupported rows', () => {
     const [row] = parseRobinhoodActivityCsv('Activity Date,Trans Code,Amount\n2026-01-02,Corporate Mystery,"$2.00"');
     expect(row).toMatchObject({ status: 'unsupported', rowNumber: 2, message: expect.stringContaining('Corporate Mystery') });

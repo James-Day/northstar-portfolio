@@ -96,10 +96,17 @@ function directedAmount(type: RobinhoodActivityType, amount: DecimalString): Dec
 export function parseRobinhoodActivityCsv(csv: string): ParsedRobinhoodRow[] {
   if (new TextEncoder().encode(csv).byteLength > MAX_BYTES) throw new Error('CSV exceeds the 10 MB import limit.');
   const parsedRecords = parseCsvRecords(csv);
-  const headers = parsedRecords[0]?.map(normalizedHeader) ?? [];
+  // Exports can contain a leading blank line when they are copied through a
+  // spreadsheet application. Locate the first non-empty record as the header,
+  // while keeping the blank records in the data slice so source row numbers
+  // remain aligned with the original file for review and audit evidence.
+  const headerRecordIndex = parsedRecords.findIndex((record) => record.some((value) => value.trim()));
+  const headers = parsedRecords[headerRecordIndex]?.map(normalizedHeader) ?? [];
   if (new Set(headers).size !== headers.length) throw new Error('CSV has duplicate column headers.');
-  const records = parsedRecords.slice(1).map((values) => Object.fromEntries(headers.map((header, index) => [header, (values[index] ?? '').trim()])));
-  if (records.length === 0) throw new Error('CSV needs a header and at least one activity row.');
+  const records = headerRecordIndex < 0
+    ? []
+    : parsedRecords.slice(headerRecordIndex + 1).map((values) => Object.fromEntries(headers.map((header, index) => [header, (values[index] ?? '').trim()])));
+  if (headerRecordIndex < 0 || records.every((record) => Object.values(record).every((value) => !String(value ?? '').trim()))) throw new Error('CSV needs a header and at least one activity row.');
   if (records.length > MAX_ROWS) throw new Error('CSV exceeds the 50,000-row import limit.');
 
   const headerSet = new Set(Object.keys(records[0]));
@@ -108,7 +115,9 @@ export function parseRobinhoodActivityCsv(csv: string): ParsedRobinhoodRow[] {
   }
 
   const parsedRows = records.flatMap<ParsedRobinhoodRow>((raw, index) => {
-    const rowNumber = index + 2;
+    // Include any records before the header so review points to the original
+    // physical CSV row even when the export starts with blank lines.
+    const rowNumber = headerRecordIndex + index + 2;
     if (Object.values(raw).every((value) => !String(value ?? '').trim())) return [];
     const code = (raw['trans code'] ?? '').trim().toUpperCase();
     const type = transactionTypeFor(code, raw.description ?? '');
