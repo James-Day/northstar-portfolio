@@ -24,7 +24,10 @@ export function AuthCallbackPage({ supabaseConfig }: { supabaseConfig?: PublicSu
     }
     let active = true;
     const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
-      if (session) window.location.replace('/dashboard');
+      if (session) void fetch('/api/auth/session', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accessToken: session.access_token }) }).then((response) => {
+        if (response.ok) window.location.replace('/dashboard');
+        else if (active) setMessage('We could not establish the private workspace session. Please return to sign in.');
+      });
     });
     void client.auth.getSession().then(({ data, error }) => {
       if (!active || data.session) return;

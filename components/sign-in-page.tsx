@@ -30,6 +30,14 @@ export function SignInPage({ supabaseConfig }: { supabaseConfig?: PublicSupabase
         setMessage('Check your email to confirm your account, then return here to sign in.');
       } else {
         await auth.signIn({ email, password });
+        const { data } = await client!.auth.getSession();
+        if (!data.session?.access_token) throw new Error('We could not establish the private workspace session.');
+        const sessionResponse = await fetch('/api/auth/session', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ accessToken: data.session.access_token }),
+        });
+        if (!sessionResponse.ok) throw new Error('We could not establish the private workspace session.');
         window.location.assign('/dashboard');
       }
     } catch (error) {

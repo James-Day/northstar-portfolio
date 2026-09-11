@@ -399,6 +399,10 @@ export function PortfolioApp({
         setAuthLoading(false);
       }
     });
+    void client.auth.getSession().then(({ data }) => {
+      if (!active || generation !== authGeneration.current || !data.session?.access_token) return;
+      void fetch('/api/auth/session', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accessToken: data.session.access_token }) });
+    });
     const { data: listener } = client.auth.onAuthStateChange(
       (_event, session) => {
         authGeneration.current += 1;
@@ -408,6 +412,7 @@ export function PortfolioApp({
         setEmail(session?.user.email);
         setUserId(nextUserId);
         setAuthLoading(false);
+        if (session?.access_token) void fetch('/api/auth/session', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accessToken: session.access_token }) });
       },
     );
     return () => {
@@ -801,9 +806,13 @@ export function PortfolioApp({
   }
 
   async function signOut() {
-    await client?.auth.signOut({ scope: 'global' });
-    clearSessionWorkspaceState();
-    window.location.assign('/');
+    try {
+      await client?.auth.signOut({ scope: 'global' });
+    } finally {
+      await fetch('/api/auth/session', { method: 'DELETE' });
+      clearSessionWorkspaceState();
+      window.location.assign('/');
+    }
   }
 
   async function downloadLiveExport(kind: 'activity' | 'report') {
