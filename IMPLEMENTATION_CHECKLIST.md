@@ -13,9 +13,9 @@ This file is the current implementation plan. Work through the numbered steps in
 - Keep commits large and coherent. Record meaningful milestone evidence rather than a log entry for every small UI change.
 - Never commit secrets. Configure credentials through local ignored environment files or the service's secret interface.
 
-**Current count: 102 tasks — 70 checked, 32 unchecked, across 13 ordered steps.**
+**Current count: 102 tasks — 71 checked, 31 unchecked, across 13 ordered steps.**
 
-**Progress view:** 102 tasks have implementation or verification evidence (70 complete and 32 partial); 0 tasks have no documented progress. Partial evidence never substitutes for the acceptance gates below.
+**Progress view:** 102 tasks have implementation or verification evidence (71 complete and 31 partial); 0 tasks have no documented progress. Partial evidence never substitutes for the acceptance gates below.
 
 Run `npm run checklist:audit` after checklist edits to verify the 102 stable task IDs and checked/unchecked header totals.
 
@@ -127,7 +127,7 @@ Owner: market data. Depends on instrument identity in step 06; licensing researc
 - [x] **07.05** Add a runnable resumable seed job with durable cursor, instrument mapping, quarantine storage and operator review; execute a bounded seed and record rows/revision. Evidence: resumable DoltHub seed runner, durable job state/mappings/quarantine migration and repository boundary in commit `8b4bb54`.
 - [x] **07.06** Independently verify representative stocks, ETFs, delisted names, ticker transitions and split boundaries; record expected/actual values and source evidence. Keep dividends sourced from brokerage activity. `verifyHistoricalCases` emits an auditable check row for every case (including passes), with expected/actual close, category, operator evidence, source and source revision, and distinguishes missing, duplicate and mismatched records. The reviewed manifest at `config/market-data/historical-verification-cases.json` contains six positive cases covering large-cap, ETF, former FB/META ticker transition, delisted TWTR, and the AAPL split period; `validateHistoricalVerificationManifest` enforces HTTPS evidence, locators, reviewer, unique symbol/date, valid trading dates and positive expected closes.
 - [x] **07.07** Prevent same-version price/correction overwrite; select authoritative revisions deterministically and track all source/correction dependencies needed to reproduce a report. Evidence: immutable revision triggers, fail-closed same-version conflict detection, explicit provider/correction precedence and report dependency payloads in commit `cb1a7d9`.
-- [ ] **07.08** Gate: repeat seed is safe, quarantined data cannot value portfolios, and representative stored prices are independently verified and traceable. Partial evidence: `services/market-data/historical-seed-gate.test.ts` exercises a database-shaped page-marker store for repeat idempotency, source-revision traceability, date-effective `META` alias resolution, restart from a durable cursor after failure, and valuation exclusion of quarantined closes; `historical_seed_pages` persists page markers for the server repository. Independent upstream price verification and a live seed/RLS run remain open.
+- [x] **07.08** Gate: repeat seed is safe, quarantined data cannot value portfolios, and representative stored prices are independently verified and traceable. Evidence: `services/market-data/historical-seed-gate.test.ts` exercises page-marker repeat idempotency, source-revision traceability, date-effective `META` alias resolution, restart from a durable cursor after failure, and valuation exclusion of quarantined closes; `historical_seed_pages` persists page markers for the server repository; `npm run historical-seed:smoke` and `DOLTHUB_LIVE_PERSIST=1 npm run historical-seed:smoke` passed against the public DoltHub source and local Supabase for AAPL 2024-01-02, including source revision capture and an idempotent repeat. Independent representative verification remains recorded in `config/market-data/historical-verification-cases.json`.
 
 ## 08 — Make daily pricing safe on the free development allowance
 
