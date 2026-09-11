@@ -167,4 +167,20 @@ describe('accepted Robinhood fixture gate', () => {
       ],
     })).toThrow(/cash neutral/);
   });
+
+  it('fails closed when split ratio evidence is non-positive or not dilutive', () => {
+    const parsed = parseRobinhoodActivityCsv([
+      'Activity Date,Trans Code,Instrument,Quantity,Price,Amount',
+      '2024-10-01,Buy,SCHD,10,$70,($700)',
+      '2024-10-11,SPL,SCHD,1,,,',
+    ].join('\n'));
+    const rows = [parsed[0], { ...parsed[1], activity: parsed[1].activity && { ...parsed[1].activity, corporateAction: { type: 'split' as const, ratioNumerator: '1' as never, ratioDenominator: '2' as never } } }];
+    expect(() => reconcileAcceptedFixture(rows, {
+      resolvedSymbols: ['SCHD'],
+      rows: [
+        { rowNumber: 2, type: 'buy', symbol: 'SCHD', quantity: '10', amount: '-700' },
+        { rowNumber: 3, type: 'split', symbol: 'SCHD', quantity: '1', amount: '0', splitRatio: { numerator: '1', denominator: '2' } },
+      ],
+    })).toThrow(/invalid split ratio/);
+  });
 });

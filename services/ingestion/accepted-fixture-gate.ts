@@ -81,7 +81,10 @@ export function reconcileAcceptedFixture(
     if (activity.type === 'split') {
       if (!activity.symbol || activity.quantity === null || !activity.corporateAction) throw new Error(`Accepted fixture row ${row.rowNumber} has incomplete split evidence.`);
       const before = quantities.get(activity.symbol) ?? new Decimal(0);
-      const ratio = new Decimal(activity.corporateAction.ratioNumerator).div(activity.corporateAction.ratioDenominator);
+      const numerator = new Decimal(activity.corporateAction.ratioNumerator);
+      const denominator = new Decimal(activity.corporateAction.ratioDenominator);
+      if (!numerator.isFinite() || !denominator.isFinite() || numerator.lte(denominator) || denominator.lte(0)) throw new Error(`Accepted fixture row ${row.rowNumber} has an invalid split ratio.`);
+      const ratio = numerator.div(denominator);
       const expectedAdded = before.times(ratio.minus(1));
       if (!new Decimal(activity.quantity).eq(expectedAdded)) throw new Error(`Accepted fixture row ${row.rowNumber} split quantity does not reconcile to the position.`);
       quantities.set(activity.symbol, before.times(ratio));
