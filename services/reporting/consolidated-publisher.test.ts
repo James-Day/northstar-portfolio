@@ -137,4 +137,21 @@ describe('consolidated report publisher', () => {
     })).rejects.toThrow('Conflicting closes');
     expect(publish).not.toHaveBeenCalled();
   });
+
+  it('refuses to publish when accounts provide conflicting validated split actions', async () => {
+    const publish = vi.fn();
+    const input = (accountId: string, numerator: string): PersistedReportInputs => ({
+      valuation: {
+        dates: [{ date: isoDate('2026-02-02'), canChainFromPrevious: false }], events: [], openingLots: [], closes: [],
+        corporateActions: [{ instrumentId: 'instrument-split' as never, type: 'split', status: 'validated', ratioNumerator: decimalString(numerator), ratioDenominator: decimalString('1'), effectiveDate: isoDate('2026-02-02') }],
+      },
+      ledger: { cash: decimalString('0'), openLots: [], realizedGainLoss: decimalString('0'), dividendIncome: decimalString('0'), netDeposits: decimalString('0'), sales: [] },
+      activityCoveredThrough: null, pricesThrough: isoDate('2026-02-02'), importStateRevision: `ledger:${accountId}`,
+    });
+    await expect(publishConsolidatedReportSnapshot({
+      publisher: { publish }, userId: 'user-1',
+      accounts: [{ accountId: 'a', inputs: input('a', '2') }, { accountId: 'b', inputs: input('b', '3') }],
+    })).rejects.toThrow('Conflicting corporate actions');
+    expect(publish).not.toHaveBeenCalled();
+  });
 });
