@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { decimalString } from '@/lib/domain/money';
 import { isoDate, type DailyClose } from '@/lib/domain/types';
 import { valueLedgerHistory } from '@/services/calculations/valuation';
@@ -6,12 +6,32 @@ import { applyLinkedLotTransfers, type InternalTransfer } from '@/services/ledge
 import type { LedgerEvent } from '@/services/ledger/fifo';
 import { composePersistedReportInputs, type PersistedReportInputs } from '@/services/reporting/compose-report-inputs';
 import { calculateConsolidatedReport, type ConsolidatedAccountInput } from '@/services/reporting/consolidated';
+import { SupabaseLedgerReplayRepository } from '@/services/ledger/persisted-replay';
 
 const d = decimalString;
 const date = (value: string) => isoDate(value);
 const instrument = 'instrument-stock' as never;
 const actionDate = date('2026-01-02');
 const latestImportIds = new Set(['dividend', 'drip-buy', 'sale', 'account-fee', 'cash-out', 'cash-in']);
+const accountId = '11111111-1111-4111-8111-111111111111';
+const userId = '22222222-2222-4222-8222-222222222222';
+const instrumentUuid = '33333333-3333-4333-8333-333333333333';
+
+function persistedRow(id: string, entryType: string, overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    account_id: accountId,
+    effective_date: '2026-01-01',
+    entry_type: entryType,
+    instrument_id: ['buy', 'sell', 'dividend', 'drip_buy'].includes(entryType) ? instrumentUuid : null,
+    quantity: null,
+    unit_price: null,
+    cash_amount: '0',
+    description: entryType,
+    imports: { status: 'committed' },
+    ...overrides,
+  };
+}
 
 const close = (tradingDate: string, value: string): DailyClose => ({
   instrumentId: instrument,
@@ -128,6 +148,49 @@ describe('persisted accounting reconciliation fixture', () => {
     expect(undoneTaxable.valuation.events.map((event) => event.id)).toEqual(['deposit', 'first-buy', 'second-buy']);
     // Undo changes the active replay while source rows/import evidence remains separately retained by persistence.
     expect([...latestImportIds]).toHaveLength(6);
+  });
+
+  it('reconciles signed database rows through the replay repository without duplicating DRIP income or fees', async () => {
+    const committedRows = [
+      persistedRow('44444444-4444-4444-8444-444444444441', 'deposit', { cash_amount: '1000' }),
+      persistedRow('44444444-4444-4444-8444-444444444442', 'buy', { cash_amount: '-500', quantity: '10', unit_price: '50' }),
+      // The commit RPC stores an explicit dividend row alongside the paired
+      // drip_buy row. Only the dividend row represents income.
+      persistedRow('44444444-4444-4444-8444-444444444443', 'dividend', { effective_date: '2026-01-03', cash_amount: '5' }),
+      persistedRow('44444444-4444-4444-8444-444444444444', 'drip_buy', { effective_date: '2026-01-03', cash_amount: '-5', quantity: '0.1', unit_price: '50' }),
+      persistedRow('44444444-4444-4444-8444-444444444445', 'fee', { effective_date: '2026-01-03', cash_amount: '-2' }),
+    ];
+    const preUndoRows = committedRows.slice(0, 2);
+    let ledgerCalls = 0;
+    const fetcher = vi.fn(async (input: Request | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/accounts')) return new Response(JSON.stringify([{ id: accountId, user_id: userId }]));
+      ledgerCalls += 1;
+      return new Response(JSON.stringify(ledgerCalls === 1 ? committedRows : preUndoRows));
+    });
+    const repository = new SupabaseLedgerReplayRepository({ supabaseUrl: 'https://supabase.test', serviceRoleKey: 'service-secret', fetcher: fetcher as typeof fetch });
+    const closes = [close('2026-01-01', '50'), close('2026-01-03', '60')];
+    const compose = (replay: Awaited<ReturnType<SupabaseLedgerReplayRepository['get']>>) => composePersistedReportInputs({
+      replay: replay!,
+      dates: [{ date: date('2026-01-01'), canChainFromPrevious: false }, { date: date('2026-01-03'), canChainFromPrevious: true }],
+      closes,
+    });
+
+    const committed = compose(await repository.get(accountId, userId));
+    expect(committed.ledger).toMatchObject({ cash: '498', dividendIncome: '5', netDeposits: '1000', realizedGainLoss: '0' });
+    expect(committed.ledger.dividendEvents).toHaveLength(1);
+    expect(committed.ledger.dividendEvents?.[0]).toMatchObject({ eventId: '44444444-4444-4444-8444-444444444443', amount: '5' });
+    expect(committed.ledger.openLots.map((lot) => ({ quantity: lot.remainingQuantity, basis: lot.totalCostBasis }))).toEqual([
+      { quantity: '10', basis: '500' },
+      { quantity: '0.1', basis: '5' },
+    ]);
+
+    const undone = compose(await repository.get(accountId, userId));
+    expect(undone.ledger).toMatchObject({ cash: '500', dividendIncome: '0', netDeposits: '1000', realizedGainLoss: '0' });
+    expect(undone.ledger.dividendEvents).toHaveLength(0);
+    expect(undone.ledger.openLots.map((lot) => ({ quantity: lot.remainingQuantity, basis: lot.totalCostBasis }))).toEqual([{ quantity: '10', basis: '500' }]);
+    expect(undone.importStateRevision).not.toBe(committed.importStateRevision);
+    expect(undone.importStateRevision).toBe('ledger:44444444-4444-4444-8444-444444444441,44444444-4444-4444-8444-444444444442');
   });
 });
 
