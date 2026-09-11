@@ -67,11 +67,12 @@ describe('accepted Robinhood fixture gate', () => {
   });
 
   it('rejects split share additions that do not match the declared ratio', () => {
-    const rows = parseRobinhoodActivityCsv([
+    const parsed = parseRobinhoodActivityCsv([
       'Activity Date,Trans Code,Instrument,Quantity,Price,Amount',
       '2024-10-01,Buy,SCHD,10,$70,($700)',
       '2024-10-11,SPL,SCHD,10,,,',
     ].join('\n'));
+    const rows = [parsed[0], { ...parsed[1], activity: parsed[1].activity && { ...parsed[1].activity, corporateAction: { type: 'split' as const, ratioNumerator: '3' as never, ratioDenominator: '1' as never } } }];
     expect(() => reconcileAcceptedFixture(rows, {
       resolvedSymbols: ['SCHD'],
       rows: [
