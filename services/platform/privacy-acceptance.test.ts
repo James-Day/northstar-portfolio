@@ -3,6 +3,7 @@ import { resolveEntitlementAccess } from '@/services/billing/entitlements';
 import { toCsv } from '@/services/privacy/export';
 import { createUserDataDeletionPlan, transitionDeletionRequest, type DeletionRequest } from '@/services/privacy/deletion';
 import { runRawFileRetention, type RetentionCandidate } from '@/services/privacy/retention-executor';
+import { runUserDeletion, type DeletionPlanItem, type DeletionPlanRepository, type DeletionSideEffects } from '@/services/privacy/deletion-executor';
 import { validateBackupRestoreEvidence } from '@/services/platform/backup-restore-evidence';
 
 describe('privacy and continuity acceptance boundary', () => {
@@ -47,5 +48,44 @@ describe('privacy and continuity acceptance boundary', () => {
     };
     expect(validateBackupRestoreEvidence(evidence, { now: new Date('2026-09-10T00:00:00.000Z') }).valid).toBe(true);
     expect(validateBackupRestoreEvidence({ ...evidence, checks: { ...evidence.checks, deletion: 'not-run' } }, { now: new Date('2026-09-10T00:00:00.000Z') }).valid).toBe(false);
+  });
+
+  it('keeps a partially failed deletion retryable while completing independent cleanup work', async () => {
+    const raw: DeletionPlanItem = {
+      id: 'raw-item', requestId: 'delete-2', userId: 'user-2', targetType: 'raw_object', targetId: null,
+      targetPath: 'user-2/account-2/statement.csv', attempt: 1,
+    };
+    const auth: DeletionPlanItem = {
+      id: 'auth-item', requestId: 'delete-2', userId: 'user-2', targetType: 'auth_user', targetId: null,
+      targetPath: null, attempt: 1,
+    };
+    let firstClaim = true;
+    let rawAvailable = true;
+    let authDeleted = false;
+    const repository: DeletionPlanRepository = {
+      claim: async () => {
+        if (firstClaim) { firstClaim = false; return [auth, raw]; }
+        return rawAvailable ? [{ ...raw, attempt: 2 }] : [];
+      },
+      complete: async (id) => { if (id === raw.id) rawAvailable = false; },
+      fail: async (id) => { if (id === raw.id) rawAvailable = true; return 'retrying'; },
+    };
+    const effects: DeletionSideEffects = {
+      deletePrivateObject: async () => { throw new Error('temporary storage outage'); },
+      deleteAccount: async () => undefined,
+      deleteReportSnapshots: async () => undefined,
+      deleteProfile: async () => undefined,
+      cancelBillingCustomer: async () => undefined,
+      deleteAuthUser: async () => { authDeleted = true; },
+    };
+    const first = await runUserDeletion({ repository, effects, now: () => new Date('2026-09-10T00:00:00.000Z') });
+    expect(first).toEqual({ claimed: 2, completed: 1, retrying: 1, exhausted: 0 });
+    expect(authDeleted).toBe(true);
+    expect(rawAvailable).toBe(true);
+
+    effects.deletePrivateObject = async () => { rawAvailable = false; };
+    const second = await runUserDeletion({ repository, effects, now: () => new Date('2026-09-10T00:00:10.000Z') });
+    expect(second).toEqual({ claimed: 1, completed: 1, retrying: 0, exhausted: 0 });
+    expect(rawAvailable).toBe(false);
   });
 });
