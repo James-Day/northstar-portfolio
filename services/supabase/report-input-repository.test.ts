@@ -17,4 +17,11 @@ describe('SupabaseReportInputRepository', () => {
     await expect(repo.listValidatedCorporateActions({ instrumentIds: ['11111111-1111-4111-8111-111111111111' as never], from: isoDate('2026-01-01'), through: isoDate('2026-01-03') })).resolves.toMatchObject([{ type: 'split', status: 'validated', ratioNumerator: '2' }]);
     expect(String(fetcher.mock.calls[0][0])).toContain('status=eq.validated');
   });
+
+  it('resolves one source revision to its database UUID', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify([{ id: '22222222-2222-4222-8222-222222222222' }]), { status: 200 }));
+    const repo = new SupabaseReportInputRepository({ supabaseUrl: 'https://db.test', serviceRoleKey: 'secret', fetcher });
+    await expect(repo.findPriceRevisionId({ source: 'dolthub', sourceRevision: 'commit-1' })).resolves.toBe('22222222-2222-4222-8222-222222222222');
+    expect(String(fetcher.mock.calls[0][0])).toContain('source_revision=eq.commit-1');
+  });
 });

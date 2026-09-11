@@ -10,7 +10,7 @@ type ReportJob = Extract<QueueJob, { kind: 'report.recompute' }>;
 
 export type SupabaseReportContextLoaderOptions = {
   ledger: Pick<SupabaseLedgerReplayRepository, 'get'>;
-  market: Pick<SupabaseReportInputRepository, 'listCloses' | 'listCorrections' | 'listValidatedCorporateActions'>;
+  market: Pick<SupabaseReportInputRepository, 'listCloses' | 'listCorrections' | 'listValidatedCorporateActions' | 'findPriceRevisionId'>;
   resolveRange(job: ReportJob, replay: Awaited<ReturnType<SupabaseLedgerReplayRepository['get']>>): Promise<{ from: IsoDate; through: IsoDate }>;
   calendarOverrides?: Parameters<typeof buildUsEquityValuationDates>[0]['overrides'];
 };
@@ -33,9 +33,8 @@ export function createSupabaseReportContextLoader(options: SupabaseReportContext
       options.market.listValidatedCorporateActions(query),
     ]);
     const inputs: PersistedReportInputs = composePersistedReportInputs({ replay, dates, closes, corrections, corporateActions });
-    // The reader preserves source revisions in dependencies; a UUID price
-    // revision can be attached by a richer loader once that projection is
-    // needed. Never substitute a source commit for the database foreign key.
-    return { userId: job.requestedBy, accountId: job.accountId, inputs, priceRevisionId: null };
+    const revisions = [...new Set((inputs.priceDependencies ?? []).map((dependency) => `${dependency.source}|${dependency.sourceRevision}`))];
+    const priceRevisionId = revisions.length === 1 ? await options.market.findPriceRevisionId({ source: inputs.priceDependencies![0].source, sourceRevision: inputs.priceDependencies![0].sourceRevision }) : null;
+    return { userId: job.requestedBy, accountId: job.accountId, inputs, priceRevisionId };
   };
 }

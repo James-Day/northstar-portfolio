@@ -7,6 +7,7 @@ import type { CorporateAction } from '@/services/ledger/corporate-actions';
 const closeSchema = z.object({ instrument_id: z.string().uuid(), trading_date: z.string(), close: z.string(), price_revisions: z.object({ source: z.enum(['dolthub', 'marketstack', 'manual_correction']), source_revision: z.string() }) });
 const correctionSchema = z.object({ instrument_id: z.string().uuid(), trading_date: z.string(), corrected_close: z.string(), evidence: z.string(), correction_version: z.string() });
 const actionSchema = z.object({ instrument_id: z.string().uuid(), action_date: z.string(), action_type: z.literal('split'), ratio_numerator: z.string(), ratio_denominator: z.string(), status: z.literal('validated') });
+const revisionIdSchema = z.array(z.object({ id: z.string().uuid() }));
 
 export type SupabaseReportInputRepositoryOptions = { supabaseUrl: string; serviceRoleKey: string; fetcher?: typeof fetch; pageSize?: number };
 
@@ -56,6 +57,18 @@ export class SupabaseReportInputRepository {
     url.searchParams.set('status', 'eq.validated');
     const rows = z.array(actionSchema).parse(await this.request(url));
     return rows.map((row) => ({ instrumentId: row.instrument_id, type: 'split', status: 'validated', ratioNumerator: decimalString(row.ratio_numerator), ratioDenominator: decimalString(row.ratio_denominator), effectiveDate: isoDate(row.action_date) }));
+  }
+
+  async findPriceRevisionId(input: { source: DailyClose['source']; sourceRevision: string }): Promise<string | null> {
+    if (input.source === 'manual_correction') return null;
+    const url = new URL('/rest/v1/price_revisions', this.baseUrl);
+    url.searchParams.set('select', 'id');
+    url.searchParams.set('source', `eq.${input.source}`);
+    url.searchParams.set('source_revision', `eq.${input.sourceRevision}`);
+    url.searchParams.set('limit', '2');
+    const rows = revisionIdSchema.parse(await this.request(url));
+    if (rows.length > 1) throw new Error('Supabase returned duplicate price revisions.');
+    return rows[0]?.id ?? null;
   }
 
   private async request(url: URL): Promise<unknown> {
