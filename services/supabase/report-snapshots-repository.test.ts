@@ -22,6 +22,19 @@ describe('Supabase report snapshots repository', () => {
     expect(String(fetcher.mock.calls[1][0])).toContain('price_revision_id=is.null');
   });
 
+  it('keeps separate price revisions independently reproducible on the same valuation date', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ id: '11111111-1111-4111-8111-111111111111' }]), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ id: '22222222-2222-4222-8222-222222222222' }]), { status: 201 }));
+    const repository = new SupabaseReportSnapshotsRepository({ supabaseUrl: 'https://supabase.test', serviceRoleKey: 'service-secret', fetcher: fetcher as typeof fetch });
+    const base = { userId: '22222222-2222-4222-8222-222222222222', accountId: '33333333-3333-4333-8333-333333333333', reportType: 'account_daily' as const, asOfDate: '2026-07-06', importStateRevision: 'ledger:rev-1', payload: { value: '100' } };
+    await expect(repository.publish({ ...base, priceRevisionId: '44444444-4444-4444-8444-444444444444' })).resolves.toBe('11111111-1111-4111-8111-111111111111');
+    await expect(repository.publish({ ...base, priceRevisionId: '55555555-5555-4555-8555-555555555555', payload: { value: '110' } })).resolves.toBe('22222222-2222-4222-8222-222222222222');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetcher.mock.calls[0][1].body).price_revision_id).toBe('44444444-4444-4444-8444-444444444444');
+    expect(JSON.parse(fetcher.mock.calls[1][1].body).price_revision_id).toBe('55555555-5555-4555-8555-555555555555');
+  });
+
   it('requires UUID and account dependencies before writing', async () => {
     const fetcher = vi.fn();
     const repository = new SupabaseReportSnapshotsRepository({ supabaseUrl: 'https://supabase.test', serviceRoleKey: 'service-secret', fetcher: fetcher as typeof fetch });
