@@ -120,4 +120,21 @@ describe('consolidated report publisher', () => {
       }),
     }));
   });
+
+  it('refuses to publish when accounts provide conflicting closes for one instrument date', async () => {
+    const publish = vi.fn();
+    const conflicting = (value: string, id: string): PersistedReportInputs => ({
+      valuation: {
+        dates: [{ date: isoDate('2026-02-02'), canChainFromPrevious: false }], events: [], openingLots: [],
+        closes: [{ instrumentId: 'instrument-conflict' as never, tradingDate: isoDate('2026-02-02'), close: decimalString(value), source: 'dolthub', sourceRevision: id }], corporateActions: [],
+      },
+      ledger: { cash: decimalString('0'), openLots: [], realizedGainLoss: decimalString('0'), dividendIncome: decimalString('0'), netDeposits: decimalString('0'), sales: [] },
+      activityCoveredThrough: null, pricesThrough: isoDate('2026-02-02'), importStateRevision: `ledger:${id}`,
+    });
+    await expect(publishConsolidatedReportSnapshot({
+      publisher: { publish }, userId: 'user-1',
+      accounts: [{ accountId: 'a', inputs: conflicting('100', 'revision-a') }, { accountId: 'b', inputs: conflicting('101', 'revision-b') }],
+    })).rejects.toThrow('Conflicting closes');
+    expect(publish).not.toHaveBeenCalled();
+  });
 });
