@@ -95,4 +95,29 @@ describe('consolidated report publisher', () => {
       }),
     }));
   });
+
+  it('publishes an unavailable return when the Modified Dietz denominator is invalid', async () => {
+    const publish = vi.fn().mockResolvedValue('snapshot-zero');
+    await publishConsolidatedReportSnapshot({
+      publisher: { publish }, userId: 'user-1',
+      accounts: [{ accountId: 'empty', inputs: {
+        valuation: { dates: [
+          { date: isoDate('2026-02-02'), canChainFromPrevious: false },
+          { date: isoDate('2026-02-03'), canChainFromPrevious: true },
+        ], events: [], openingLots: [], closes: [], corporateActions: [] },
+        ledger: { cash: decimalString('0'), openLots: [], realizedGainLoss: decimalString('0'), dividendIncome: decimalString('0'), netDeposits: decimalString('0'), sales: [] },
+        activityCoveredThrough: null, pricesThrough: null, importStateRevision: 'ledger:empty',
+      } }],
+    });
+
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({
+      payload: expect.objectContaining({
+        totalValue: '0', timeWeightedReturn: null,
+        unavailableDates: [
+          { date: '2026-02-02', reason: 'non_contiguous_period' },
+          { date: '2026-02-03', reason: 'invalid_denominator' },
+        ],
+      }),
+    }));
+  });
 });
