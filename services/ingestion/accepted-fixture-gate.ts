@@ -66,6 +66,7 @@ export function reconcileAcceptedFixture(
     assertDecimal(activity.amount, `row ${row.rowNumber} amount`);
     const amount = new Decimal(activity.amount);
     if (!amount.eq(expectedRow.amount)) throw new Error(`Accepted fixture row ${row.rowNumber} cash amount mismatch.`);
+    if (activity.type === 'split' && !amount.isZero()) throw new Error(`Accepted fixture row ${row.rowNumber} split must be cash neutral.`);
     assertEconomicSign(activity.type, amount, row.rowNumber);
     if (activity.quantity !== null) {
       assertDecimal(activity.quantity, `row ${row.rowNumber} quantity`);

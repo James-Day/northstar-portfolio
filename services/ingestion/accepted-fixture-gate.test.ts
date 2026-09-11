@@ -151,4 +151,20 @@ describe('accepted Robinhood fixture gate', () => {
     expect(result.quantitiesBySymbol).toEqual({ SCHG: '0.375' });
     expect(result.cashAmount).toBe('-8.4375');
   });
+
+  it('fails closed when a split carries a cash amount', () => {
+    const parsed = parseRobinhoodActivityCsv([
+      'Activity Date,Trans Code,Instrument,Quantity,Price,Amount',
+      '2024-10-01,Buy,SCHD,10,$70,($700)',
+      '2024-10-11,SPL,SCHD,20,,,',
+    ].join('\n'));
+    const rows = [parsed[0], { ...parsed[1], activity: parsed[1].activity && { ...parsed[1].activity, amount: '1' as never } }];
+    expect(() => reconcileAcceptedFixture(rows, {
+      resolvedSymbols: ['SCHD'],
+      rows: [
+        { rowNumber: 2, type: 'buy', symbol: 'SCHD', quantity: '10', amount: '-700' },
+        { rowNumber: 3, type: 'split', symbol: 'SCHD', quantity: '20', amount: '1', splitRatio: { numerator: '3', denominator: '1' } },
+      ],
+    })).toThrow(/cash neutral/);
+  });
 });
