@@ -32,6 +32,7 @@ describe('authenticated CI integration contract', () => {
   it('passes only ephemeral public configuration to the app and redacts diagnostics', () => {
     expect(workflow).toMatch(/export NEXT_PUBLIC_SUPABASE_URL="\$\{API_URL\}"/);
     expect(workflow).toMatch(/export NEXT_PUBLIC_SUPABASE_ANON_KEY="\$\{ANON_KEY\}"/);
+    expect(workflow).toMatch(/export SUPABASE_SERVICE_ROLE_KEY="\$\{SERVICE_ROLE_KEY\}"/);
     expect(workflow).toMatch(/export NEXT_PUBLIC_API_URL="http:\/\/127\.0\.0\.1:8787"/);
     expect(workflow).toMatch(/unset SERVICE_ROLE_KEY POSTGRES_PASSWORD DASHBOARD_PASSWORD JWT_SECRET/);
     expect(workflow).toMatch(/safe_tail/);
