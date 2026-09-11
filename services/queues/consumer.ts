@@ -1,5 +1,5 @@
 import { parseQueueJob, type QueueJob } from './contracts';
-import type { QueueFailureRecorder } from './failure-evidence';
+import { sanitizeQueueEvidence, type QueueFailureRecorder } from './failure-evidence';
 
 export type QueueMessage<T = unknown> = { body: T; ack(): void; retry(options?: { delaySeconds?: number }): void };
 export type QueueHandlers = {
@@ -16,7 +16,7 @@ export async function consumeQueueMessages(messages: QueueMessage[], handlers: Q
     let job: QueueJob;
     try { job = parseQueueJob(message.body); } catch {
       try {
-        await options.failureRecorder?.record({ queueName: options.queueName, payload: message.body, reason: 'Invalid queue job payload.' });
+        await options.failureRecorder?.record({ queueName: options.queueName, payload: sanitizeQueueEvidence(message.body), reason: 'Invalid queue job payload.' });
         message.ack(); result.rejected += 1;
       } catch { message.retry({ delaySeconds: 60 }); result.retried += 1; }
       continue;
@@ -25,7 +25,7 @@ export async function consumeQueueMessages(messages: QueueMessage[], handlers: Q
     if (!handler) { message.retry({ delaySeconds: 60 }); result.retried += 1; continue; }
     try { await handler(job as never); message.ack(); result.acknowledged += 1; }
     catch (error) {
-      try { await options.failureRecorder?.record({ queueName: options.queueName, payload: job, reason: error instanceof Error ? error.message : 'Queue handler failed.' }); } catch { /* retry remains safest if evidence cannot be persisted */ }
+      try { await options.failureRecorder?.record({ queueName: options.queueName, payload: sanitizeQueueEvidence(job), reason: sanitizeQueueEvidence(error instanceof Error ? error.message : 'Queue handler failed.') as string }); } catch { /* retry remains safest if evidence cannot be persisted */ }
       message.retry({ delaySeconds: 60 }); result.retried += 1;
     }
   }

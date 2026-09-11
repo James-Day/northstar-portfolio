@@ -28,4 +28,14 @@ describe('queue consumer', () => {
     expect(invalid.ack).toHaveBeenCalledOnce();
     expect(invalid.retry).not.toHaveBeenCalled();
   });
+
+  it('redacts credential-shaped queue evidence before durable persistence', async () => {
+    const invalid = message({ kind: 'unknown.job', access_token: 'secret-token', nested: { authorization: 'Bearer hidden' } });
+    const record = vi.fn().mockResolvedValue(undefined);
+    await consumeQueueMessages([invalid], {}, { failureRecorder: { record }, queueName: 'imports' });
+    const evidence = record.mock.calls[0][0];
+    expect(evidence.payload).toEqual({ kind: 'unknown.job', access_token: '[REDACTED]', nested: { authorization: '[REDACTED]' } });
+    expect(JSON.stringify(evidence)).not.toContain('hidden');
+    expect(JSON.stringify(evidence)).not.toContain('secret-token');
+  });
 });
