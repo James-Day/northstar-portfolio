@@ -70,6 +70,16 @@ export function runLaunchPreflight(options: LaunchPreflightOptions = {}): Launch
     ? check('billing.price-format', 'pass', 'Stripe monthly and annual price IDs use the expected format.')
     : check('billing.price-format', 'fail', 'Stripe monthly and annual price IDs must use price_ identifiers.'));
 
+  const monthlyCents = env.STRIPE_MONTHLY_PRICE_CENTS;
+  const annualCents = env.STRIPE_ANNUAL_PRICE_CENTS;
+  const amountsConfigured = monthlyCents !== undefined || annualCents !== undefined;
+  const amountsValid = monthlyCents === '500' && annualCents === '4900';
+  checks.push(amountsValid
+    ? check('billing.price-amounts', 'pass', 'Stripe prices match $5 monthly and $49 annual pricing.')
+    : amountsConfigured || environment === 'production'
+      ? check('billing.price-amounts', 'fail', 'Stripe price amounts must be 500 monthly cents and 4900 annual cents.')
+      : check('billing.price-amounts', 'warn', 'Staging should record 500 monthly cents and 4900 annual cents after Stripe test prices are created.'));
+
   const publicUrl = env.NEXT_PUBLIC_SUPABASE_URL;
   const serverUrl = env.SUPABASE_URL;
   checks.push(publicUrl && serverUrl && publicUrl === serverUrl

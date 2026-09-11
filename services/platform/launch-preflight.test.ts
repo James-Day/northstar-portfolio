@@ -13,6 +13,8 @@ const baseEnv = {
   STRIPE_WEBHOOK_SECRET: 'whsec_example',
   STRIPE_MONTHLY_PRICE_ID: 'price_monthly',
   STRIPE_ANNUAL_PRICE_ID: 'price_annual',
+  STRIPE_MONTHLY_PRICE_CENTS: '500',
+  STRIPE_ANNUAL_PRICE_CENTS: '4900',
 };
 
 function files(): Record<string, string> {
@@ -56,6 +58,11 @@ describe('launch preflight', () => {
     const result = run({ ...baseEnv, STRIPE_WEBHOOK_SECRET: 'secret', STRIPE_MONTHLY_PRICE_ID: 'monthly' });
     expect(result.checks.find((item) => item.id === 'billing.webhook-format')?.status).toBe('fail');
     expect(result.checks.find((item) => item.id === 'billing.price-format')?.status).toBe('fail');
+  });
+
+  it('rejects configured Stripe amounts that do not match product pricing', () => {
+    const result = run({ ...baseEnv, STRIPE_ANNUAL_PRICE_CENTS: '4999' });
+    expect(result.checks.find((item) => item.id === 'billing.price-amounts')?.status).toBe('fail');
   });
 
   it('requires a live Stripe key and commercial provider plan in production', () => {

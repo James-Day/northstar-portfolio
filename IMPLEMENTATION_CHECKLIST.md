@@ -174,7 +174,7 @@ Owner: billing. Depends on usable reports in step 09; retain planned $5 monthly/
 
 - [x] **11.01** Pure first-usable-import 14-day no-card trial and duplicate-event entitlement reducers exist. Evidence: `services/billing/entitlements.ts`.
 - [x] **11.02** Persist one-time trial start atomically after the first usable committed import. The commit trigger and security-definer RPC create the trial once; retries, undo or another account cannot restart an existing trial.
-- [ ] **11.03** Configure Stripe test products/prices, Checkout and Billing Portal endpoints with authenticated customer ownership.
+- [ ] **11.03** Configure Stripe test products/prices, Checkout and Billing Portal endpoints with authenticated customer ownership. Launch preflight now validates optional recorded amounts against 500 monthly cents / 4900 annual cents and fails production when amounts are missing or wrong; live Stripe test-product creation and endpoint verification remain open.
 - [x] **11.04** Verify webhook signatures on raw bodies and persist replay/event-order protection. Evidence: raw-body HMAC verification, strict event validation, durable payload/audit handling, server-controlled customer ownership lookup, and lifecycle handler dispatch in commit `368c349`.
 - [x] **11.05** Enforce entitlement server-side; implement expiration, payment failures, plan changes/cancellation and truthful billing/trial UI. Evidence: request-time entitlement gate for reports/freshness, trial expiration handling, billing status endpoint and subscription status UI in commit `c7fe907`.
 - [ ] **11.06** Gate: Stripe test lifecycle and invalid/duplicate/reordered webhook tests pass; export/deletion remain accessible after cancellation.
