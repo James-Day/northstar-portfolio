@@ -119,11 +119,17 @@ describe('accepted Robinhood fixture gate', () => {
   it('fails closed when a split row has no inferred corporate-action ratio', () => {
     const csv = [
       'Activity Date,Trans Code,Instrument,Quantity,Price,Amount',
-      '2026-01-02,SPL,VTI,1,,,',
+      '2026-01-01,Buy,VTI,1,$100,($100)',
+      '2026-01-02,SPL,VTI,2,,,',
     ].join('\n');
-    expect(() => reconcileAcceptedFixture(parseRobinhoodActivityCsv(csv), {
+    const parsed = parseRobinhoodActivityCsv(csv);
+    const rows = [parsed[0], { ...parsed[1], activity: parsed[1].activity && { ...parsed[1].activity, corporateAction: undefined } }];
+    expect(() => reconcileAcceptedFixture(rows, {
       resolvedSymbols: ['VTI'],
-      rows: [{ rowNumber: 2, type: 'split', symbol: 'VTI', quantity: '1', amount: '0' }],
+      rows: [
+        { rowNumber: 2, type: 'buy', symbol: 'VTI', quantity: '1', amount: '-100' },
+        { rowNumber: 3, type: 'split', symbol: 'VTI', quantity: '2', amount: '0' },
+      ],
     })).toThrow(/no validated split ratio/);
   });
 });
