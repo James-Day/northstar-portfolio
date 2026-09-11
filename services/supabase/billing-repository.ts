@@ -6,6 +6,8 @@ import type {
   EntitlementStatus,
 } from "@/services/billing/entitlements";
 
+const billingTimestamp = z.string().datetime({ offset: true });
+
 const customerSchema = z.object({
   user_id: z.string().uuid(),
   entitlement_status: z.enum([
@@ -15,9 +17,12 @@ const customerSchema = z.object({
     "past_due",
     "canceled",
   ]),
-  trial_started_at: z.string().nullable(),
-  trial_ends_at: z.string().nullable(),
-  last_webhook_created_at: z.string().nullable().optional(),
+  // Entitlement decisions compare these values against the current instant.
+  // Reject malformed timestamps instead of mapping them to Invalid Date,
+  // which could otherwise make an expired trial appear active.
+  trial_started_at: billingTimestamp.nullable(),
+  trial_ends_at: billingTimestamp.nullable(),
+  last_webhook_created_at: billingTimestamp.nullable().optional(),
   last_webhook_id: z.string().nullable().optional(),
 });
 

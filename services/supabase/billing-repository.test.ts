@@ -20,6 +20,11 @@ describe('SupabaseBillingRepository', () => {
     expect(fetcher.mock.calls[0][1]).toMatchObject({ headers: { authorization: 'Bearer user-token', apikey: 'anon' } });
   });
 
+  it('rejects malformed entitlement timestamps before making an access decision', async () => {
+    const fetcher = mockFetcher([{ ...customer, trial_ends_at: 'not-a-date' }]);
+    await expect(new SupabaseBillingRepository({ supabaseUrl: 'https://supabase.test', supabaseAnonKey: 'anon', fetcher }).getEntitlement(customer.user_id, 'user-token')).rejects.toThrow();
+  });
+
   it('starts the trial through the atomic RPC and preserves user ownership', async () => {
     const fetcher = mockFetcher([customer]);
     const result = await new SupabaseBillingRepository({ supabaseUrl: 'https://supabase.test', supabaseAnonKey: 'anon', fetcher }).startTrialAfterCommittedImport(customer.user_id, 'user-token');
