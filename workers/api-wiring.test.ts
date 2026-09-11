@@ -15,4 +15,8 @@ describe('Worker scheduled wiring', () => {
     expect(worker).toMatch(/createStripeCustomerCancellation/);
     expect(worker).not.toMatch(/NEXT_PUBLIC.*STRIPE/);
   });
+
+  it('guards market-data refresh independently from other scheduled jobs', () => {
+    expect(worker).toMatch(/if \(environment\.SUPABASE_URL && environment\.SUPABASE_SERVICE_ROLE_KEY && environment\.MARKETSTACK_API_KEY\) handleScheduledRefresh/);
+  });
 });
