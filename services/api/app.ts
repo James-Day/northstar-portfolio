@@ -62,7 +62,9 @@ import {
   requestClientKey,
   requestId,
   requestRateLimit,
+  redactRequestLog,
   type RateLimitStore,
+  type SafeRequestLog,
 } from '@/services/security/request-security';
 
 const ACTIVITY_EXPORT_PAGE_SIZE = 100;
@@ -118,6 +120,8 @@ export type ApiDependencies = {
   billing?: StripeBillingHttpDependencies;
   billingPersistence?: BillingPersistence;
   rateLimitStore?: RateLimitStore;
+  /** Receives only redacted request metadata; never request bodies or headers. */
+  log?: (entry: SafeRequestLog) => void;
   now?: () => number;
 };
 
@@ -158,6 +162,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
   const rateLimitStore =
     dependencies.rateLimitStore ?? new MemoryRateLimitStore();
   const now = dependencies.now ?? Date.now;
+  const log = dependencies.log ?? (() => undefined);
 
   api.use('*', async (context, next) => {
     const request = context.req.raw;
@@ -184,6 +189,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
       context.header('x-ratelimit-remaining', String(decision.remaining));
       if (!decision.allowed) {
         context.header('retry-after', String(decision.retryAfterSeconds));
+        log(redactRequestLog({ requestId: id, method: request.method, path: new URL(request.url).pathname, status: 429 }));
         return context.json({ error: 'rate_limited', requestId: id }, 429);
       }
     }
@@ -203,6 +209,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
     }
     if (context.req.method === 'OPTIONS') return context.body(null, 204);
     await next();
+    log(redactRequestLog({ requestId: id, method: request.method, path: new URL(request.url).pathname, status: context.res.status }));
   });
 
   api.get('/health', (context) =>
@@ -1114,7 +1121,9 @@ async function readAllActivityForExport(
   }
 }
 
-export const api = createApi();
+export const api = createApi({
+  log: (entry) => console.info(JSON.stringify(entry)),
+});
 
 async function requireSession(
   request: Request,

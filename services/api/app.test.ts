@@ -84,6 +84,24 @@ describe('standalone API', () => {
     });
   });
 
+  it('emits only redacted request metadata for successful and limited requests', async () => {
+    const log = vi.fn();
+    const app = createApi({ log });
+    const response = await app.request('http://api.test/health?token=secret', {
+      headers: { authorization: 'Bearer secret-token' },
+    });
+    expect(response.status).toBe(200);
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ method: 'GET', path: '/health', status: 200 }));
+    expect(JSON.stringify(log.mock.calls)).not.toContain('secret');
+
+    const limited = createApi({
+      log,
+      rateLimitStore: { consume: () => ({ allowed: false, limit: 1, remaining: 0, retryAfterSeconds: 1 }) },
+    });
+    await limited.request('http://api.test/health?token=secret');
+    expect(log).toHaveBeenLastCalledWith(expect.objectContaining({ status: 429, path: '/health' }));
+  });
+
   it('rejects oversized or control-character bearer tokens before session verification', async () => {
     const verifySession = vi.fn();
     const app = createApi({ verifySession });
