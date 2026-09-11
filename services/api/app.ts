@@ -841,6 +841,18 @@ export function createApi(dependencies: ApiDependencies = {}) {
     return context.json({ upload }, 201);
   });
 
+  api.post('/v1/accounts/:accountId/imports/:importId/object', async (context) => {
+    const authenticated = await requireSession(context.req.raw, context.env, verifySession);
+    if (authenticated instanceof Response) return authenticated;
+    const body = await context.req.json().catch(() => null) as { objectPath?: unknown; sha256?: unknown; size?: unknown } | null;
+    if (!body || typeof body.objectPath !== 'string' || typeof body.sha256 !== 'string' || typeof body.size !== 'number') return context.json({ error: 'object_metadata_required' }, 400);
+    const repository = signedUploadRepository ?? createSignedUploadRepository(context.env);
+    if (!repository.bind) return context.json({ error: 'object_binding_unavailable' }, 503);
+    const bound = await repository.bind(authenticated.user.id, authenticated.accessToken, context.req.param('accountId'), context.req.param('importId'), body.objectPath, body.sha256, body.size);
+    if (bound === undefined) return context.json({ error: 'not_found' }, 404);
+    return context.json({ bound: true });
+  });
+
   api.post(
     '/v1/accounts/:accountId/imports/:importId/object',
     async (context) => {
