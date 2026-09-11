@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { parseRobinhoodActivityCsv } from '@/services/ingestion/robinhood';
 import { normalizeRobinhoodRowsForLedger } from '@/services/ingestion/ledger-normalization';
 import { readFileSync } from 'node:fs';
+import Decimal from 'decimal.js';
+import { applyFifoLedger, type LedgerEvent } from '@/services/ledger/fifo';
+import { decimalString } from '@/lib/domain/money';
 
 describe('Robinhood ledger normalization', () => {
   it('counts separately reported dividend plus reinvestment buy as one dividend', () => {
@@ -93,5 +96,28 @@ describe('Robinhood ledger normalization', () => {
       { entryType: 'transfer_in', cashAmount: '20', externalFlow: false },
       { entryType: 'transfer_out', cashAmount: '-5', externalFlow: false },
     ]);
+  });
+
+  it.each([
+    ['individual', 'individual-activity.csv', 'VTI', { cash: '415.98', dividendIncome: '0.24', netDeposits: '460', realizedGainLoss: '1', shares: '0.1508' }],
+    ['traditional IRA', 'traditional-ira-activity.csv', 'SCHD', { cash: '698.47', dividendIncome: '0.78', netDeposits: '900', realizedGainLoss: '1', shares: '2.5091' }],
+    ['Roth IRA', 'roth-ira-activity.csv', 'VOO', { cash: '712.75', dividendIncome: '0.55', netDeposits: '750', realizedGainLoss: '1.25', shares: '0.3761' }],
+  ])('reconciles %s normalized activity through the FIFO calculation boundary', (_name, fileName, symbol, expected) => {
+    const rows = parseRobinhoodActivityCsv(readFileSync(new URL(`../../fixtures/robinhood/${fileName}`, import.meta.url), 'utf8'));
+    const entries = normalizeRobinhoodRowsForLedger(rows, new Map([[symbol, `instrument-${symbol.toLowerCase()}`]]));
+    const events: LedgerEvent[] = entries.map((entry) => {
+      const amount = decimalString(new Decimal(entry.cashAmount).abs().toFixed());
+      if (entry.entryType === 'buy' || entry.entryType === 'drip_buy' || entry.entryType === 'sell') {
+        return { id: `${fileName}-${entry.sourceRowNumber}`, date: entry.effectiveDate, type: entry.entryType, instrumentId: entry.instrumentId!, quantity: entry.quantity!, grossAmount: amount, fee: decimalString('0') };
+      }
+      if (entry.entryType === 'dividend') return { id: `${fileName}-${entry.sourceRowNumber}`, date: entry.effectiveDate, type: 'dividend', instrumentId: entry.instrumentId ?? undefined, amount };
+      return { id: `${fileName}-${entry.sourceRowNumber}`, date: entry.effectiveDate, type: entry.entryType, amount } as LedgerEvent;
+    });
+    const result = applyFifoLedger(events);
+
+    expect(result).toMatchObject({ cash: expected.cash, dividendIncome: expected.dividendIncome, netDeposits: expected.netDeposits, realizedGainLoss: expected.realizedGainLoss });
+    expect(result.openLots.filter((lot) => lot.instrumentId === `instrument-${symbol.toLowerCase()}`).reduce((sum, lot) => sum.plus(lot.remainingQuantity), new Decimal(0)).toFixed()).toBe(expected.shares);
+    expect(result.dividendEvents).toHaveLength(1);
+    expect(result.sales).toHaveLength(1);
   });
 });

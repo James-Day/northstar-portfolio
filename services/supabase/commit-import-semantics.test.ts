@@ -14,4 +14,11 @@ describe('commit import financial semantics', () => {
     expect(migration).toMatch(/drop index public\.ledger_entries_import_source_row_unique/i);
     expect(migration).toMatch(/create unique index ledger_entries_import_source_row_type_unique on public\.ledger_entries\(source_row_id, entry_type\)/i);
   });
+
+  it('preserves normalized cash direction and flow classification for all non-trade activity', () => {
+    expect(migration).toMatch(/case when v_type = 'drip_buy' then -abs\(\(v_activity ->> 'amount'\)::numeric\) else \(v_activity ->> 'amount'\)::numeric end/i);
+    expect(migration).toMatch(/v_type in \('deposit', 'withdrawal'\)/i);
+    expect(migration).toMatch(/if v_type in \('buy', 'drip_buy'\) then[\s\S]*abs\(\(v_activity ->> 'amount'\)::numeric\)/i);
+    expect(migration).toMatch(/v_type in \('buy', 'sell', 'dividend', 'drip_buy'\)/i);
+  });
 });
