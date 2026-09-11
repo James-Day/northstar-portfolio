@@ -47,6 +47,43 @@ const serviceOwnedTables = [
   'billing_webhook_events',
 ];
 
+// These tables are shared reference/projection data. Clients may read the
+// rows exposed by their SELECT policies, but all writes must come from the
+// trusted worker/database functions. Keeping this inventory explicit makes a
+// newly-added global table fail CI until its intended boundary is reviewed.
+const globalReadOnlyTables = [
+  'instruments',
+  'instrument_aliases',
+  'corporate_actions',
+  'price_revisions',
+  'daily_prices',
+  'price_corrections',
+];
+
+const userOwnedTables = [
+  'profiles',
+  'accounts',
+  'imports',
+  'import_source_rows',
+  'ledger_entries',
+  'lots',
+  'report_snapshots',
+  'billing_customers',
+  'audit_events',
+  'raw_file_retention',
+  'raw_file_retention_audit',
+  'user_deletion_requests',
+  'user_deletion_plan_items',
+  'account_opening_history',
+  'lot_matches',
+  'internal_transfer_reconciliations',
+  'import_issue_resolutions',
+];
+
+function unique(values: string[]) {
+  return [...new Set(values)];
+}
+
 describe('database security migration contract', () => {
   it('enables RLS on every public table declared by migrations', async () => {
     const sql = await migrationSql();
@@ -70,6 +107,36 @@ describe('database security migration contract', () => {
     }
   });
 
+  it('classifies every migrated table exactly once', async () => {
+    const sql = await migrationSql();
+    const names = unique(tableNames(sql));
+    const classified = [...userOwnedTables, ...serviceOwnedTables, ...globalReadOnlyTables];
+
+    expect(unique(classified), 'table inventories must not overlap').toHaveLength(classified.length);
+    expect(unique(classified).sort()).toEqual(names.sort());
+  });
+
+  it('protects global reference tables from guessed-ID and direct client writes', async () => {
+    const sql = await migrationSql();
+    for (const name of globalReadOnlyTables) {
+      expect(sql, `${name} must revoke direct client writes`).toMatch(
+        new RegExp(`revoke\\s+(?:all|insert\\s*,\\s*update\\s*,\\s*delete)\\s+on\\s+[^;]*public\\.${name}[^;]*from\\s+public\\s*,\\s*anon\\s*,\\s*authenticated`),
+      );
+      expect(sql, `${name} must grant client reads explicitly`).toMatch(
+        new RegExp(`grant\\s+select\\s+on\\s+[^;]*public\\.${name}[^;]*to\\s+(?:anon\\s*,\\s*authenticated|authenticated\\s*,\\s*anon)`),
+      );
+    }
+  });
+
+  it('requires every user-owned table to expose only an auth.uid ownership boundary', async () => {
+    const sql = await migrationSql();
+    for (const name of userOwnedTables) {
+      expect(sql, `${name} must have an RLS owner policy`).toMatch(
+        new RegExp(`create\\s+policy\\s+[a-z0-9_]+[\\s\\S]*?on\\s+public\\.${name}[\\s\\S]*?auth\\.uid\\s*\\(\\s*\\)`),
+      );
+    }
+  });
+
   it('requires every user-owned table to have an auth.uid-scoped policy', async () => {
     const sql = await migrationSql();
     for (const [name, contract] of Object.entries(ownerPolicyContracts)) {
@@ -85,6 +152,15 @@ describe('database security migration contract', () => {
       );
       expect(sql, `${name} must grant only authenticated reads`).toMatch(
         new RegExp(`grant\\s+select\\s+on\\s+public\\.${name}\\s+to\\s+authenticated`),
+      );
+    }
+  });
+
+  it('locks immutable source evidence and derived projections against direct writes', async () => {
+    const sql = await migrationSql();
+    for (const name of ['imports', 'import_source_rows', 'report_snapshots', 'lot_matches', 'internal_transfer_reconciliations']) {
+      expect(sql, `${name} must revoke direct writes`).toMatch(
+        new RegExp(`revoke\\s+(?:all|insert\\s*,\\s*update\\s*,\\s*delete)\\s+on\\s+[^;]*public\\.${name}[^;]*from\\s+public\\s*,\\s*anon\\s*,\\s*authenticated`),
       );
     }
   });
