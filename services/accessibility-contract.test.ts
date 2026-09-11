@@ -63,4 +63,9 @@ describe('authenticated workspace accessibility contract', () => {
       expect(context).toMatch(/className="[^"]*overflow-(?:x-)?auto[^"]*"/);
     }
   });
+
+  it('keeps the portfolio chart inside a measurable, shrinkable container', () => {
+    expect(portfolioApp).toMatch(/className="mt-8 h-44 min-w-0 w-full"/);
+    expect(portfolioApp).toMatch(/<ResponsiveContainer[^>]*minWidth=\{0\}[^>]*minHeight=\{1\}/);
+  });
 });
