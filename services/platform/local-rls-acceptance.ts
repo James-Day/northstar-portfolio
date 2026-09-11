@@ -141,7 +141,7 @@ export async function runLocalRlsAcceptance(
     if (uploaded) {
       const serviceDelete = await fetcher(`${base}/storage/v1/object/brokerage-statements/${objectPath}`, {
         method: 'DELETE',
-        headers: serviceHeaders(credentials.serviceRoleKey, { 'content-type': 'application/json' }),
+        headers: serviceHeaders(credentials.serviceRoleKey),
       });
       await expectStatus(serviceDelete, [200], 'service private object cleanup');
     }
