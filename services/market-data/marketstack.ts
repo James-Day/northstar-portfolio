@@ -90,13 +90,14 @@ export class MarketstackProvider implements DailyPriceProvider {
       if (!/^[A-Z][A-Z0-9.\-]{0,14}$/.test(symbol))
         throw new Error(`Invalid market-data symbol: ${symbol}`);
     });
-    this.options.requestBudget.reserve(uniqueSymbols.length);
-
     const batchSize = this.options.maxSymbolsPerRequest ?? 1;
     if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 100)
       throw new Error(
         "Marketstack batch size must be an integer from 1 through 100.",
       );
+    // Validate all local configuration before reserving quota. A malformed
+    // batch size must never consume units when no provider request can run.
+    this.options.requestBudget.reserve(uniqueSymbols.length);
     const prices: DailyPrice[] = [];
     for (let offset = 0; offset < uniqueSymbols.length; offset += batchSize) {
       prices.push(

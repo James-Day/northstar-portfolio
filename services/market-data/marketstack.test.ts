@@ -90,4 +90,16 @@ describe("MarketstackProvider", () => {
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(budget.usedUnits).toBe(3);
   });
+
+  it("does not reserve quota when the batch-size configuration is invalid", async () => {
+    const budget = new MonthlyRequestBudget(3);
+    const provider = new MarketstackProvider({
+      apiKey: "development-key",
+      fetcher: vi.fn() as unknown as typeof fetch,
+      requestBudget: budget,
+      maxSymbolsPerRequest: 0,
+    });
+    await expect(provider.getDailyPrices(["AAPL"], isoDate("2026-09-08"))).rejects.toThrow("batch size");
+    expect(budget.usedUnits).toBe(0);
+  });
 });
