@@ -1,6 +1,9 @@
 -- Fence raw-file retention completion and failure updates to the claim that
 -- produced them. A worker may finish after its lease is reclaimed; its late
 -- response must not complete or reschedule the newer attempt.
+drop function if exists public.complete_raw_file_retention(uuid, timestamptz);
+drop function if exists public.fail_raw_file_retention(uuid, timestamptz, timestamptz, text, integer);
+
 create or replace function public.complete_raw_file_retention(
   p_id uuid,
   p_attempts integer,
