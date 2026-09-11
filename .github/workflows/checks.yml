@@ -86,7 +86,35 @@ jobs:
             -H "apikey: ${ANON_KEY}" \
             -H 'content-type: application/json' \
             --data '{"email":"portfolio-integration-a@example.test","password":"local-integration-a-2026-only"}' \
-            >/dev/null
+            >"${RUNNER_TEMP}/auth-a.json"
+          curl --fail-with-body --silent --show-error \
+            -X POST "${API_URL}/auth/v1/signup" \
+            -H "apikey: ${ANON_KEY}" \
+            -H 'content-type: application/json' \
+            --data '{"email":"portfolio-integration-b@example.test","password":"local-integration-b-2026-only"}' \
+            >"${RUNNER_TEMP}/auth-b.json"
+          user_a_id="$(jq -r '.user.id' "${RUNNER_TEMP}/auth-a.json")"
+          user_a_token="$(jq -r '.access_token' "${RUNNER_TEMP}/auth-a.json")"
+          user_b_token="$(jq -r '.access_token' "${RUNNER_TEMP}/auth-b.json")"
+          object_path="${user_a_id}/integration/statement.csv"
+          printf 'Date,Amount\n2026-01-02,100.00\n' >"${RUNNER_TEMP}/statement.csv"
+          curl --fail-with-body --silent --show-error \
+            -X POST "${API_URL}/storage/v1/object/brokerage-statements/${object_path}" \
+            -H "apikey: ${ANON_KEY}" -H "authorization: Bearer ${user_a_token}" \
+            -H 'content-type: text/csv' --data-binary @"${RUNNER_TEMP}/statement.csv" >/dev/null
+          curl --fail --silent \
+            "${API_URL}/storage/v1/object/brokerage-statements/${object_path}" \
+            -H "apikey: ${ANON_KEY}" -H "authorization: Bearer ${user_a_token}" >/dev/null
+          cross_user_status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            "${API_URL}/storage/v1/object/brokerage-statements/${object_path}" \
+            -H "apikey: ${ANON_KEY}" -H "authorization: Bearer ${user_b_token}")"
+          if [[ "${cross_user_status}" == 2* ]]; then
+            echo 'Private Storage object was readable by the wrong user.' >&2
+            exit 1
+          fi
+          curl --fail --silent -X DELETE \
+            "${API_URL}/storage/v1/object/brokerage-statements/${object_path}" \
+            -H "apikey: ${SERVICE_ROLE_KEY}" -H "authorization: Bearer ${SERVICE_ROLE_KEY}" >/dev/null
 
           # The API Worker is server-side and receives the service key above.
           npm run dev:api -- --ip 127.0.0.1 --port 8787 >"${api_log}" 2>&1 &

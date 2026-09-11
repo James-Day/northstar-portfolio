@@ -20,6 +20,11 @@ describe('authenticated CI integration contract', () => {
   it('creates a disposable auth fixture and exercises the authenticated browser path', () => {
     expect(workflow).toMatch(/\/auth\/v1\/signup/);
     expect(workflow).toMatch(/portfolio-integration-a@example\.test/);
+    expect(workflow).toMatch(/portfolio-integration-b@example\.test/);
+    expect(workflow).toMatch(/storage\/v1\/object\/brokerage-statements/);
+    expect(workflow).toMatch(/cross_user_status=/);
+    expect(workflow).toMatch(/Private Storage object was readable by the wrong user/);
+    expect(workflow).toMatch(/-X DELETE/);
     expect(workflow).toMatch(/E2E_AUTH_EMAIL=/);
     expect(workflow).toMatch(/E2E_AUTH_PASSWORD=/);
     expect(workflow).toMatch(/npm run test:e2e -- tests\/e2e\/authenticated-workspace\.spec\.ts/);
