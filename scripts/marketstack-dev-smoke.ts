@@ -28,12 +28,16 @@ try {
     maxSymbolsPerRequest: 1,
   });
   const prices = await provider.getDailyPrices([request.symbol], request.tradingDate as never);
+  const metadata = prices[0]?.providerMetadata as { exchange?: unknown; requestedDate?: unknown } | undefined;
   console.log(JSON.stringify({
     symbol: request.symbol,
     tradingDate: request.tradingDate,
     close: prices[0]?.close ?? null,
     provider: prices[0]?.provider ?? null,
-    providerMetadata: prices[0]?.providerMetadata ?? null,
+    providerMetadata: metadata ? {
+      exchange: typeof metadata.exchange === 'string' ? metadata.exchange : null,
+      requestedDate: typeof metadata.requestedDate === 'string' ? metadata.requestedDate : null,
+    } : null,
     requestUnits: budget.usedUnits,
   }, null, 2));
 } catch (error) {

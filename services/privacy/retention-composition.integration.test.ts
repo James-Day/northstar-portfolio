@@ -93,4 +93,28 @@ describe('scheduled retention local composition', () => {
     expect(audit.map((event) => event.event)).toEqual(['claimed', 'failed', 'claimed', 'deleted']);
     expect(normalizedActivity).toEqual([{ importId: row.importId, type: 'buy', symbol: 'VOO', amount: '100.00' }]);
   });
+
+  it('reclaims a stale deleting claim after a worker crash and keeps normalized rows', async () => {
+    const firstClaimAt = new Date('2026-02-01T00:00:00.000Z');
+    const recoveryAt = new Date('2026-02-01T00:16:00.000Z');
+    const row = fixture(recoveryAt);
+    row.status = 'deleting';
+    row.attempt = 1;
+    row.claimedAt = firstClaimAt;
+    const audit: Array<{ event: string; attempt: number; error?: string }> = [];
+    const repositoryAdapter = repository(row, audit);
+    const normalizedActivity = [{ importId: row.importId, type: 'dividend', symbol: 'VTI', amount: '12.34' }];
+    const objects = new Set([row.objectPath]);
+    const storage = {
+      async delete(path: string) { objects.delete(path); },
+      async verifyDeleted(path: string) { return !objects.has(path); },
+    };
+
+    const result = await runRawFileRetention({ repository: repositoryAdapter, storage, now: () => recoveryAt });
+
+    expect(result).toEqual({ claimed: 1, deleted: 1, retrying: 0, exhausted: 0 });
+    expect(row.status).toBe('deleted');
+    expect(audit.map((event) => event.event)).toEqual(['claimed', 'deleted']);
+    expect(normalizedActivity).toEqual([{ importId: row.importId, type: 'dividend', symbol: 'VTI', amount: '12.34' }]);
+  });
 });

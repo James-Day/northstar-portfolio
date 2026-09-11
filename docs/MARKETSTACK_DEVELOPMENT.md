@@ -20,6 +20,16 @@ not claim a live allowance or perform that check automatically.
 
 Before enabling the recurring schedule, run one deliberately tiny smoke fetch:
 
+```text
+npm run marketstack:dev-smoke -- --symbol AAPL --date 2026-09-09 --allowance 100
+```
+
+The command accepts exactly one symbol and date, makes one bounded provider
+request, and prints only the normalized close, provider name, exchange/date
+metadata, and request-unit count. It never prints the API key. Replace the
+example date with a date that has a published close and set `--allowance` to
+the allowance confirmed for the development key.
+
 1. Start the local Supabase project and apply migrations.
 2. Set `MARKETSTACK_API_KEY` and `MARKETSTACK_MONTHLY_CAP` to values no larger
    than the allowance confirmed in the provider account.
