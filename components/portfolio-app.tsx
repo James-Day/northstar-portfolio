@@ -63,6 +63,7 @@ import {
   getDashboardWarnings,
   type DashboardWarning,
 } from '@/lib/dashboard-warnings';
+import { resolvedNonReportableRowIds } from '@/lib/import/issue-resolution-view';
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
 type PublicApiConfig = { baseUrl: string };
@@ -1023,9 +1024,15 @@ export function PortfolioApp({
         throw new Error(
           'The CSV was saved, but its review rows could not be loaded.',
         );
+      const issuesResponse = await fetch(
+        `${apiConfig.baseUrl}/v1/imports/${importId}/issues`,
+        { headers: { authorization: `Bearer ${data.session.access_token}` } },
+      );
+      const issuesPayload: unknown = await issuesResponse.json().catch(() => undefined);
+      if (!issuesResponse.ok) throw new Error('The CSV was saved, but its review resolutions could not be loaded.');
       setStagedImportId(importId);
       setLiveRows(detail.sourceRows as LiveImportRow[]);
-      setResolvedIssueRowIds(new Set());
+      setResolvedIssueRowIds(resolvedNonReportableRowIds(issuesPayload));
       setHistoryVersion((current) => current + 1);
       setStageMessage(
         'Saved for review. This import has not changed your portfolio yet.',
