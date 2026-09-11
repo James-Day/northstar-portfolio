@@ -1,0 +1,40 @@
+{
+  "individual-activity.csv": {
+    "resolvedSymbols": ["VTI"],
+    "rows": [
+      { "rowNumber": 2, "type": "buy", "symbol": "VTI", "quantity": "0.25", "amount": "-75" },
+      { "rowNumber": 3, "type": "deposit", "symbol": null, "quantity": null, "amount": "500" },
+      { "rowNumber": 4, "type": "dividend", "symbol": "VTI", "quantity": null, "amount": "0.24" },
+      { "rowNumber": 5, "type": "buy", "symbol": "VTI", "quantity": "0.0008", "amount": "-0.24" },
+      { "rowNumber": 6, "type": "sell", "symbol": "VTI", "quantity": "0.1", "amount": "31" },
+      { "rowNumber": 7, "type": "fee", "symbol": "VTI", "quantity": null, "amount": "-0.02" },
+      { "rowNumber": 8, "type": "withdrawal", "symbol": null, "quantity": null, "amount": "-40" }
+    ]
+  },
+  "traditional-ira-activity.csv": {
+    "resolvedSymbols": ["SCHD"],
+    "rows": [
+      { "rowNumber": 2, "type": "deposit", "symbol": null, "quantity": null, "amount": "1000" },
+      { "rowNumber": 3, "type": "buy", "symbol": "SCHD", "quantity": "3", "amount": "-255" },
+      { "rowNumber": 4, "type": "dividend", "symbol": "SCHD", "quantity": null, "amount": "0.78" },
+      { "rowNumber": 5, "type": "buy", "symbol": "SCHD", "quantity": "0.0091", "amount": "-0.78" },
+      { "rowNumber": 6, "type": "ira_incentive", "symbol": null, "quantity": null, "amount": "10" },
+      { "rowNumber": 7, "type": "sell", "symbol": "SCHD", "quantity": "0.5", "amount": "43.5" },
+      { "rowNumber": 8, "type": "fee", "symbol": null, "quantity": null, "amount": "-0.03" },
+      { "rowNumber": 9, "type": "withdrawal", "symbol": null, "quantity": null, "amount": "-100" }
+    ]
+  },
+  "roth-ira-activity.csv": {
+    "resolvedSymbols": ["VOO"],
+    "rows": [
+      { "rowNumber": 2, "type": "deposit", "symbol": null, "quantity": null, "amount": "750" },
+      { "rowNumber": 3, "type": "buy", "symbol": "VOO", "quantity": "0.5", "amount": "-250" },
+      { "rowNumber": 4, "type": "dividend", "symbol": "VOO", "quantity": null, "amount": "0.55" },
+      { "rowNumber": 5, "type": "buy", "symbol": "VOO", "quantity": "0.0011", "amount": "-0.55" },
+      { "rowNumber": 6, "type": "transfer_in", "symbol": null, "quantity": null, "amount": "200" },
+      { "rowNumber": 7, "type": "transfer_out", "symbol": null, "quantity": null, "amount": "-50" },
+      { "rowNumber": 8, "type": "sell", "symbol": "VOO", "quantity": "0.125", "amount": "63.75" },
+      { "rowNumber": 9, "type": "fee", "symbol": null, "quantity": null, "amount": "-1" }
+    ]
+  }
+}
