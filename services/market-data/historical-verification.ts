@@ -17,7 +17,7 @@ export type HistoricalVerificationMismatch = {
   actualClose: DecimalString | null;
   category: HistoricalVerificationCase['category'];
   evidence: string;
-  reason: 'missing' | 'close_mismatch';
+  reason: 'missing' | 'duplicate' | 'close_mismatch';
 };
 
 /** Compares stored source closes with operator-supplied independent fixtures. */
@@ -42,7 +42,7 @@ export function verifyHistoricalCases(
       actualClose: actual,
       category: fixture.category,
       evidence: fixture.evidence,
-      reason: actual === null ? 'missing' as const : 'close_mismatch' as const,
+      reason: matches.length === 0 ? 'missing' as const : matches.length > 1 ? 'duplicate' as const : 'close_mismatch' as const,
     };
   }).filter((mismatch): mismatch is HistoricalVerificationMismatch => mismatch !== null);
   return { checked: cases.length, passed: cases.length - mismatches.length, mismatches };

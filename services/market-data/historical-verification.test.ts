@@ -27,4 +27,12 @@ describe('historical source verification', () => {
       expect.objectContaining({ symbol: 'OLD', reason: 'missing', actualClose: null, evidence: 'independent record B' }),
     ]);
   });
+
+  it('distinguishes duplicate source records from a missing close', () => {
+    const result = verifyHistoricalCases([
+      close('AAPL', '2024-01-02', '185.64'),
+      close('AAPL', '2024-01-02', '185.64'),
+    ], [{ symbol: 'AAPL', tradingDate: isoDate('2024-01-02'), expectedClose: decimalString('185.64'), category: 'large_cap', evidence: 'independent record' }]);
+    expect(result).toMatchObject({ passed: 0, mismatches: [expect.objectContaining({ reason: 'duplicate', actualClose: null })] });
+  });
 });
