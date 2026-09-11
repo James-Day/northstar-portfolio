@@ -34,7 +34,19 @@ export function inspectPriceRecords(records: CandidatePrice[], extremeMoveThresh
 
   for (const record of sorted) {
     const key = keyFor(record);
-    const close = new Decimal(record.close);
+    let close: Decimal;
+    try {
+      close = new Decimal(record.close);
+    } catch {
+      addIssue(record, { instrumentId: record.instrumentId, tradingDate: record.tradingDate, reason: 'invalid_close', detail: 'Close must be a finite numeric value.' });
+      seen.add(key);
+      continue;
+    }
+    if (!close.isFinite()) {
+      addIssue(record, { instrumentId: record.instrumentId, tradingDate: record.tradingDate, reason: 'invalid_close', detail: 'Close must be a finite numeric value.' });
+      seen.add(key);
+      continue;
+    }
     if (close.lte(0)) addIssue(record, { instrumentId: record.instrumentId, tradingDate: record.tradingDate, reason: 'invalid_close', detail: 'Close must be greater than zero.' });
     if (seen.has(key)) addIssue(record, { instrumentId: record.instrumentId, tradingDate: record.tradingDate, reason: 'duplicate_date', detail: 'More than one close exists for this instrument and date.' });
     seen.add(key);

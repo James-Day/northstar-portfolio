@@ -25,4 +25,13 @@ describe('price quality', () => {
     ]);
     expect(result).toMatchObject({ accepted: [{ close: '100' }, { close: '101' }], quarantined: [] });
   });
+
+  it('quarantines malformed closes instead of throwing or blocking other symbols', () => {
+    const result = inspectPriceRecords([
+      { instrumentId: 'bad', tradingDate: isoDate('2026-01-02'), close: 'not-a-number' as never },
+      { instrumentId: 'good', tradingDate: isoDate('2026-01-02'), close: d('42') },
+    ]);
+    expect(result.accepted).toEqual([{ instrumentId: 'good', tradingDate: '2026-01-02', close: '42' }]);
+    expect(result.quarantined[0]?.issues).toEqual([expect.objectContaining({ reason: 'invalid_close' })]);
+  });
 });
