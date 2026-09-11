@@ -17,6 +17,8 @@ const transitions: Record<DeletionRequestStatus, DeletionRequestStatus[]> = {
 
 export function transitionDeletionRequest(request: DeletionRequest, next: DeletionRequestStatus, at: Date): DeletionRequest {
   if (!transitions[request.status].includes(next)) throw new Error(`Cannot transition deletion request from ${request.status} to ${next}.`);
+  if (!Number.isFinite(request.requestedAt.getTime()) || !Number.isFinite(at.getTime())) throw new Error('Deletion lifecycle timestamps must be valid.');
+  if (at < request.requestedAt) throw new Error('Deletion lifecycle timestamp cannot precede the request.');
   return { ...request, status: next, completedAt: next === 'completed' ? at : null };
 }
 

@@ -18,4 +18,10 @@ describe('user data deletion', () => {
     expect(() => createUserDataDeletionPlan('user', [], ['other-user/statement.csv'], false)).toThrow('invalid user-owned object path');
     expect(() => createUserDataDeletionPlan('user', [], ['user/../other.csv'], false)).toThrow('invalid user-owned object path');
   });
+
+  it('preserves chronological deletion audit timestamps', () => {
+    const request = { id: 'request', userId: 'user', status: 'requested' as const, requestedAt: new Date('2026-01-02T00:00:00Z'), completedAt: null };
+    expect(() => transitionDeletionRequest(request, 'processing', new Date('2026-01-01T00:00:00Z'))).toThrow('cannot precede');
+    expect(() => transitionDeletionRequest(request, 'processing', new Date('invalid'))).toThrow('timestamps must be valid');
+  });
 });
