@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-13 | 01.07 — Baseline gate refresh (partial) | Reran `npm run baseline:gate` after the queue and local-fixture milestones: typecheck, 144 Vitest files/556 tests, production build, and generated-browser secret scan all passed. | Fresh-checkout migration/database isolation and hosted browser acceptance remain required. |
+
 | 2026-09-13 | 01.05 — Seed deterministic local reference fixtures (partial) | Extended the integration harness to upsert a stable AAPL instrument and alias through the service-role REST boundary after creating the two deterministic Auth users. Six fixture tests, typecheck, checklist audit, and diff checks passed. | Docker/Supabase execution, API/frontend startup, RLS isolation, and cleanup against a live local stack remain unverified. |
 
 | 2026-09-13 | 05.02/08.09 — Wire the declared price queue consumer | Added the provider-neutral `price-queue-runtime` adapter and exported the `northstar-prices` Worker consumer. Jobs use the existing server-only provider, persistence, quota, calendar, and retry path; provider publication gaps retry instead of acknowledging incomplete prices. Ten focused queue/Worker tests and typecheck passed. | Cloudflare queue delivery and production Supabase/Marketstack execution remain unverified. |
