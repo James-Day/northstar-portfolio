@@ -15,7 +15,7 @@ This file is the current implementation plan. Work through the numbered steps in
 
 **Current count: 102 tasks — 67 checked, 35 unchecked, across 13 ordered steps.**
 
-**Progress view:** 89 tasks have implementation or verification evidence (67 complete and 22 partial); 13 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
+**Progress view:** 90 tasks have implementation or verification evidence (67 complete and 23 partial); 12 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -200,7 +200,7 @@ Owner: integration/platform. Depends on all earlier acceptance gates.
 - [ ] **13.02** Verify signup → account → upload → resolve/review → commit → accurate dashboard → trial → billing with representative brokerage and IRA files.
 - [ ] **13.03** Run adversarial regression cases: cross-user IDs, session expiry, concurrent import/undo, duplicate DRIP, split chronology, unavailable prices, queue replay, quota concurrency and webhook ordering. Local boundary coverage now includes all named cases, including guessed import IDs, expired private API sessions and overlapping commit/undo requests in `services/adversarial-regression.test.ts`; staging execution against real RLS, queues, quota reservations and Stripe remains required.
 - [ ] **13.04** Configure and verify hosted Supabase/auth, API origins, Worker queues/cron/secrets, storage, retention and Stripe in staging; document deployed revisions.
-- [ ] **13.05** Choose final product name/domain, check conflicts, and apply/verify logo/favicon consistently. Northstar remains the working name.
+- [ ] **13.05** Choose final product name/domain, check conflicts, and apply/verify logo/favicon consistently. Partial evidence: Northstar’s compass mark is now shared by the React wordmark and `public/favicon.svg`; document, application, and Open Graph metadata use the same Northstar title. Final name/domain conflict clearance and hosted visual verification remain.
 - [ ] **13.06** Confirm production market-data storage/display rights and an approved commercial plan before paid launch; free Marketstack remains development-only unless verified rights establish otherwise. Do not upgrade automatically.
 - [x] **13.07** Verify operating costs against $45–75/month before marketing, escalating estimates above $100; use current provider allowances/prices rather than old planning assumptions. Evidence: integer-cent budget assessment, current Marketstack plan table, 20% reserve capacity calculation, environment thresholds and documentation in commit `a879f23`.
 - [ ] **13.08** Gate: record all passing launch evidence, production configuration, recovery/rollback procedure and deployed version before inviting paying users.

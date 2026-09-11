@@ -14,7 +14,19 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'Northstar — Portfolio clarity',
-  description: 'A portfolio-tracker prototype for long-term investors.',
+  description:
+    'Portfolio clarity for long-term investors. Track holdings, returns, dividends, and realized gains from your brokerage activity.',
+  applicationName: 'Northstar',
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+  },
+  openGraph: {
+    title: 'Northstar — Portfolio clarity',
+    description:
+      'Track holdings, returns, dividends, and realized gains from your brokerage activity.',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({
