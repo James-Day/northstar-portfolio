@@ -39,4 +39,13 @@ describe('accepted Robinhood fixture gate', () => {
     expect(result.dividendIncome).toBe('0.24');
     expect(result.cashAmount).toBe('0');
   });
+
+  it('fails closed when a supported activity has the wrong cash direction', () => {
+    const rows = parseRobinhoodActivityCsv('Activity Date,Trans Code,Instrument,Quantity,Amount\n2026-01-02,Buy,VTI,1,-100');
+    const malformed = [{ ...rows[0], activity: rows[0].activity && { ...rows[0].activity, amount: '100' as never } }];
+    expect(() => reconcileAcceptedFixture(malformed, {
+      resolvedSymbols: ['VTI'],
+      rows: [{ rowNumber: 2, type: 'buy', symbol: 'VTI', quantity: '1', amount: '100' }],
+    })).toThrow(/invalid positive cash amount/);
+  });
 });

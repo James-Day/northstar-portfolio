@@ -56,7 +56,9 @@ export function reconcileAcceptedFixture(
       throw new Error(`Accepted fixture row ${row.rowNumber} quantity/activity mismatch.`);
     }
     assertDecimal(activity.amount, `row ${row.rowNumber} amount`);
-    if (!new Decimal(activity.amount).eq(expectedRow.amount)) throw new Error(`Accepted fixture row ${row.rowNumber} cash amount mismatch.`);
+    const amount = new Decimal(activity.amount);
+    if (!amount.eq(expectedRow.amount)) throw new Error(`Accepted fixture row ${row.rowNumber} cash amount mismatch.`);
+    assertEconomicSign(activity.type, amount, row.rowNumber);
     if (activity.quantity !== null) {
       assertDecimal(activity.quantity, `row ${row.rowNumber} quantity`);
       if (new Decimal(activity.quantity).lte(0)) throw new Error(`Accepted fixture row ${row.rowNumber} quantity must be positive.`);
@@ -95,4 +97,11 @@ function assertDecimal(value: string, label: string): void {
 
 function requiresResolvedSymbol(type: RobinhoodActivityType): boolean {
   return type === 'buy' || type === 'sell' || type === 'dividend' || type === 'drip_buy';
+}
+
+function assertEconomicSign(type: RobinhoodActivityType, amount: Decimal, rowNumber: number): void {
+  const negative = new Set<RobinhoodActivityType>(['buy', 'drip_buy', 'fee', 'withdrawal', 'transfer_out']);
+  const positive = new Set<RobinhoodActivityType>(['sell', 'dividend', 'interest', 'deposit', 'ira_incentive', 'transfer_in']);
+  if (negative.has(type) && !amount.isNegative()) throw new Error(`Accepted fixture row ${rowNumber} has an invalid positive cash amount for ${type}.`);
+  if (positive.has(type) && !amount.isPositive()) throw new Error(`Accepted fixture row ${rowNumber} has an invalid non-positive cash amount for ${type}.`);
 }
