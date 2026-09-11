@@ -9,16 +9,31 @@ export type ScheduledRefreshDependencies = { symbols: ActiveSymbolSource; provid
 /** Scheduler composition used by Cloudflare cron and local job tests. */
 export async function runScheduledPriceRefresh(now: Date, dependencies: ScheduledRefreshDependencies): Promise<DailyRefreshJobResult> {
   const discovered = dependencies.symbols.listDetailed ? await dependencies.symbols.listDetailed() : { symbols: await dependencies.symbols.list(), unresolvedInstrumentIds: [] };
-  // Claims represent one provider attempt for a NY trading date. Sort and
-  // deduplicate symbols so equivalent active-symbol reads share one claim,
-  // even when their database order differs or UTC crosses midnight first.
+  // Claims are per symbol and NY trading date. Sort and deduplicate symbols so
+  // equivalent active-symbol reads share the same claim names, while a retry
+  // with a smaller or larger active set still cannot duplicate an overlapping
+  // provider request.
   const claimDate = eligibleEodTradingDate(now, 18, dependencies.calendarOverrides) ?? now.toISOString().slice(0, 10);
   const claimSymbols = [...new Set(discovered.symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))].sort();
-  const key = `daily-refresh:${claimDate}:${claimSymbols.join(',')}`;
-  if (dependencies.claimStore && !(await dependencies.claimStore.tryClaim(key))) return { status: 'skipped', reason: 'already_running' };
+  const claimKeys = claimSymbols.map((symbol) => `daily-refresh:${claimDate}:${symbol}`);
+  const claimedKeys: string[] = [];
+  if (dependencies.claimStore) {
+    try {
+      for (const key of claimKeys) {
+        if (!(await dependencies.claimStore.tryClaim(key))) {
+          for (const claimedKey of claimedKeys) await dependencies.claimStore.release(claimedKey);
+          return { status: 'skipped', reason: 'already_running' };
+        }
+        claimedKeys.push(key);
+      }
+    } catch (error) {
+      for (const claimedKey of claimedKeys) await dependencies.claimStore.release(claimedKey);
+      throw error;
+    }
+  }
   try {
     return await runAndRecordDailyPriceRefresh(now, discovered.symbols, dependencies.provider, dependencies.persistence, dependencies.recorder, dependencies.retry, dependencies.quota, dependencies.calendarOverrides, discovered.unresolvedInstrumentIds.length);
   } finally {
-    await dependencies.claimStore?.release(key);
+    for (const key of claimedKeys) await dependencies.claimStore?.release(key);
   }
 }
