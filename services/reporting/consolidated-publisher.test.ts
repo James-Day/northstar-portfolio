@@ -194,4 +194,18 @@ describe('consolidated report publisher', () => {
     });
     expect(publish).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({ valuationThrough: '2026-03-03', valueHistory: [{ date: '2026-03-03', value: '20' }], unavailableDates: [{ date: '2026-03-03', reason: 'non_contiguous_period' }] }) }));
   });
+
+  it('retains unresolved internal transfers in the consolidated snapshot payload', async () => {
+    const publish = vi.fn().mockResolvedValue('snapshot-transfer-warning');
+    await publishConsolidatedReportSnapshot({
+      publisher: { publish }, userId: 'user-1',
+      accounts: [{ accountId: 'taxable', inputs: {
+        valuation: { dates: [{ date: isoDate('2026-03-05'), canChainFromPrevious: false }], events: [{ id: 'transfer-out', date: isoDate('2026-03-05'), type: 'transfer_out', amount: decimalString('100') }], openingLots: [], closes: [], corporateActions: [] },
+        ledger: { cash: decimalString('-100'), openLots: [], realizedGainLoss: decimalString('0'), dividendIncome: decimalString('0'), netDeposits: decimalString('0'), sales: [] },
+        activityCoveredThrough: isoDate('2026-03-05'), pricesThrough: null, importStateRevision: 'ledger:taxable',
+      } }],
+      links: [{ transferGroupId: 'missing-transfer', outgoingId: 'transfer-out', incomingId: 'missing-in' }],
+    });
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({ unresolvedTransfers: [{ transferGroupId: 'missing-transfer', ids: ['missing-in', 'transfer-out'], reason: 'Linked transfer rows are not present in the consolidated ledger.' }] }) }));
+  });
 });

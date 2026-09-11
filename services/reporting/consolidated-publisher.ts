@@ -29,6 +29,7 @@ export async function publishConsolidatedReportSnapshot(input: {
     history: result.history,
     activityCoveredThrough: result.inputs.activityCoveredThrough,
     pricesThrough: result.inputs.pricesThrough,
+    unresolvedTransfers: result.inputs.unresolvedTransfers,
     ledger: result.inputs.ledger,
   });
   const asOfDate = result.history.valuations.at(-1)?.date;

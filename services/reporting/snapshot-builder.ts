@@ -2,6 +2,7 @@ import type { IsoDate } from '@/lib/domain/types';
 import type { ValuationHistory } from '@/services/calculations/valuation';
 import type { LedgerResult } from '@/services/ledger/fifo';
 import type { PriceDependency } from '@/services/market-data/price-corrections';
+import type { UnresolvedTransfer } from '@/services/ledger/transfers';
 
 export type ReportSnapshotPayload = {
   activityCoveredThrough: IsoDate | null;
@@ -15,6 +16,7 @@ export type ReportSnapshotPayload = {
   realizedGainLoss: string | null;
   realizedSales: LedgerResult['sales'];
   dividends: NonNullable<LedgerResult['dividendEvents']>;
+  unresolvedTransfers: UnresolvedTransfer[];
   valueHistory: Array<{ date: IsoDate; value: string | null }>;
   holdings: ValuationHistory['valuations'][number]['holdings'];
   unavailableDates: Array<{ date: IsoDate; reason: string }>;
@@ -50,7 +52,7 @@ export const reportMethodology: ReportMethodology = {
 };
 
 /** Builds a reproducible report payload from exact-decimal valuation output. */
-export function buildReportSnapshotPayload(input: { history: ValuationHistory; activityCoveredThrough: IsoDate | null; pricesThrough: IsoDate | null; priceDependencies?: PriceDependency[]; ledger?: Pick<LedgerResult, 'netDeposits' | 'dividendIncome' | 'realizedGainLoss'> & Partial<Pick<LedgerResult, 'sales' | 'dividendEvents'>> }): ReportSnapshotPayload {
+export function buildReportSnapshotPayload(input: { history: ValuationHistory; activityCoveredThrough: IsoDate | null; pricesThrough: IsoDate | null; priceDependencies?: PriceDependency[]; unresolvedTransfers?: UnresolvedTransfer[]; ledger?: Pick<LedgerResult, 'netDeposits' | 'dividendIncome' | 'realizedGainLoss'> & Partial<Pick<LedgerResult, 'sales' | 'dividendEvents'>> }): ReportSnapshotPayload {
   const latest = input.history.valuations.at(-1);
   return {
     activityCoveredThrough: input.activityCoveredThrough,
@@ -64,6 +66,7 @@ export function buildReportSnapshotPayload(input: { history: ValuationHistory; a
     realizedGainLoss: input.ledger?.realizedGainLoss ?? null,
     realizedSales: input.ledger?.sales ?? [],
     dividends: input.ledger?.dividendEvents ?? [],
+    unresolvedTransfers: input.unresolvedTransfers ?? [],
     valueHistory: input.history.valuations.map((valuation) => ({ date: valuation.date, value: valuation.totalValue })),
     holdings: latest?.holdings ?? [],
     unavailableDates: input.history.valuations.filter((valuation) => valuation.totalValue === null || valuation.return.return === null || !valuation.canChainFromPrevious).map((valuation) => ({ date: valuation.date, reason: !valuation.canChainFromPrevious ? 'non_contiguous_period' : valuation.return.unavailableReason ?? 'missing_valuation' })),
