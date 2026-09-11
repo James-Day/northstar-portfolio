@@ -5,7 +5,7 @@ import { RefreshMetricsCollector } from '@/services/market-data/refresh-metrics'
 import type { MarketDataQuotaLedger, QuotaReservation } from '@/services/market-data/quota';
 
 export type DailyRefreshResult =
-  | { status: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'quota_exhausted' | 'provider_data_pending' }
+  | { status: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'already_running' | 'quota_exhausted' | 'provider_data_pending' }
   | { status: 'ready_to_persist'; tradingDate: IsoDate; requestedSymbols: string[]; prices: DailyPrice[] };
 
 export type DailyPricePersistence = {
@@ -14,12 +14,12 @@ export type DailyPricePersistence = {
 };
 
 export type DailyRefreshJobResult =
-  | { status: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'quota_exhausted' | 'provider_data_pending' }
+  | { status: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'already_running' | 'quota_exhausted' | 'provider_data_pending' }
   | { status: 'persisted'; tradingDate: IsoDate; requestedSymbols: string[]; upserted: number };
 
 export type DailyRefreshRetryOptions = { maxAttempts?: number; baseDelayMs?: number; sleep?: (milliseconds: number) => Promise<void> };
 export type DailyRefreshEvent =
-  | { type: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'quota_exhausted' | 'provider_data_pending'; symbolCount?: number }
+  | { type: 'skipped'; reason: 'before_close_or_non_trading_day' | 'no_active_symbols' | 'already_fetched' | 'already_running' | 'quota_exhausted' | 'provider_data_pending'; symbolCount?: number }
   | { type: 'attempt'; attempt: number; maxAttempts: number; symbolCount: number }
   /** Emitted only immediately before a provider call, after all skip guards pass. */
   | { type: 'requested'; symbolCount: number }
