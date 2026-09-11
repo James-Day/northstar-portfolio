@@ -115,4 +115,15 @@ describe('accepted Robinhood fixture gate', () => {
       ],
     })).toThrow(/sells more VTI shares/);
   });
+
+  it('fails closed when a split row has no inferred corporate-action ratio', () => {
+    const csv = [
+      'Activity Date,Trans Code,Instrument,Quantity,Price,Amount',
+      '2026-01-02,SPL,VTI,1,,,',
+    ].join('\n');
+    expect(() => reconcileAcceptedFixture(parseRobinhoodActivityCsv(csv), {
+      resolvedSymbols: ['VTI'],
+      rows: [{ rowNumber: 2, type: 'split', symbol: 'VTI', quantity: '1', amount: '0' }],
+    })).toThrow(/no validated split ratio/);
+  });
 });
