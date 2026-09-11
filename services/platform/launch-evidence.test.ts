@@ -38,4 +38,16 @@ describe('launch evidence aggregator', () => {
     expect(result.ready).toBe(false);
     expect(result.blockers).toEqual(expect.arrayContaining(['configuration.preflight', 'deployment.revision']));
   });
+
+  it('fails closed for an incomplete evidence shape instead of throwing', () => {
+    const result = aggregateLaunchEvidence({} as LaunchEvidenceInput);
+    expect(result.ready).toBe(false);
+    expect(result.blockers).toEqual(expect.arrayContaining([
+      'configuration.preflight',
+      'market-data.rights',
+      'deployment.revision',
+      'recovery.rollback',
+    ]));
+    expect(result.summary.passed).toBe(0);
+  });
 });

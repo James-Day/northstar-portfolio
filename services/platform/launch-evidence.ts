@@ -79,12 +79,15 @@ export function aggregateLaunchEvidence(input: LaunchEvidenceInput): LaunchEvide
     add(checks, `baseline.${name}`, status === 'pass' ? 'pass' : status === 'fail' ? 'fail' : 'not-run', status === 'pass' ? `${name} passed.` : `${name} has not passed.`);
   }
 
-  const preflightPassed = input?.preflight?.passed === true && input.preflight.checks.length > 0 && input.preflight.checks.every((check) => check.status === 'pass');
+  const preflight = input?.preflight;
+  const preflightChecks = Array.isArray(preflight?.checks) ? preflight.checks : [];
+  const preflightPassed = preflight?.passed === true && preflightChecks.length > 0 && preflightChecks.every((check) => check.status === 'pass');
   add(checks, 'configuration.preflight', preflightPassed ? 'pass' : 'fail', preflightPassed ? 'Launch preflight passed without warnings.' : 'Launch preflight is incomplete, failed, or contains warnings.');
 
   add(checks, 'recovery.backup-restore', input?.backupRestore?.valid === true ? 'pass' : 'fail', input?.backupRestore?.valid === true ? 'Backup/restore evidence passed validation.' : 'A validated backup/restore drill is required.');
 
-  const rightsApproved = input?.provenance?.rightsReview === 'approved' && nonEmpty(input.provenance.commercialPlan);
+  const provenance = input?.provenance;
+  const rightsApproved = provenance?.rightsReview === 'approved' && nonEmpty(provenance.commercialPlan);
   add(checks, 'market-data.rights', rightsApproved ? 'pass' : 'fail', rightsApproved ? 'Market-data rights and commercial plan are approved.' : 'Market-data rights review and commercial plan approval are required.');
 
   for (const name of HOSTED_REQUIREMENTS) {
@@ -93,7 +96,7 @@ export function aggregateLaunchEvidence(input: LaunchEvidenceInput): LaunchEvide
   }
 
   const deployment = input?.deployment;
-  const deploymentValid = deployment?.environment === input?.preflight?.environment && nonEmpty(deployment.workerRevision) && nonEmpty(deployment.migrationRevision) && UTC_TIMESTAMP.test(deployment.deployedAt ?? '');
+  const deploymentValid = deployment?.environment === preflight?.environment && nonEmpty(deployment?.workerRevision) && nonEmpty(deployment?.migrationRevision) && UTC_TIMESTAMP.test(deployment?.deployedAt ?? '');
   add(checks, 'deployment.revision', deploymentValid ? 'pass' : 'fail', deploymentValid ? 'Deployed environment, Worker revision, migration revision, and timestamp are recorded.' : 'A deployed environment and immutable Worker/migration revisions are required.');
 
   const rollback = input?.rollback;
