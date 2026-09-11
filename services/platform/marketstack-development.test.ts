@@ -38,6 +38,7 @@ describe('Marketstack development configuration', () => {
     [{ MARKETSTACK_API_KEY: 'dev-key', MARKETSTACK_SCHEDULE_ENABLED: 'true' }, { symbol: 'AAPL', tradingDate: '2026-09-09' }, 'MARKETSTACK_SCHEDULE_ENABLED'],
     [{ MARKETSTACK_API_KEY: 'dev-key' }, { symbol: 'AAPL,MSFT', tradingDate: '2026-09-09' }, 'one valid symbol'],
     [{ MARKETSTACK_API_KEY: 'dev-key' }, { symbol: 'AAPL', tradingDate: '2026-02-30' }, 'valid calendar date'],
+    [{ MARKETSTACK_API_KEY: 'dev-key' }, { symbol: 'AAPL', tradingDate: '2026-09-12' }, 'weekday trading date'],
     [{ MARKETSTACK_API_KEY: 'dev-key', MARKETSTACK_MONTHLY_CAP: '100' }, { symbol: 'AAPL', tradingDate: '2026-09-09', confirmedAllowance: 50 }, 'allowance'],
   ])('fails closed for unsafe smoke input (%s)', (env, input, message) => {
     expect(() => validateMarketstackDevelopmentSmokeRequest(env, input)).toThrow(message);

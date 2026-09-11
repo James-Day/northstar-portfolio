@@ -68,6 +68,8 @@ export function validateMarketstackDevelopmentSmokeRequest(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(tradingDate)) throw new Error('Smoke fetch requires one trading date in YYYY-MM-DD format.');
   const parsedDate = new Date(`${tradingDate}T00:00:00.000Z`);
   if (Number.isNaN(parsedDate.valueOf()) || parsedDate.toISOString().slice(0, 10) !== tradingDate) throw new Error('Smoke fetch requires a valid calendar date.');
+  const dayOfWeek = parsedDate.getUTCDay();
+  if (dayOfWeek === 0 || dayOfWeek === 6) throw new Error('Smoke fetch requires a weekday trading date.');
   const status = getMarketstackDevelopmentStatus(env);
   if (!Number.isInteger(status.monthlyCap) || status.monthlyCap < 1) throw new Error('MARKETSTACK_MONTHLY_CAP must be a positive integer.');
   if (input.confirmedAllowance !== undefined && (!Number.isInteger(input.confirmedAllowance) || input.confirmedAllowance < 1 || status.monthlyCap > input.confirmedAllowance)) {
