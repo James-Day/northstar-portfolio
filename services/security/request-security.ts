@@ -146,6 +146,27 @@ export class MemoryRateLimitStore implements RateLimitStore {
   }
 }
 
+/**
+ * Production safety net for a Worker deployed without its shared counter
+ * binding. A local in-memory counter cannot enforce a limit across isolates,
+ * so production requests must fail closed until the Durable Object is bound.
+ */
+export class FailClosedRateLimitStore implements RateLimitStore {
+  consume(
+    _key: string,
+    _now: number,
+    limit: number,
+    windowMs: number,
+  ): RateLimitDecision {
+    return {
+      allowed: false,
+      limit,
+      remaining: 0,
+      retryAfterSeconds: Math.max(1, Math.ceil(windowMs / 1000)),
+    };
+  }
+}
+
 export function requestRateLimit(path: string, method: string) {
   if (path === '/health') return { limit: 120, windowMs: 60_000 };
   if (method === 'POST' || method === 'PUT' || method === 'DELETE')

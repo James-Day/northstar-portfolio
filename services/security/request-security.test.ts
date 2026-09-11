@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   MemoryRateLimitStore,
+  FailClosedRateLimitStore,
   SharedRateLimitStore,
   RequestBodyTooLargeError,
   readJsonRequest,
@@ -11,6 +12,15 @@ import {
 } from '@/services/security/request-security';
 
 describe('request security', () => {
+  it('fails closed when a production deployment has no shared counter', () => {
+    expect(new FailClosedRateLimitStore().consume('ip', 0, 30, 60_000)).toEqual({
+      allowed: false,
+      limit: 30,
+      remaining: 0,
+      retryAfterSeconds: 60,
+    });
+  });
+
   it('allows a bounded burst and returns a retry window after exhaustion', () => {
     const store = new MemoryRateLimitStore();
     expect(store.consume('ip', 0, 2, 60_000)).toMatchObject({
