@@ -127,8 +127,11 @@ export type ApiDependencies = {
 
 export function createApi(dependencies: ApiDependencies = {}) {
   const api = new Hono<{ Bindings: ApiBindings }>();
+  const log = dependencies.log ?? (() => undefined);
   api.onError((error, context) => {
     const requestId = context.res.headers.get('x-request-id') ?? 'unknown';
+    const status = error instanceof RequestBodyTooLargeError ? 413 : error instanceof SyntaxError ? 400 : 500;
+    log(redactRequestLog({ requestId, method: context.req.raw.method, path: new URL(context.req.raw.url).pathname, status }));
     if (error instanceof RequestBodyTooLargeError)
       return context.json(
         { error: 'request_too_large', maxBytes: error.maxBytes, requestId },
@@ -162,7 +165,6 @@ export function createApi(dependencies: ApiDependencies = {}) {
   const rateLimitStore =
     dependencies.rateLimitStore ?? new MemoryRateLimitStore();
   const now = dependencies.now ?? Date.now;
-  const log = dependencies.log ?? (() => undefined);
 
   api.use('*', async (context, next) => {
     const request = context.req.raw;

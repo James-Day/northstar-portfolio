@@ -1508,7 +1508,9 @@ describe('standalone API', () => {
   });
 
   it('returns a generic server error for unexpected route failures', async () => {
+    const log = vi.fn();
     const app = createApi({
+      log,
       verifySession: async () => ({ id: 'user-123' }),
       accountsRepository: {
         list: async () => {
@@ -1533,5 +1535,6 @@ describe('standalone API', () => {
       requestId: expect.any(String),
     });
     expect(JSON.stringify(body)).not.toContain('secret provider response');
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({ method: 'GET', path: '/v1/accounts', status: 500 }));
   });
 });
