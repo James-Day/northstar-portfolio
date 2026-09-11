@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-11 | 13.04 — Staging configuration contract (partial) | Added contract tests covering secret-free environment templates, Supabase/Stripe/Marketstack declarations, Cloudflare queue and Durable Object bindings, cron configuration, and the staging-versus-production evidence boundary. | Hosted staging deployment, live RLS/Storage/cron/Stripe verification and deployed revision evidence remain required. |
+
 | 2026-09-11 | 01.07 — Fresh baseline gate rerun (partial) | `npm run baseline:gate` passed with typecheck, 141 Vitest files/539 tests, production build, and generated-browser secret scan. | Fresh-checkout migration/database isolation and hosted browser acceptance remain required. |
 
 | 2026-09-13 | 11.03 — Stripe configuration contract gate (partial) | Added `validateStripeBillingConfiguration` with the fixed $5 monthly/$49 annual contract, strict server price ID validation, distinct monthly/annual IDs, complete amount-pair checks, and production-required amounts. Launch preflight now uses the shared validator; focused Stripe/preflight tests (18) and typecheck passed. | This is a deterministic repository/configuration check only. Stripe test-product creation, live Checkout/Portal endpoint verification, webhook delivery, and hosted customer lifecycle remain open. |
