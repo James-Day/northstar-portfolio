@@ -177,4 +177,21 @@ describe('consolidated report publisher', () => {
     await publishConsolidatedReportSnapshot({ publisher: { publish }, userId: 'user-1', accounts: [{ accountId: 'a', inputs: input('a') }, { accountId: 'b', inputs: input('b') }] });
     expect(publish).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({ totalValue: '200', holdings: [{ instrumentId: 'instrument-split', quantity: '4', close: '50', value: '200' }] }) }));
   });
+
+  it('uses only the common persisted valuation calendar across accounts', async () => {
+    const publish = vi.fn().mockResolvedValue('snapshot-common-calendar');
+    const input = (accountId: string, dates: PersistedReportInputs['valuation']['dates']): PersistedReportInputs => ({
+      valuation: { dates, events: [{ id: `deposit-${accountId}`, date: dates[0].date, type: 'deposit', amount: decimalString('10') }], openingLots: [], closes: [], corporateActions: [] },
+      ledger: { cash: decimalString('0'), openLots: [], realizedGainLoss: decimalString('0'), dividendIncome: decimalString('0'), netDeposits: decimalString('0'), sales: [] },
+      activityCoveredThrough: dates.at(-1)!.date, pricesThrough: null, importStateRevision: `ledger:${accountId}`,
+    });
+    await publishConsolidatedReportSnapshot({
+      publisher: { publish }, userId: 'user-1',
+      accounts: [
+        { accountId: 'a', inputs: input('a', [{ date: isoDate('2026-03-02'), canChainFromPrevious: false }, { date: isoDate('2026-03-03'), canChainFromPrevious: true }]) },
+        { accountId: 'b', inputs: input('b', [{ date: isoDate('2026-03-03'), canChainFromPrevious: false }, { date: isoDate('2026-03-04'), canChainFromPrevious: true }]) },
+      ],
+    });
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({ valuationThrough: '2026-03-03', valueHistory: [{ date: '2026-03-03', value: '20' }], unavailableDates: [{ date: '2026-03-03', reason: 'non_contiguous_period' }] }) }));
+  });
 });
