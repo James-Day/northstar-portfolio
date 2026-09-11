@@ -48,4 +48,18 @@ describe('user deletion executor', () => {
     expect(f.effects.deletePrivateObject).not.toHaveBeenCalled();
     expect(f.repository.fail).toHaveBeenCalledWith('outside', expect.objectContaining({ error: 'Deletion raw-object item has an invalid user-owned path.' }));
   });
+
+  it('redacts credential-shaped deletion failures before durable audit persistence', async () => {
+    const f = fixture([item('report_snapshots', 'reports')]);
+    (f.effects.deleteReportSnapshots as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('upstream https://storage.example/delete?token=secret token=abc123 password=hunter2'),
+    );
+
+    const result = await runUserDeletion({ repository: f.repository, effects: f.effects, now: () => new Date('2026-01-01T00:00:00Z') });
+
+    expect(result).toEqual({ claimed: 1, completed: 0, retrying: 1, exhausted: 0 });
+    expect(f.repository.fail).toHaveBeenCalledWith('reports', expect.objectContaining({
+      error: 'upstream [redacted-url] token=[redacted] password=[redacted]',
+    }));
+  });
 });

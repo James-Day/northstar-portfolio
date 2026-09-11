@@ -46,7 +46,14 @@ function retryAt(now: Date, attempt: number): Date {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message.slice(0, 1000) : String(error).slice(0, 1000);
+  const message = error instanceof Error ? error.message : String(error);
+  // Deletion failures are persisted in the audit trail. Keep useful provider
+  // context while preventing URLs and credential-shaped values from becoming
+  // durable user data if an adapter includes them in an exception.
+  return message
+    .replace(/https?:\/\/[^\s]+/gi, '[redacted-url]')
+    .replace(/(authorization|token|secret|api[-_]?key|password)\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
+    .slice(0, 1000);
 }
 
 async function executeItem(item: DeletionPlanItem, effects: DeletionSideEffects): Promise<void> {
