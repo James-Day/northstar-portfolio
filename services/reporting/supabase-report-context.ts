@@ -5,13 +5,14 @@ import type { SupabaseLedgerReplayRepository } from '@/services/ledger/persisted
 import type { SupabaseReportInputRepository } from '@/services/supabase/report-input-repository';
 import type { ReportRecomputeContext } from '@/services/reporting/report-queue-handler';
 import type { IsoDate, InstrumentId } from '@/lib/domain/types';
+import type { PersistedLedgerReplay } from '@/services/ledger/persisted-replay';
 
 type ReportJob = Extract<QueueJob, { kind: 'report.recompute' }>;
 
 export type SupabaseReportContextLoaderOptions = {
   ledger: Pick<SupabaseLedgerReplayRepository, 'get'>;
   market: Pick<SupabaseReportInputRepository, 'listCloses' | 'listCorrections' | 'listValidatedCorporateActions' | 'findPriceRevisionId'>;
-  resolveRange(job: ReportJob, replay: Awaited<ReturnType<SupabaseLedgerReplayRepository['get']>>): Promise<{ from: IsoDate; through: IsoDate }>;
+  resolveRange(job: ReportJob, replay: PersistedLedgerReplay): Promise<{ from: IsoDate; through: IsoDate }>;
   calendarOverrides?: Parameters<typeof buildUsEquityValuationDates>[0]['overrides'];
 };
 

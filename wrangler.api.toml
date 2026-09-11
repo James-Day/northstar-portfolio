@@ -10,6 +10,10 @@ MARKETSTACK_MONTHLY_CAP = "100"
 # Keep these in deployment configuration; do not change source code for one-off closures.
 MARKET_CALENDAR_CLOSED_DATES = ""
 MARKET_CALENDAR_OPEN_DATES = ""
+# Required before enabling the report queue consumer; set by the price
+# publication scheduler after a close is available.
+REPORT_THROUGH_DATE = ""
+REPORT_MAX_LOOKBACK_DAYS = "1830"
 
 [triggers]
 # Run hourly on weekdays; the application guard selects the first eligible
