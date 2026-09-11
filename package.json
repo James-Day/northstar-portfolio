@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:security": "vitest run services/security/rls-schema.test.ts",
     "preflight:launch": "node --experimental-strip-types scripts/launch-preflight.ts",
+    "marketstack:dev-status": "node --experimental-strip-types scripts/marketstack-dev-status.ts",
     "integration:local": "node --experimental-strip-types scripts/local-integration.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

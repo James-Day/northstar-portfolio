@@ -18,7 +18,7 @@ describe('Worker scheduled wiring', () => {
   });
 
   it('guards market-data refresh independently from other scheduled jobs', () => {
-    expect(worker).toMatch(/if \(environment\.SUPABASE_URL && environment\.SUPABASE_SERVICE_ROLE_KEY && environment\.MARKETSTACK_API_KEY\) handleScheduledRefresh/);
+    expect(worker).toMatch(/isMarketstackScheduledRefreshEnabled\(environment\)/);
   });
 
   it('fails closed for production requests when the shared counter binding is absent', async () => {

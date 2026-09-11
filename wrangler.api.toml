@@ -6,6 +6,8 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 APP_ENV = "development"
 MARKETSTACK_MONTHLY_CAP = "100"
+# Safety default: a key alone never enables recurring development calls.
+MARKETSTACK_SCHEDULE_ENABLED = "false"
 # Optional comma-separated YYYY-MM-DD overrides for extraordinary exchange sessions.
 # Keep these in deployment configuration; do not change source code for one-off closures.
 MARKET_CALENDAR_CLOSED_DATES = ""
