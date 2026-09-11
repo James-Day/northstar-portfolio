@@ -42,7 +42,17 @@ export class SupabaseDailyPricesRepository {
 
   async persist(input: { tradingDate: string; prices: DailyPrice[] }): Promise<{ upserted: number }> {
     if (input.prices.length === 0) return { upserted: 0 };
-    const sourceRevision = input.prices.map((price) => `${price.provider}:${String(price.providerMetadata.requestedDate ?? input.tradingDate)}`).join('|');
+    const normalizedSymbols = input.prices.map((price) => price.symbol.trim().toUpperCase());
+    if (input.prices.some((price) => price.tradingDate !== input.tradingDate)) throw new Error('Daily price payload contains a date different from the requested trading date.');
+    if (new Set(normalizedSymbols).size !== normalizedSymbols.length) throw new Error('Daily price payload contains duplicate symbols.');
+    // A revision identifies the logical provider snapshot, so symbol order in
+    // a retried or differently paginated active-symbol read must not create a
+    // second revision for the same date.
+    const sourceRevision = input.prices
+      .map((price, index) => ({ symbol: normalizedSymbols[index], revision: `${price.provider}:${String(price.providerMetadata.requestedDate ?? input.tradingDate)}` }))
+      .sort((left, right) => left.symbol.localeCompare(right.symbol))
+      .map(({ revision }) => revision)
+      .join('|');
     const revisionUrl = new URL('/rest/v1/price_revisions', this.baseUrl);
     revisionUrl.searchParams.set('on_conflict', 'source,source_revision');
     const revisionResponse = await this.fetcher(revisionUrl, { method: 'POST', headers: { ...this.headers(), 'content-type': 'application/json', prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify({ source: input.prices[0].provider, source_revision: sourceRevision }) });
@@ -50,7 +60,7 @@ export class SupabaseDailyPricesRepository {
     const revisions = z.array(revisionSchema).parse(await revisionResponse.json());
     const revisionId = revisions[0]?.id;
     if (!revisionId) throw new Error('Supabase did not return the daily price revision ID.');
-    const symbols = [...new Set(input.prices.map((price) => price.symbol.trim().toUpperCase()))];
+    const symbols = normalizedSymbols;
     const aliasUrl = new URL('/rest/v1/instrument_aliases', this.baseUrl);
     aliasUrl.searchParams.set('select', 'instrument_id,symbol,effective_from,effective_to');
     aliasUrl.searchParams.set('symbol', 'in.(' + symbols.join(',') + ')');
