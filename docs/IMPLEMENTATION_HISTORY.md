@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-10 | 12.07 — Actionable operational monitoring boundary (partial) | Operational status now emits stable component codes, severity, actionable next steps, import/recovery signals, and rejects invalid negative or fractional durable counters. Focused monitoring tests and typecheck pass. | Hosted metrics, backup/restore execution and alert delivery remain required. |
+
 | 2026-09-13 | 08.07 - Fail-closed development smoke boundary (partial) | Added `validateMarketstackDevelopmentSmokeRequest` with focused coverage to normalize exactly one symbol/date, reject production or recurring schedules, validate trading dates, and require an explicit allowance ceiling without exposing secrets. | A user-supplied free key, current allowance confirmation, local Supabase write, and live smoke evidence remain required; no network call or plan change was performed. |
 
 | 2026-09-10 | 10.09 — Authenticated browser boundary (partial) | Extended `tests/e2e/authenticated-workspace.spec.ts` to cover private dashboard entry, optional account-scope switching, and clean sign-out back to `/sign-in`. The fixture remains environment-gated and makes no hosted execution claim. | Live Supabase-backed value reconciliation, cross-account isolation, and full enabled-action traversal remain required. |
