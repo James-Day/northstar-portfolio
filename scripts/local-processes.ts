@@ -36,6 +36,13 @@ export function redactProcessOutput(value: string, secrets: string[] = []): stri
     .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, '$1[REDACTED]');
 }
 
+/** Keeps CLI failure diagnostics useful without allowing unbounded or secret-bearing output. */
+export function boundedRedactedOutput(value: string, secrets: string[] = [], maxLines = DEFAULT_OUTPUT_LINES): string {
+  const lines = redactProcessOutput(value, secrets).split(/\r?\n/).filter(Boolean);
+  if (lines.length <= maxLines) return lines.join('\n');
+  return [`[diagnostics truncated to ${maxLines} lines]`, ...lines.slice(-maxLines)].join('\n');
+}
+
 function executableFor(command: string): string {
   if (process.platform !== 'win32') return command;
   return command === 'npm' ? 'npm.cmd' : command;

@@ -1,12 +1,17 @@
 import { EventEmitter } from 'node:events';
 import type { ChildProcess } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
-import { redactProcessOutput, waitForLocalHttp } from '../../scripts/local-processes';
+import { boundedRedactedOutput, redactProcessOutput, waitForLocalHttp } from '../../scripts/local-processes';
 
 describe('local process harness contracts', () => {
   it('redacts credentials and bearer tokens from captured output', () => {
     expect(redactProcessOutput('SERVICE_ROLE_KEY=secret-value Bearer abc.def.ghi', ['secret-value']))
       .toBe('SERVICE_ROLE_KEY=[REDACTED] Bearer [REDACTED]');
+  });
+
+  it('bounds redacted CLI diagnostics while retaining the newest failure lines', () => {
+    const output = ['SERVICE_ROLE_KEY=secret-value', 'old diagnostic', 'another diagnostic', 'latest failure'].join('\n');
+    expect(boundedRedactedOutput(output, ['secret-value'], 2)).toBe('[diagnostics truncated to 2 lines]\nanother diagnostic\nlatest failure');
   });
 
   it('waits for a process endpoint and reports captured output on early exit', async () => {

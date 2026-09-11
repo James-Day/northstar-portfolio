@@ -6,7 +6,7 @@ import {
   type LocalIntegrationUser,
   type LocalSupabaseCredentials,
 } from '../services/platform/local-supabase-fixtures.ts';
-import { startLocalProcess, stopLocalProcesses, waitForLocalHttp, type LocalProcessHandle } from './local-processes.ts';
+import { boundedRedactedOutput, startLocalProcess, stopLocalProcesses, waitForLocalHttp, type LocalProcessHandle } from './local-processes.ts';
 
 const keepRunning = process.argv.includes('--keep');
 const withApp = process.argv.includes('--with-app');
@@ -28,7 +28,7 @@ function run(args: string[], printOutput = true): string {
   const command = supabaseCommand();
   const result = spawnSync(command.executable, [...command.prefix, ...args], { cwd: process.cwd(), encoding: 'utf8', stdio: ['inherit', 'pipe', 'pipe'], shell: process.platform === 'win32' });
   if (result.status !== 0) {
-    const details = [result.stderr, result.stdout].filter(Boolean).join('\n').trim();
+    const details = boundedRedactedOutput([result.stderr, result.stdout].filter(Boolean).join('\n'));
     throw new Error(`supabase ${args.join(' ')} failed${details ? `: ${details}` : '.'}`);
   }
   if (printOutput && result.stdout) process.stdout.write(result.stdout);
