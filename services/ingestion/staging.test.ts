@@ -85,4 +85,17 @@ describe("Robinhood import staging", () => {
       "without path characters",
     );
   });
+
+  it("does not let a malformed earlier row make partial history look complete", async () => {
+    const partial = [
+      "Activity Date,Trans Code,Instrument,Quantity,Price,Amount",
+      "2025-01-01,Buy,VTI,1,$100,not-money",
+      "2026-01-04,Buy,VTI,1,$100,$100",
+    ].join("\n");
+    const staged = await stageRobinhoodImport("account-123", partial);
+    expect(staged.review.invalidRowCount).toBe(1);
+    expect(staged.activityFrom).toBe("2026-01-04");
+    expect(staged.activityThrough).toBe("2026-01-04");
+    expect(() => assertStagedImportCanCommit(staged)).toThrow("invalid source rows");
+  });
 });
