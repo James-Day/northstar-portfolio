@@ -166,6 +166,34 @@ describe('database security migration contract', () => {
     }
   });
 
+  it('does not grant browser mutation privileges through any migration', async () => {
+    const sql = await migrationSql();
+    const browserRoles = '(?:public\\s*,\\s*)?(?:anon\\s*,\\s*)?authenticated';
+
+    // A later migration can accidentally reopen a table that an earlier
+    // hardening migration closed. Inspect the complete migration stream and
+    // reject every explicit client INSERT/UPDATE/DELETE grant for tables that
+    // are intentionally service-owned or globally reference-only.
+    for (const name of [...serviceOwnedTables, ...globalReadOnlyTables]) {
+      expect(sql, `${name} must never grant browser mutations`).not.toMatch(
+        new RegExp(`grant\\s+(?:all|(?:insert|update|delete)(?:\\s*,\\s*(?:insert|update|delete)){0,2})\\s+on\\s+[^;]*public\\.${name}[^;]*\\s+to\\s+${browserRoles}`),
+      );
+    }
+  });
+
+  it('requires every user-owned policy expression to bind the authenticated owner', async () => {
+    const sql = await migrationSql();
+    for (const name of userOwnedTables) {
+      const policies = [...sql.matchAll(/create\s+policy\s+[a-z0-9_]+[\s\S]*?;/g)]
+        .filter(([policy]) => new RegExp(`on\\s+public\\.${name}(?![a-z0-9_])`).test(policy));
+      expect(policies, `${name} must declare at least one policy`).not.toHaveLength(0);
+      for (const [policy] of policies) {
+        expect(policy, `${name} policy must reference auth.uid()`).toMatch(/auth\.uid\s*\(\s*\)/);
+        expect(policy, `${name} policy must not use an unconditional true boundary`).not.toMatch(/using\s*\(\s*true\s*\)/);
+      }
+    }
+  });
+
   it('keeps brokerage statements private and scoped to the authenticated owner', async () => {
     const sql = await migrationSql();
     expect(sql).toMatch(/insert\s+into\s+storage\.buckets[\s\S]*brokerage-statements[\s\S]*false/);
