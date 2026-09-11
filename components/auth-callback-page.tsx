@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { BrandMark } from '@/components/brand-mark';
 import { createPublicSupabaseClient } from '@/services/supabase/client';
 import { readOAuthCallbackError } from '@/lib/auth/oauth-callback';
+import { establishBrowserSession } from '@/lib/auth/session-handoff';
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
 
@@ -23,15 +24,24 @@ export function AuthCallbackPage({ supabaseConfig }: { supabaseConfig?: PublicSu
       return;
     }
     let active = true;
-    const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
-      if (session) void fetch('/api/auth/session', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accessToken: session.access_token }) }).then((response) => {
-        if (response.ok) window.location.replace('/dashboard');
+    let handedOffToken: string | undefined;
+    async function handleSession(session: { access_token: string } | null) {
+      if (!active || !session || session.access_token === handedOffToken) return;
+      handedOffToken = session.access_token;
+      try {
+        if (await establishBrowserSession(session.access_token)) window.location.replace('/dashboard');
         else if (active) setMessage('We could not establish the private workspace session. Please return to sign in.');
-      });
+      } catch {
+        if (active) setMessage('We could not establish the private workspace session. Please return to sign in.');
+      }
+    }
+    const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
+      void handleSession(session);
     });
     void client.auth.getSession().then(({ data, error }) => {
-      if (!active || data.session) return;
-      setMessage(error?.message ?? 'This link is expired or invalid. Request a new link and try again.');
+      if (!active) return;
+      if (data.session) void handleSession(data.session);
+      else setMessage(error?.message ?? 'This link is expired or invalid. Request a new link and try again.');
     });
     return () => {
       active = false;

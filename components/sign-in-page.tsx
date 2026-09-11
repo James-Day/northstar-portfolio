@@ -7,6 +7,7 @@ import { BrandMark } from '@/components/brand-mark';
 import { createSupabaseAuthService } from '@/services/auth/supabase-auth';
 import { createPublicSupabaseClient } from '@/services/supabase/client';
 import { buildAuthRedirectUrl } from '@/lib/auth/redirects';
+import { establishBrowserSession } from '@/lib/auth/session-handoff';
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
 type Mode = 'sign-in' | 'sign-up';
@@ -35,12 +36,7 @@ export function SignInPage({ supabaseConfig, authRedirectOrigins = ['http://loca
         await auth.signIn({ email, password });
         const { data } = await client!.auth.getSession();
         if (!data.session?.access_token) throw new Error('We could not establish the private workspace session.');
-        const sessionResponse = await fetch('/api/auth/session', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ accessToken: data.session.access_token }),
-        });
-        if (!sessionResponse.ok) throw new Error('We could not establish the private workspace session.');
+        if (!await establishBrowserSession(data.session.access_token)) throw new Error('We could not establish the private workspace session.');
         window.location.assign('/dashboard');
       }
     } catch (error) {
