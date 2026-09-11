@@ -23,7 +23,8 @@ describe('authenticated CI integration contract', () => {
     expect(workflow).toMatch(/portfolio-integration-b@example\.test/);
     expect(workflow).toMatch(/storage\/v1\/object\/brokerage-statements/);
     expect(workflow).toMatch(/cross_user_status=/);
-    expect(workflow).toMatch(/Private Storage object was readable by the wrong user/);
+    expect(workflow).toMatch(/cross_user_status="\$\(curl[\s\S]*?if \[\[ "\$\{cross_user_status\}" != '400'/);
+    expect(workflow).toMatch(/Private Storage isolation returned an unexpected HTTP status/);
     expect(workflow).toMatch(/-X DELETE/);
     expect(workflow).toMatch(/E2E_AUTH_EMAIL=/);
     expect(workflow).toMatch(/E2E_AUTH_PASSWORD=/);

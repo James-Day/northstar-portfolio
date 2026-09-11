@@ -108,8 +108,8 @@ jobs:
           cross_user_status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
             "${API_URL}/storage/v1/object/brokerage-statements/${object_path}" \
             -H "apikey: ${ANON_KEY}" -H "authorization: Bearer ${user_b_token}")"
-          if [[ "${cross_user_status}" == 2* ]]; then
-            echo 'Private Storage object was readable by the wrong user.' >&2
+          if [[ "${cross_user_status}" != '400' && "${cross_user_status}" != '401' && "${cross_user_status}" != '403' && "${cross_user_status}" != '404' ]]; then
+            echo "Private Storage isolation returned an unexpected HTTP status: ${cross_user_status}." >&2
             exit 1
           fi
           curl --fail --silent -X DELETE \
