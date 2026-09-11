@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-10 | 02.05 — Private workspace routing contract (partial) | Added coverage proving the dashboard is dynamic and authenticates before rendering `PortfolioApp`, while the public demo passes no Supabase or API configuration. | Hosted/browser cookie handoff and provider verification remain required. |
+
 | 2026-09-10 | 10.07 — Workspace accessibility contract (partial) | Added static coverage for keyboard landmarks, labeled account navigation, table column scopes, responsive table regions, status/alert messaging, and icon-only button labeling. | Live authenticated keyboard traversal, screen-reader output, dialog focus behavior and 200% enlargement remain to be verified. |
 
 | 2026-09-10 | 07.04 — Harden provenance link safety (partial) | Provenance compliance now requires HTTPS URLs for the license, upstream repository and display attribution links, with focused coverage for malformed or executable link schemes. | Exact dataset rights review and paid-use approval remain pending. |
