@@ -26,7 +26,7 @@ export type DailyRefreshEvent =
   | { type: 'failed'; attempt: number; maxAttempts: number; message: string }
   | { type: 'persisted'; tradingDate: IsoDate; symbolCount: number; upserted: number };
 export type DailyRefreshTelemetry = { record: (event: DailyRefreshEvent) => void };
-export type DailyRefreshRunRecorder = { record(run: { tradingDate: IsoDate | null; status: 'persisted' | 'skipped' | 'failed'; attempts: number; failedAttempts: number; requestedSymbols: number; persistedRows: number; publicationPendingSymbols?: number; quotaUnits: number; errorMessage?: string | null }): Promise<string> };
+export type DailyRefreshRunRecorder = { record(run: { tradingDate: IsoDate | null; status: 'persisted' | 'skipped' | 'failed'; attempts: number; failedAttempts: number; requestedSymbols: number; persistedRows: number; publicationPendingSymbols?: number; unresolvedInstrumentCount?: number; quotaUnits: number; errorMessage?: string | null }): Promise<string> };
 /**
  * The legacy read-only guard is retained for local callers. Scheduled
  * production jobs should provide `ledger`, which atomically reserves capacity
@@ -179,16 +179,17 @@ export async function runAndRecordDailyPriceRefresh(
   options: DailyRefreshRetryOptions = {},
   quota?: DailyQuotaGuard,
   calendarOverrides: UsEquityCalendarOverrides = {},
+  unresolvedInstrumentCount = 0,
 ): Promise<DailyRefreshJobResult> {
   const collector = new RefreshMetricsCollector();
   try {
     const result = await runDailyPriceRefreshWithRetry(now, activeSymbols, provider, persistence, options, collector, quota, calendarOverrides);
     const metrics = collector.getSnapshot();
-    await recorder.record({ tradingDate: result.status === 'persisted' ? result.tradingDate : null, status: result.status, attempts: metrics.attempts, failedAttempts: metrics.failedAttempts, requestedSymbols: metrics.requestedSymbols, persistedRows: result.status === 'persisted' ? result.upserted : 0, publicationPendingSymbols: metrics.publicationPendingSymbols, quotaUnits: metrics.requestedSymbols });
+    await recorder.record({ tradingDate: result.status === 'persisted' ? result.tradingDate : null, status: result.status, attempts: metrics.attempts, failedAttempts: metrics.failedAttempts, requestedSymbols: metrics.requestedSymbols, persistedRows: result.status === 'persisted' ? result.upserted : 0, publicationPendingSymbols: metrics.publicationPendingSymbols, unresolvedInstrumentCount, quotaUnits: metrics.requestedSymbols });
     return result;
   } catch (error) {
     const metrics = collector.getSnapshot();
-    await recorder.record({ tradingDate: null, status: 'failed', attempts: metrics.attempts, failedAttempts: metrics.failedAttempts, requestedSymbols: metrics.requestedSymbols, persistedRows: 0, publicationPendingSymbols: metrics.publicationPendingSymbols, quotaUnits: metrics.requestedSymbols, errorMessage: error instanceof Error ? error.message : 'Daily refresh failed.' });
+    await recorder.record({ tradingDate: null, status: 'failed', attempts: metrics.attempts, failedAttempts: metrics.failedAttempts, requestedSymbols: metrics.requestedSymbols, persistedRows: 0, publicationPendingSymbols: metrics.publicationPendingSymbols, unresolvedInstrumentCount, quotaUnits: metrics.requestedSymbols, errorMessage: error instanceof Error ? error.message : 'Daily refresh failed.' });
     throw error;
   }
 }

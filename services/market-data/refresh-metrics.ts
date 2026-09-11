@@ -40,6 +40,7 @@ export function classifyRefreshAlerts(input: {
   quotaExhausted?: boolean;
   staleSymbols?: number;
   publicationPendingSymbols?: number;
+  unresolvedInstrumentCount?: number;
 }): RefreshOperationalAlert[] {
   const alerts: RefreshOperationalAlert[] = [];
   if (input.status === "failed" && input.failedAttempts > 0)

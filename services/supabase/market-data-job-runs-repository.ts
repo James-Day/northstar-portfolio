@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 const runSchema = z.object({ id: z.string().uuid() });
-export type MarketDataJobRun = { tradingDate: string | null; status: 'persisted' | 'skipped' | 'failed'; attempts: number; failedAttempts: number; requestedSymbols: number; persistedRows: number; publicationPendingSymbols?: number; quotaUnits: number; errorMessage?: string | null };
+export type MarketDataJobRun = { tradingDate: string | null; status: 'persisted' | 'skipped' | 'failed'; attempts: number; failedAttempts: number; requestedSymbols: number; persistedRows: number; publicationPendingSymbols?: number; unresolvedInstrumentCount?: number; quotaUnits: number; errorMessage?: string | null };
 
 export type MarketDataJobRunsRepositoryOptions = { supabaseUrl: string; serviceRoleKey: string; fetcher?: typeof fetch };
 
@@ -18,7 +18,7 @@ export class SupabaseMarketDataJobRunsRepository {
 
   async record(run: MarketDataJobRun): Promise<string> {
     const url = new URL('/rest/v1/market_data_job_runs', this.baseUrl);
-    const response = await this.fetcher(url, { method: 'POST', headers: { apikey: this.options.serviceRoleKey, authorization: `Bearer ${this.options.serviceRoleKey}`, 'content-type': 'application/json', prefer: 'return=representation' }, body: JSON.stringify({ trading_date: run.tradingDate, status: run.status, attempts: run.attempts, failed_attempts: run.failedAttempts, requested_symbols: run.requestedSymbols, persisted_rows: run.persistedRows, publication_pending_symbols: run.publicationPendingSymbols ?? 0, quota_units: run.quotaUnits, error_message: run.errorMessage ?? null }) });
+    const response = await this.fetcher(url, { method: 'POST', headers: { apikey: this.options.serviceRoleKey, authorization: `Bearer ${this.options.serviceRoleKey}`, 'content-type': 'application/json', prefer: 'return=representation' }, body: JSON.stringify({ trading_date: run.tradingDate, status: run.status, attempts: run.attempts, failed_attempts: run.failedAttempts, requested_symbols: run.requestedSymbols, persisted_rows: run.persistedRows, publication_pending_symbols: run.publicationPendingSymbols ?? 0, unresolved_instrument_count: run.unresolvedInstrumentCount ?? 0, quota_units: run.quotaUnits, error_message: run.errorMessage ?? null }) });
     if (!response.ok) throw new Error(`Supabase market-data job run write failed with HTTP ${response.status}.`);
     const rows = z.array(runSchema).parse(await response.json());
     if (!rows[0]) throw new Error('Supabase did not return a market-data job run ID.');

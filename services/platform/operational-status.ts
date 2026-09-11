@@ -12,7 +12,7 @@ export type OperationalStatus = {
 
 /** Turns durable worker counters into a secret-free operator status summary. */
 export function summarizeOperationalStatus(input: {
-  marketData?: { failedRuns?: number; quotaExhausted?: boolean; staleSymbols?: number; publicationPendingSymbols?: number; lastSuccessfulAt?: Date | null; maxSuccessAgeMs?: number };
+  marketData?: { failedRuns?: number; quotaExhausted?: boolean; staleSymbols?: number; publicationPendingSymbols?: number; unresolvedInstrumentCount?: number; lastSuccessfulAt?: Date | null; maxSuccessAgeMs?: number };
   queues?: { failedJobs?: number; pendingJobs?: number };
   retention?: { exhaustedItems?: number; pendingItems?: number };
   reports?: { failedPublishes?: number; staleJobs?: number };
@@ -28,6 +28,7 @@ export function summarizeOperationalStatus(input: {
   else if ((market?.failedRuns ?? 0) > 0) add('market_data', 'critical', 'A market-data refresh failed after retries; affected valuations remain unavailable.');
   else if ((market?.staleSymbols ?? 0) > 0) add('market_data', 'warning', `${market?.staleSymbols} market-data symbol(s) are stale.`);
   else if ((market?.publicationPendingSymbols ?? 0) > 0) add('market_data', 'warning', `${market?.publicationPendingSymbols} market-data symbol(s) are awaiting end-of-day publication.`);
+  else if ((market?.unresolvedInstrumentCount ?? 0) > 0) add('market_data', 'warning', `${market?.unresolvedInstrumentCount} active instrument(s) have no current ticker alias.`);
   else if (market?.lastSuccessfulAt && now.getTime() - market.lastSuccessfulAt.getTime() > maxSuccessAgeMs) add('market_data', 'warning', 'No successful market-data refresh has completed within the expected freshness window.');
   const queues = input.queues;
   if ((queues?.failedJobs ?? 0) > 0) add('queues', 'critical', `${queues?.failedJobs} queued job(s) require replay or investigation.`);
