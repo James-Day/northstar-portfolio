@@ -81,6 +81,10 @@ jobs:
             --data '{"email":"portfolio-integration-a@example.test","password":"local-integration-a-2026-only"}' \
             >/dev/null
 
+          # The app only receives the public URL/key. Never let the service key
+          # or local database credentials leak into frontend/API child processes.
+          unset SERVICE_ROLE_KEY POSTGRES_PASSWORD DASHBOARD_PASSWORD JWT_SECRET
+
           npm run dev -- --host 127.0.0.1 >"${app_log}" 2>&1 &
           app_pid=$!
           for attempt in {1..60}; do
