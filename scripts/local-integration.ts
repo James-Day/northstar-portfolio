@@ -14,6 +14,7 @@ import { runLocalRlsAcceptance } from '../services/platform/local-rls-acceptance
 const keepRunning = process.argv.includes('--keep');
 const withApp = process.argv.includes('--with-app');
 const withRls = process.argv.includes('--rls');
+const withBrowser = process.argv.includes('--browser');
 
 type Command = { executable: string; prefix: string[] };
 
@@ -43,23 +44,33 @@ function assertCliAvailable() {
   supabaseCommand();
 }
 
-async function startApps(credentials: LocalSupabaseCredentials): Promise<LocalProcessHandle[]> {
+async function startApps(credentials: LocalSupabaseCredentials, browser = false): Promise<LocalProcessHandle[]> {
+  const apiPort = 8787;
+  const frontendPort = 3000;
+  if (browser && process.platform === 'win32') {
+    spawnSync('powershell.exe', ['-NoProfile', '-Command', '$p=(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue).OwningProcess; if ($p) { Stop-Process -Id $p -Force }'], { windowsHide: true, stdio: 'ignore' });
+  }
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     SUPABASE_URL: credentials.apiUrl,
     SUPABASE_ANON_KEY: credentials.anonKey,
     SUPABASE_SERVICE_ROLE_KEY: credentials.serviceRoleKey,
+    ...(browser ? {
+      NEXT_PUBLIC_API_URL: `http://127.0.0.1:${apiPort}`,
+      NEXT_PUBLIC_SUPABASE_URL: credentials.apiUrl,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: credentials.anonKey,
+    } : {}),
   };
   const specs = [
-    { name: 'api', command: 'npx', args: ['wrangler', 'dev', '--config', 'wrangler.api.toml'], url: 'http://127.0.0.1:8787/health' },
-    { name: 'frontend', command: 'npm', args: ['run', 'dev', '--', '--host', '127.0.0.1'], url: 'http://127.0.0.1:3000/' },
+    { name: 'api', command: 'npx', args: ['wrangler', 'dev', '--config', 'wrangler.api.toml', ...(browser ? ['--port', String(apiPort)] : [])], url: `http://127.0.0.1:${apiPort}/health` },
+    { name: 'frontend', command: 'npm', args: ['run', 'dev', '--', '--host', '127.0.0.1', ...(browser ? ['--port', String(frontendPort)] : [])], url: `http://localhost:${frontendPort}/` },
   ];
   const handles: LocalProcessHandle[] = [];
   for (const spec of specs) {
     try {
       const probeUrl = spec.name === 'frontend' ? 'http://localhost:3000/' : spec.url;
       const response = await fetch(probeUrl);
-      if (response.status < 500) {
+      if (response.status < 500 && !browser) {
         console.log(`${spec.name} already available; reusing the existing process.`);
         continue;
       }
@@ -108,11 +119,33 @@ async function main() {
       if (users.length !== 2) throw new Error('The RLS acceptance suite requires both deterministic Auth users.');
       await runLocalRlsAcceptance(credentials, [users[0], users[1]]);
     }
-    if (withApp) {
+    if (withApp || withBrowser) {
       console.log('Starting API and frontend processes…');
-      apps = await startApps(credentials);
+      apps = await startApps(credentials, withBrowser);
       await Promise.all(apps.map((app) => waitForLocalHttp(app)));
-      console.log('API and frontend are ready. Run the authenticated isolation suite.');
+      if (withBrowser) {
+        const browserEnv: NodeJS.ProcessEnv = {
+          ...process.env,
+          E2E_AUTH_EMAIL: users[0]?.email,
+          E2E_AUTH_PASSWORD: users[0]?.password,
+          E2E_AUTH_EMAIL_B: users[1]?.email,
+          E2E_AUTH_PASSWORD_B: users[1]?.password,
+          PLAYWRIGHT_BASE_URL: 'http://localhost:3000',
+          PLAYWRIGHT_EXTERNAL_SERVER: '1',
+        };
+        const command = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+        const browserRun = spawnSync(command, ['--yes', 'playwright', 'test', 'tests/e2e/authenticated-workspace.spec.ts', '--reporter=line'], {
+          cwd: process.cwd(),
+          env: browserEnv,
+          stdio: 'inherit',
+          shell: process.platform === 'win32',
+          windowsHide: true,
+        });
+        if (browserRun.status !== 0) throw new Error(`Authenticated browser acceptance failed with exit code ${browserRun.status ?? 'unknown'}.`);
+        console.log('Authenticated browser acceptance passed.');
+      } else {
+        console.log('API and frontend are ready. Run the authenticated isolation suite.');
+      }
       if (keepRunning) await waitForInterrupt();
     } else {
       console.log('Local database reset and Auth fixtures completed. Use --with-app to start the API/frontend smoke harness.');
