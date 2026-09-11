@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { verifyStripeWebhook, StripeSignatureError } from '@/services/billing/stripe-http';
+import { verifyStripeWebhook, StripeSignatureError, validateStripeBillingConfiguration, BillingConfigurationError } from '@/services/billing/stripe-http';
 
 async function sign(secret: string, body: string, timestamp: number): Promise<string> {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
@@ -27,5 +27,39 @@ describe('Stripe HTTP webhook boundary', () => {
     const body = JSON.stringify({ id: 'evt_rotate', type: 'customer.subscription.deleted', created: 1_767_000_000, data: {} });
     const signature = await sign('whsec_current', body, 1_767_000_000);
     await expect(verifyStripeWebhook(body, `${signature},v1=deadbeef`, 'whsec_current', { now: new Date('2026-01-01T00:00:00Z'), toleranceSeconds: 100_000_000 })).resolves.toMatchObject({ id: 'evt_rotate' });
+  });
+});
+
+describe('Stripe billing configuration contract', () => {
+  const valid = {
+    monthlyPriceId: 'price_monthlytest',
+    annualPriceId: 'price_annualtest',
+    monthlyPriceCents: '500',
+    annualPriceCents: '4900',
+  };
+
+  it('accepts the distinct $5 monthly and $49 annual server configuration', () => {
+    expect(validateStripeBillingConfiguration(valid, { requireAmounts: true })).toEqual({
+      monthlyPriceId: 'price_monthlytest',
+      annualPriceId: 'price_annualtest',
+    });
+  });
+
+  it.each([
+    ['the same price for both plans', { monthlyPriceId: 'price_same', annualPriceId: 'price_same' }],
+    ['a client-shaped or malformed monthly identifier', { monthlyPriceId: 'monthly', annualPriceId: valid.annualPriceId }],
+    ['a missing annual identifier', { monthlyPriceId: valid.monthlyPriceId, annualPriceId: undefined }],
+    ['a partial amount recording', { ...valid, annualPriceCents: undefined }],
+    ['a wrong amount', { ...valid, annualPriceCents: '4999' }],
+  ])('rejects %s before any Stripe request', (_label, overrides) => {
+    expect(() => validateStripeBillingConfiguration({ ...valid, ...overrides }, { requireAmounts: true })).toThrow(BillingConfigurationError);
+  });
+
+  it('allows staging to omit amounts while rejecting any incomplete amount pair', () => {
+    expect(validateStripeBillingConfiguration({ monthlyPriceId: valid.monthlyPriceId, annualPriceId: valid.annualPriceId })).toEqual({
+      monthlyPriceId: valid.monthlyPriceId,
+      annualPriceId: valid.annualPriceId,
+    });
+    expect(() => validateStripeBillingConfiguration({ ...valid, monthlyPriceCents: undefined })).toThrow(BillingConfigurationError);
   });
 });

@@ -1,5 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import {
+  BillingConfigurationError,
+  validateStripeBillingConfiguration,
+} from '@/services/billing/stripe-http';
 
 export type LaunchCheckStatus = 'pass' | 'fail' | 'warn';
 
@@ -66,14 +70,31 @@ export function runLaunchPreflight(options: LaunchPreflightOptions = {}): Launch
   checks.push(env.STRIPE_WEBHOOK_SECRET?.startsWith('whsec_')
     ? check('billing.webhook-format', 'pass', 'Stripe webhook secret uses the expected format.')
     : check('billing.webhook-format', 'fail', 'STRIPE_WEBHOOK_SECRET must use a whsec_ secret.'));
-  checks.push(env.STRIPE_MONTHLY_PRICE_ID?.startsWith('price_') && env.STRIPE_ANNUAL_PRICE_ID?.startsWith('price_')
-    ? check('billing.price-format', 'pass', 'Stripe monthly and annual price IDs use the expected format.')
-    : check('billing.price-format', 'fail', 'Stripe monthly and annual price IDs must use price_ identifiers.'));
+  try {
+    validateStripeBillingConfiguration({
+      monthlyPriceId: env.STRIPE_MONTHLY_PRICE_ID,
+      annualPriceId: env.STRIPE_ANNUAL_PRICE_ID,
+    });
+    checks.push(check('billing.price-format', 'pass', 'Stripe monthly and annual price IDs use distinct expected identifiers.'));
+  } catch (error) {
+    checks.push(check('billing.price-format', 'fail', error instanceof BillingConfigurationError ? error.message : 'Stripe price configuration is invalid.'));
+  }
 
   const monthlyCents = env.STRIPE_MONTHLY_PRICE_CENTS;
   const annualCents = env.STRIPE_ANNUAL_PRICE_CENTS;
   const amountsConfigured = monthlyCents !== undefined || annualCents !== undefined;
-  const amountsValid = monthlyCents === '500' && annualCents === '4900';
+  let amountsValid = false;
+  try {
+    validateStripeBillingConfiguration({
+      monthlyPriceId: env.STRIPE_MONTHLY_PRICE_ID,
+      annualPriceId: env.STRIPE_ANNUAL_PRICE_ID,
+      monthlyPriceCents: monthlyCents,
+      annualPriceCents: annualCents,
+    }, { requireAmounts: environment === 'production' });
+    amountsValid = monthlyCents === '500' && annualCents === '4900';
+  } catch {
+    amountsValid = false;
+  }
   checks.push(amountsValid
     ? check('billing.price-amounts', 'pass', 'Stripe prices match $5 monthly and $49 annual pricing.')
     : amountsConfigured || environment === 'production'

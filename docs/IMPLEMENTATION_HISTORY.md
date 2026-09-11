@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-13 | 11.03 — Stripe configuration contract gate (partial) | Added `validateStripeBillingConfiguration` with the fixed $5 monthly/$49 annual contract, strict server price ID validation, distinct monthly/annual IDs, complete amount-pair checks, and production-required amounts. Launch preflight now uses the shared validator; focused Stripe/preflight tests (18) and typecheck passed. | This is a deterministic repository/configuration check only. Stripe test-product creation, live Checkout/Portal endpoint verification, webhook delivery, and hosted customer lifecycle remain open. |
+
 | 2026-09-10 | 02.07 — Tighten OAuth origin matching (partial) | Added regression coverage proving redirect allowlisting rejects hostile subdomains and unexpected ports, preserving exact-origin matching with fixed callback paths. | Target-environment OAuth configuration and live invalid-callback verification remain required. |
 
 | 2026-09-10 | 02.05 — Private workspace routing contract (partial) | Added coverage proving the dashboard is dynamic and authenticates before rendering `PortfolioApp`, while the public demo passes no Supabase or API configuration. | Hosted/browser cookie handoff and provider verification remain required. |

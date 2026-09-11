@@ -252,11 +252,63 @@ export function createStripeCustomerCancellation(
 
 export type BillingPlan = "monthly" | "annual";
 
+export const BILLING_PRICE_CONTRACT = {
+  monthlyCents: 500,
+  annualCents: 4900,
+} as const;
+
+export type StripeBillingConfiguration = {
+  monthlyPriceId?: string;
+  annualPriceId?: string;
+  monthlyPriceCents?: string;
+  annualPriceCents?: string;
+};
+
 export class BillingConfigurationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "BillingConfigurationError";
   }
+}
+
+/**
+ * Validate the server-owned Stripe product contract before a deployment or
+ * billing request can rely on it. Stripe remains the source of truth for
+ * live product objects; this gate only checks the values recorded in app
+ * configuration and deliberately makes no network call.
+ */
+export function validateStripeBillingConfiguration(
+  configuration: StripeBillingConfiguration,
+  options: { requireAmounts?: boolean } = {},
+): { monthlyPriceId: string; annualPriceId: string } {
+  const monthlyPriceId = validateStripePriceId(
+    configuration.monthlyPriceId,
+    "monthly",
+  );
+  const annualPriceId = validateStripePriceId(
+    configuration.annualPriceId,
+    "annual",
+  );
+  if (monthlyPriceId === annualPriceId)
+    throw new BillingConfigurationError(
+      "Stripe monthly and annual prices must use different price IDs.",
+    );
+
+  const amounts = [
+    configuration.monthlyPriceCents,
+    configuration.annualPriceCents,
+  ];
+  const anyAmount = amounts.some((value) => value !== undefined);
+  if (options.requireAmounts || anyAmount) {
+    if (
+      configuration.monthlyPriceCents !== String(BILLING_PRICE_CONTRACT.monthlyCents) ||
+      configuration.annualPriceCents !== String(BILLING_PRICE_CONTRACT.annualCents)
+    )
+      throw new BillingConfigurationError(
+        "Stripe price amounts must be 500 monthly cents and 4900 annual cents.",
+      );
+  }
+  return { monthlyPriceId, annualPriceId };
 }
 
 function validateStripeCustomerId(customerId: string): string {
@@ -273,12 +325,13 @@ export function resolveBillingPriceId(
   plan: BillingPlan,
   prices: { monthly?: string; annual?: string },
 ): string {
-  const priceId = prices[plan]?.trim();
-  if (!priceId || !/^price_[A-Za-z0-9]+$/.test(priceId)) {
-    throw new BillingConfigurationError(
-      `Stripe ${plan} price is not configured.`,
-    );
-  }
+  return validateStripePriceId(prices[plan], plan);
+}
+
+function validateStripePriceId(value: string | undefined, plan: BillingPlan): string {
+  const priceId = value?.trim();
+  if (!priceId || !/^price_[A-Za-z0-9]+$/.test(priceId))
+    throw new BillingConfigurationError(`Stripe ${plan} price is not configured.`);
   return priceId;
 }
 
