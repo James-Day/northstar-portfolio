@@ -53,4 +53,10 @@ describe('operational status', () => {
     expect(() => summarizeOperationalStatus({ recovery: { lastBackupAt: new Date('invalid') } })).toThrow('Backup timestamp');
     expect(() => summarizeOperationalStatus({ now: new Date('invalid') })).toThrow('status timestamp');
   });
+
+  it('rejects future freshness timestamps instead of treating them as fresh', () => {
+    const now = new Date('2026-09-13T12:00:00Z');
+    expect(() => summarizeOperationalStatus({ now, marketData: { lastSuccessfulAt: new Date('2026-09-13T12:01:00Z') } })).toThrow('cannot be in the future');
+    expect(() => summarizeOperationalStatus({ now, recovery: { lastBackupAt: new Date('2026-09-13T12:01:00Z') } })).toThrow('cannot be in the future');
+  });
 });
