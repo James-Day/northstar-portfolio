@@ -3,6 +3,7 @@ import {
   createLocalIntegrationUsers,
   deleteLocalIntegrationUsers,
   parseSupabaseStatusEnv,
+  LocalIntegrationUsersError,
 } from './local-supabase-fixtures';
 
 describe('local Supabase integration fixtures', () => {
@@ -41,5 +42,13 @@ describe('local Supabase integration fixtures', () => {
       'http://localhost:54321/auth/v1/admin/users/user-a',
     ]);
     expect(fetcher.mock.calls[0][1]).toMatchObject({ method: 'DELETE', headers: { authorization: 'Bearer service' } });
+  });
+
+  it('exposes users created before a later fixture failure for cleanup', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ user: { id: 'user-a' }, access_token: 'token-a' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 500 }));
+    await expect(createLocalIntegrationUsers({ apiUrl: 'http://localhost:54321', anonKey: 'anon' }, fetcher))
+      .rejects.toMatchObject({ name: 'LocalIntegrationUsersError', createdUsers: [expect.objectContaining({ userId: 'user-a' })] } satisfies Partial<LocalIntegrationUsersError>);
   });
 });

@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-13 | 01.05 — Recover partial local Auth fixture cleanup (partial) | Added a typed creation error carrying users created before a later fixture fails, and taught the local integration harness to pass those users through its cleanup path. Five fixture tests, typecheck, and diff checks passed. | Docker/Supabase availability and full API/frontend isolation execution remain unverified. |
+
 | 2026-09-13 | 07.06 — Complete independent historical verification fixture set | Replaced placeholder cases with six reviewed fixtures covering AAPL, SPY, the FB/META ticker transition, delisted TWTR, and the AAPL split period. Recorded second-source URLs, retrieval dates, locators, expected closes, and source comparison metadata; the manifest gate now accepts all six cases. | The second sources support verification only; DoltHub licensing and live seed/RLS execution remain separate launch gates. |
 
 | 2026-09-13 | Queue price-job calendar validation | Tightened the shared `price.refresh` Zod contract to validate real calendar dates rather than only `YYYY-MM-DD` formatting. Added regression coverage for valid dates and impossible dates; focused queue tests and typecheck passed. | This validates calendar shape only; exchange-session eligibility, provider responses, quota reservations, and hosted queue execution remain separate gates. |

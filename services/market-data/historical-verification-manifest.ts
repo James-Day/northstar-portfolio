@@ -52,7 +52,7 @@ export function validateHistoricalVerificationManifest(
     seen.add(key);
     if (!['pending', 'verified'].includes(fixture.evidence.status)) errors.push(`${prefix}.evidence.status must be pending or verified.`);
     if (fixture.evidence.status === 'verified') {
-      if (!/^https:\/\//.test(fixture.evidence.sourceUrl)) errors.push(`${prefix}.evidence.sourceUrl must use HTTPS.`);
+      if (!fixture.evidence.sourceUrl.startsWith('https://')) errors.push(`${prefix}.evidence.sourceUrl must use HTTPS.`);
       if (!fixture.evidence.sourceName.trim()) errors.push(`${prefix}.evidence.sourceName is required.`);
       if (!fixture.evidence.locator.trim()) errors.push(`${prefix}.evidence.locator is required.`);
       if (!fixture.evidence.reviewer.trim()) errors.push(`${prefix}.evidence.reviewer is required.`);

@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import {
   createLocalIntegrationUsers,
   deleteLocalIntegrationUsers,
+  LocalIntegrationUsersError,
   parseSupabaseStatusEnv,
   type LocalIntegrationUser,
   type LocalSupabaseCredentials,
@@ -73,7 +74,12 @@ async function main() {
     console.log('Applying all migrations and deterministic fixtures…');
     run(['db', 'reset']);
     credentials = parseSupabaseStatusEnv(run(['status', '-o', 'env'], false));
-    users = await createLocalIntegrationUsers(credentials);
+    try {
+      users = await createLocalIntegrationUsers(credentials);
+    } catch (error) {
+      if (error instanceof LocalIntegrationUsersError) users = error.createdUsers;
+      throw error;
+    }
     console.log(`Created ${users.length} deterministic local Auth users in memory for the isolation suite.`);
     if (withApp) {
       console.log('Starting API and frontend processes…');

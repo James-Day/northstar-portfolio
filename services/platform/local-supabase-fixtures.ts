@@ -12,6 +12,15 @@ export type LocalIntegrationUser = {
   accessToken: string;
 };
 
+export class LocalIntegrationUsersError extends Error {
+  readonly createdUsers: LocalIntegrationUser[];
+  constructor(message: string, createdUsers: LocalIntegrationUser[]) {
+    super(message);
+    this.name = 'LocalIntegrationUsersError';
+    this.createdUsers = createdUsers;
+  }
+}
+
 export const LOCAL_INTEGRATION_USERS = [
   {
     label: 'a' as const,
@@ -68,10 +77,10 @@ export async function createLocalIntegrationUsers(
       headers: authHeaders(credentials.anonKey),
       body: JSON.stringify({ email: fixture.email, password: fixture.password }),
     });
-    if (!response.ok) throw new Error(`Local Auth fixture ${fixture.label} creation failed with HTTP ${response.status}.`);
+    if (!response.ok) throw new LocalIntegrationUsersError(`Local Auth fixture ${fixture.label} creation failed with HTTP ${response.status}.`, created);
     const body = (await response.json()) as { user?: { id?: unknown } | null; access_token?: unknown };
     if (typeof body.user?.id !== 'string' || typeof body.access_token !== 'string') {
-      throw new Error(`Local Auth fixture ${fixture.label} did not return a user session.`);
+      throw new LocalIntegrationUsersError(`Local Auth fixture ${fixture.label} did not return a user session.`, created);
     }
     created.push({ ...fixture, userId: body.user.id, accessToken: body.access_token });
   }
