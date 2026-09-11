@@ -60,4 +60,24 @@ describe('runHistoricalSeedJob', () => {
     await expect(runHistoricalSeedJob({ source: { getDailyClosePage: async () => ({ records: [], sourceRevision: 'new-rev', nextCursor: null }) }, persistence: { persistDoltHubPage: async () => ({ revisionId: 'r', upserted: 0 }) }, jobs, aliases: [alias('AAPL', 'instrument-a')], symbols: ['AAPL'], from: isoDate('2024-01-01'), through: isoDate('2024-01-03') })).rejects.toThrow('source revision changed');
     expect(jobs.state.status).toBe('failed');
   });
+
+  it('fails and leaves the seed incomplete when the source revision changes between pages', async () => {
+    const jobs = memory();
+    let page = 0;
+    const source = {
+      getDailyClosePage: vi.fn<HistoricalPageSource['getDailyClosePage']>().mockImplementation(async ({ cursor }) => {
+        page += 1;
+        return {
+          records: [close('AAPL', cursor ? '2024-01-03' : '2024-01-02', cursor ? '101' : '100')],
+          sourceRevision: cursor ? 'rev-2' : 'rev-1',
+          nextCursor: cursor ? null : { tradingDate: isoDate('2024-01-02'), symbol: 'AAPL' },
+        };
+      }),
+    };
+    await expect(runHistoricalSeedJob({ source, persistence: { persistDoltHubPage: async ({ records }) => ({ revisionId: 'r', upserted: records.length }) }, jobs, aliases: [alias('AAPL', 'instrument-a')], symbols: ['AAPL'], from: isoDate('2024-01-01'), through: isoDate('2024-01-03'), pageLimit: 1 })).rejects.toThrow('source revision changed');
+    expect(page).toBe(2);
+    expect(jobs.state.status).toBe('failed');
+    expect(jobs.state.cursor).toEqual({ tradingDate: isoDate('2024-01-02'), symbol: 'AAPL' });
+    expect(jobs.state.lastError).toContain('source revision changed');
+  });
 });
