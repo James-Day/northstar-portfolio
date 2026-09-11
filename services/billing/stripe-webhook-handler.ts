@@ -66,12 +66,21 @@ function toBillingEvent(event: VerifiedStripeEvent): BillingWebhook['type'] | un
 
 async function resolveUserId(event: VerifiedStripeEvent, lookup: (customerId: string) => Promise<string | undefined>): Promise<string | undefined> {
   const object = asRecord(event.data.object);
+  const customerId = stringAt(object, 'customer') ?? stringAt(object, 'subscription_details', 'metadata', 'customer_id');
+
+  // Once a Stripe customer has been linked, that server-owned mapping is the
+  // authority. Event metadata is useful only to bootstrap Checkout completion;
+  // accepting it first would let a later dashboard-edited event redirect a
+  // mapped customer to another Northstar user.
+  if (customerId) {
+    const mappedUserId = await lookup(customerId);
+    if (mappedUserId) return mappedUserId;
+  }
   const metadataUserId = stringAt(object, 'metadata', 'user_id');
   if (metadataUserId) return metadataUserId;
   const clientReferenceId = stringAt(object, 'client_reference_id');
   if (clientReferenceId) return clientReferenceId;
-  const customerId = stringAt(object, 'customer') ?? stringAt(object, 'subscription_details', 'metadata', 'customer_id');
-  return customerId ? lookup(customerId) : undefined;
+  return undefined;
 }
 
 function stringAt(value: unknown, ...path: string[]): string | undefined {

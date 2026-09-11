@@ -153,6 +153,44 @@ describe('standalone API', () => {
     });
   });
 
+  it('keeps activity export and deletion request available after billing cancellation', async () => {
+    const requestDeletion = vi.fn(async (userId: string, token: string) => {
+      expect(userId).toBe('user-123');
+      expect(token).toBe('session-token');
+      return { id: 'deletion-1', status: 'queued', requestedAt: '2026-09-11T20:00:00.000Z' };
+    });
+    const app = createApi({
+      verifySession: async () => ({ id: 'user-123' }),
+      billingPersistence: {
+        getEntitlement: async () => trialEntitlement('canceled'),
+        startTrialAfterCommittedImport: async () => trialEntitlement('canceled'),
+        applyVerifiedWebhook: async () => trialEntitlement('canceled'),
+      },
+      deletionRequestRepository: { request: requestDeletion },
+      accountsRepository: {
+        list: async () => [],
+        get: async () => ({ id: 'account-1' }) as never,
+        create: async () => { throw new Error('unused'); },
+      },
+      activityRepository: {
+        list: async () => ({ items: [], limit: 100, offset: 0, hasMore: false }),
+      },
+    });
+    const exportResponse = await app.request('http://api.test/v1/accounts/account-1/activity.csv', {
+      headers: { authorization: 'Bearer session-token' },
+    });
+    expect(exportResponse.status).toBe(200);
+    expect(exportResponse.headers.get('content-type')).toContain('text/csv');
+
+    const deletionResponse = await app.request('http://api.test/v1/me/deletion-request', {
+      method: 'POST',
+      headers: { authorization: 'Bearer session-token' },
+    });
+    expect(deletionResponse.status).toBe(202);
+    await expect(deletionResponse.json()).resolves.toEqual({ request: { id: 'deletion-1', status: 'queued', requestedAt: '2026-09-11T20:00:00.000Z' } });
+    expect(requestDeletion).toHaveBeenCalledOnce();
+  });
+
   it('accepts a signed Stripe webhook using the untouched request body and injects processing', async () => {
     const timestamp = Math.floor(Date.now() / 1000);
     const body = JSON.stringify({

@@ -26,6 +26,16 @@ describe('Stripe webhook durable adapter', () => {
     expect(link).not.toHaveBeenCalled();
   });
 
+  it('prefers the server-owned customer mapping over conflicting event metadata', async () => {
+    const apply = vi.fn(async () => entitlement);
+    const link = vi.fn(async () => undefined);
+    const lookup = vi.fn(async (customerId: string) => customerId === 'cus_9' ? 'user-owner' : undefined);
+    const handler = createStripeWebhookHandler({ billing: { applyVerifiedWebhook: apply, linkStripeCustomer: link }, resolveUserIdByStripeCustomerId: lookup });
+    await expect(handler(base('customer.subscription.updated', { customer: 'cus_9', metadata: { user_id: 'user-attacker' }, status: 'active' }))).resolves.toMatchObject({ status: 'applied', userId: 'user-owner' });
+    expect(apply).toHaveBeenCalledWith('user-owner', expect.anything(), expect.anything());
+    expect(link).toHaveBeenCalledWith('user-owner', 'cus_9');
+  });
+
   it('uses server-owned customer mapping when metadata is absent', async () => {
     const apply = vi.fn(async () => entitlement);
     const lookup = vi.fn(async (customerId: string) => customerId === 'cus_9' ? 'user-9' : undefined);
