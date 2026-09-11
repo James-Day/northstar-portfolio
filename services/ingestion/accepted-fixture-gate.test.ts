@@ -132,4 +132,23 @@ describe('accepted Robinhood fixture gate', () => {
       ],
     })).toThrow(/no validated split ratio/);
   });
+
+  it('reconciles fractional positions through a split without floating point drift', () => {
+    const csv = [
+      'Activity Date,Trans Code,Instrument,Quantity,Price,Amount',
+      '2024-10-01,Buy,SCHG,0.125,$90,($11.25)',
+      '2024-10-11,SPL,SCHG,0.375,,,',
+      '2024-10-14,Sell,SCHG,0.125,$22.50,$2.8125',
+    ].join('\n');
+    const result = reconcileAcceptedFixture(parseRobinhoodActivityCsv(csv), {
+      resolvedSymbols: ['SCHG'],
+      rows: [
+        { rowNumber: 2, type: 'buy', symbol: 'SCHG', quantity: '0.125', amount: '-11.25' },
+        { rowNumber: 3, type: 'split', symbol: 'SCHG', quantity: '0.375', amount: '0', splitRatio: { numerator: '4', denominator: '1' } },
+        { rowNumber: 4, type: 'sell', symbol: 'SCHG', quantity: '0.125', amount: '2.8125' },
+      ],
+    });
+    expect(result.quantitiesBySymbol).toEqual({ SCHG: '0.375' });
+    expect(result.cashAmount).toBe('-8.4375');
+  });
 });
