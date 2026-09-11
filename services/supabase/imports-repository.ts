@@ -152,18 +152,16 @@ export class SupabaseImportsRepository implements ImportsRepository {
   }
 
   async discard(importId: string, accessToken: string): Promise<ImportSummary | undefined> {
-    const url = new URL('/rest/v1/imports', this.baseUrl);
-    url.searchParams.set('id', `eq.${importId}`);
-    url.searchParams.set('status', 'eq.ready_for_review');
+    const url = new URL('/rest/v1/rpc/discard_import', this.baseUrl);
     const response = await this.fetcher(url, {
-      method: 'PATCH',
-      headers: { apikey: this.options.supabaseAnonKey, authorization: `Bearer ${accessToken}`, 'content-type': 'application/json', prefer: 'return=representation' },
-      body: JSON.stringify({ status: 'discarded' }),
+      method: 'POST',
+      headers: { apikey: this.options.supabaseAnonKey, authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ p_import_id: importId }),
     });
     if (!response.ok) throw new Error(`Supabase import discard failed with HTTP ${response.status}.`);
-    const rows: unknown = await response.json();
-    if (!Array.isArray(rows)) throw new Error('Supabase import discard returned an invalid result.');
-    return rows[0] ? toImportSummary(rows[0]) : undefined;
+    const discardedId: unknown = await response.json();
+    if (typeof discardedId !== 'string' || !discardedId) return undefined;
+    return this.get(discardedId, accessToken).then((detail) => detail?.import);
   }
 
   async commit(importId: string, accessToken: string): Promise<ImportSummary | undefined> {

@@ -42,13 +42,15 @@ describe('Supabase imports repository', () => {
   it('lists a caller-owned account history and discards only a review-ready import', async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify([summary])))
-      .mockResolvedValueOnce(new Response(JSON.stringify([{ ...summary, status: 'discarded' }])));
+      .mockResolvedValueOnce(new Response(JSON.stringify('import-id')))
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ ...summary, status: 'discarded' }])))
+      .mockResolvedValueOnce(new Response(JSON.stringify([])));
     const repository = new SupabaseImportsRepository({ supabaseUrl: 'https://project.supabase.co', supabaseAnonKey: 'anon-key', fetcher });
 
     await expect(repository.list('account-id', 'user-token')).resolves.toMatchObject([{ id: 'import-id', fileName: 'activity.csv' }]);
     await expect(repository.discard('import-id', 'user-token')).resolves.toMatchObject({ status: 'discarded' });
-    expect(fetcher.mock.calls[1][0].searchParams.get('status')).toBe('eq.ready_for_review');
-    expect(JSON.parse(fetcher.mock.calls[1][1].body)).toEqual({ status: 'discarded' });
+    expect(fetcher.mock.calls[1][0].pathname).toBe('/rest/v1/rpc/discard_import');
+    expect(JSON.parse(fetcher.mock.calls[1][1].body)).toEqual({ p_import_id: 'import-id' });
   });
 
   it('gets a visible review detail only when both import and source-row RLS queries return data', async () => {
