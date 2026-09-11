@@ -22,6 +22,10 @@ export class SupabaseReportSnapshotReader {
     const response = await this.fetcher(url, { headers: { apikey: this.options.anonKey, authorization: `Bearer ${accessToken}` } });
     if (!response.ok) throw new Error(`Supabase report snapshot query failed with HTTP ${response.status}.`);
     const row = z.array(rowSchema).parse(await response.json())[0];
+    // Treat a malformed or unexpectedly broad response as empty. RLS should
+    // enforce this server-side, but a client must fail closed before rendering
+    // another account's report if a proxy or policy is misconfigured.
+    if (row && (row.account_id !== accountId || row.report_type !== 'account_daily')) return undefined;
     return row ? { id: row.id, userId: row.user_id, accountId: row.account_id, reportType: row.report_type, asOfDate: row.as_of_date, importStateRevision: row.import_state_revision, priceRevisionId: row.price_revision_id, payload: row.payload, publishedAt: row.published_at } : undefined;
   }
 
@@ -37,6 +41,7 @@ export class SupabaseReportSnapshotReader {
     const response = await this.fetcher(url, { headers: { apikey: this.options.anonKey, authorization: `Bearer ${accessToken}` } });
     if (!response.ok) throw new Error(`Supabase consolidated report snapshot query failed with HTTP ${response.status}.`);
     const row = z.array(rowSchema).parse(await response.json())[0];
+    if (row && (row.user_id !== userId || row.account_id !== null || row.report_type !== 'consolidated_daily')) return undefined;
     return row ? { id: row.id, userId: row.user_id, accountId: row.account_id, reportType: row.report_type, asOfDate: row.as_of_date, importStateRevision: row.import_state_revision, priceRevisionId: row.price_revision_id, payload: row.payload, publishedAt: row.published_at } : undefined;
   }
 }
