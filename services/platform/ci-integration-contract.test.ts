@@ -13,6 +13,8 @@ describe('authenticated CI integration contract', () => {
     expect(workflow).toMatch(/npx --yes supabase status -o env/);
     expect(workflow).toMatch(/trap cleanup EXIT/);
     expect(workflow).toMatch(/supabase stop --no-backup/);
+    expect(workflow).toMatch(/npm run dev:api -- --ip 127\.0\.0\.1 --port 8787/);
+    expect(workflow).toMatch(/curl --fail --silent http:\/\/127\.0\.0\.1:8787\/health/);
   });
 
   it('creates a disposable auth fixture and exercises the authenticated browser path', () => {
@@ -23,6 +25,8 @@ describe('authenticated CI integration contract', () => {
     expect(workflow).toMatch(/npm run test:e2e -- tests\/e2e\/authenticated-workspace\.spec\.ts/);
     expect(workflow).toMatch(/kill "\$\{app_pid\}"/);
     expect(workflow).toMatch(/wait "\$\{app_pid\}"/);
+    expect(workflow).toMatch(/kill "\$\{api_pid\}"/);
+    expect(workflow).toMatch(/wait "\$\{api_pid\}"/);
   });
 
   it('passes only ephemeral public configuration to the app and redacts diagnostics', () => {
