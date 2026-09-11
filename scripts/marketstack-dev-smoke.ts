@@ -1,5 +1,6 @@
 import { MarketstackProvider, MonthlyRequestBudget } from '../services/market-data/marketstack.ts';
 import { validateMarketstackDevelopmentSmokeRequest } from '../services/platform/marketstack-development.ts';
+import { isoDate } from '../lib/domain/types.ts';
 
 function argument(name: string): string | undefined {
   const index = process.argv.indexOf(`--${name}`);
@@ -31,7 +32,7 @@ try {
     requestBudget: budget,
     maxSymbolsPerRequest: 1,
   });
-  const prices = await provider.getDailyPrices([request.symbol], request.tradingDate as never);
+  const prices = await provider.getDailyPrices([request.symbol], isoDate(request.tradingDate));
   const metadata = prices[0]?.providerMetadata as { exchange?: unknown; requestedDate?: unknown } | undefined;
   console.log(JSON.stringify({
     symbol: request.symbol,
