@@ -1,7 +1,12 @@
 import { z } from 'zod';
 
 const id = z.string().min(1);
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected an ISO date.');
+const isoDate = z.string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected an ISO date.')
+  .refine((value) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }, 'Expected a valid calendar date.');
 
 export const importJobSchema = z.object({
   kind: z.literal('import.process'),

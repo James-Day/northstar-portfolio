@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-13 | Queue price-job calendar validation | Tightened the shared `price.refresh` Zod contract to validate real calendar dates rather than only `YYYY-MM-DD` formatting. Added regression coverage for valid dates and impossible dates; focused queue tests and typecheck passed. | This validates calendar shape only; exchange-session eligibility, provider responses, quota reservations, and hosted queue execution remain separate gates. |
+
 | 2026-09-11 | Checklist maintenance — Stable count audit | Added `npm run checklist:audit`, which validates all 102 stable task IDs and verifies the checked/unchecked totals in the checklist header. | Partial-evidence totals remain an audited implementation-progress view; hosted gates still require their stated external evidence. |
 
 | 2026-09-11 | 13.06 — Production market-data approval boundary (partial) | Added a fail-closed approval record template and contract tests requiring exact dataset rights evidence, attribution/change/share-alike review, an independent reviewer, and an explicitly recorded commercial provider plan before paid launch. | Rights approval and commercial-plan activation remain pending; free Marketstack stays development-only. |
