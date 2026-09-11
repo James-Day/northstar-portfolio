@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-13 | 07.06 — Harden historical verification manifest (partial) | Added fail-closed validation for impossible trading dates, duplicate symbol/date cases, invalid evidence statuses, and non-positive/non-finite expected closes. Seven manifest tests and typecheck passed. | Independent values and second-source evidence remain intentionally pending; this milestone only prevents malformed review fixtures from being accepted. |
+
 | 2026-09-13 | Queue price-job calendar validation | Tightened the shared `price.refresh` Zod contract to validate real calendar dates rather than only `YYYY-MM-DD` formatting. Added regression coverage for valid dates and impossible dates; focused queue tests and typecheck passed. | This validates calendar shape only; exchange-session eligibility, provider responses, quota reservations, and hosted queue execution remain separate gates. |
 
 | 2026-09-11 | Checklist maintenance — Stable count audit | Added `npm run checklist:audit`, which validates all 102 stable task IDs and verifies the checked/unchecked totals in the checklist header. | Partial-evidence totals remain an audited implementation-progress view; hosted gates still require their stated external evidence. |

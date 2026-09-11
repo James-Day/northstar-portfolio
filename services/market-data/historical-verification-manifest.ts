@@ -1,5 +1,7 @@
 import type { IsoDate } from '@/lib/domain/types';
-import type { DecimalString } from '@/lib/domain/money';
+import Decimal from 'decimal.js';
+import { decimalString, type DecimalString } from '@/lib/domain/money';
+import { isoDate } from '@/lib/domain/types';
 import type { HistoricalVerificationCategory, HistoricalVerificationCase } from './historical-verification';
 
 export type HistoricalEvidenceStatus = 'pending' | 'verified';
@@ -39,10 +41,16 @@ export function validateHistoricalVerificationManifest(
   const errors: string[] = [];
   const pending: HistoricalVerificationManifestCase[] = [];
   const verifiedCases: HistoricalVerificationCase[] = [];
+  const seen = new Set<string>();
 
   manifest.forEach((fixture, index) => {
     const prefix = `case[${index}]`;
     if (!fixture.symbol.trim()) errors.push(`${prefix}.symbol is required.`);
+    try { isoDate(fixture.tradingDate); } catch { errors.push(`${prefix}.tradingDate must be a valid calendar date.`); }
+    const key = `${fixture.symbol.trim().toUpperCase()}|${fixture.tradingDate}`;
+    if (seen.has(key)) errors.push(`${prefix} duplicates an earlier symbol/date case.`);
+    seen.add(key);
+    if (!['pending', 'verified'].includes(fixture.evidence.status)) errors.push(`${prefix}.evidence.status must be pending or verified.`);
     if (fixture.evidence.status === 'verified') {
       if (!/^https:\/\//.test(fixture.evidence.sourceUrl)) errors.push(`${prefix}.evidence.sourceUrl must use HTTPS.`);
       if (!fixture.evidence.sourceName.trim()) errors.push(`${prefix}.evidence.sourceName is required.`);
@@ -51,6 +59,12 @@ export function validateHistoricalVerificationManifest(
     }
     if (fixture.evidence.status === 'verified' && fixture.expectedClose === null) {
       errors.push(`${prefix}.expectedClose is required for verified evidence.`);
+    }
+    if (fixture.evidence.status === 'verified' && fixture.expectedClose !== null) {
+      try {
+        const close = new Decimal(decimalString(fixture.expectedClose));
+        if (!close.isFinite() || close.lte(0)) errors.push(`${prefix}.expectedClose must be a positive finite decimal.`);
+      } catch { errors.push(`${prefix}.expectedClose must be a valid decimal.`); }
     }
     if (fixture.evidence.status === 'pending') {
       pending.push(fixture);

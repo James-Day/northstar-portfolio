@@ -65,4 +65,24 @@ describe('historical verification manifest contract', () => {
     expect(result.ready).toBe(false);
     expect(result.errors).toContain('case[0].expectedClose is required for verified evidence.');
   });
+
+  it('rejects duplicate cases and non-positive expected closes', () => {
+    const first = verified();
+    first.expectedClose = decimalString('0');
+    const second = verified();
+    const result = validateHistoricalVerificationManifest([first, second]);
+    expect(result.ready).toBe(false);
+    expect(result.errors).toEqual(expect.arrayContaining([
+      'case[0].expectedClose must be a positive finite decimal.',
+      'case[1] duplicates an earlier symbol/date case.',
+    ]));
+  });
+
+  it('rejects impossible trading dates before independent review', () => {
+    const row = verified();
+    row.tradingDate = '2026-02-30' as never;
+    const result = validateHistoricalVerificationManifest([row]);
+    expect(result.ready).toBe(false);
+    expect(result.errors).toContain('case[0].tradingDate must be a valid calendar date.');
+  });
 });
