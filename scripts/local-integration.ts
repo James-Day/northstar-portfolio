@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import {
   createLocalIntegrationUsers,
   deleteLocalIntegrationUsers,
+  seedLocalIntegrationReferenceData,
   LocalIntegrationUsersError,
   parseSupabaseStatusEnv,
   type LocalIntegrationUser,
@@ -76,6 +77,7 @@ async function main() {
     credentials = parseSupabaseStatusEnv(run(['status', '-o', 'env'], false));
     try {
       users = await createLocalIntegrationUsers(credentials);
+      await seedLocalIntegrationReferenceData(credentials);
     } catch (error) {
       if (error instanceof LocalIntegrationUsersError) users = error.createdUsers;
       throw error;

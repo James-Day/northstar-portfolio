@@ -4,6 +4,7 @@ import {
   deleteLocalIntegrationUsers,
   parseSupabaseStatusEnv,
   LocalIntegrationUsersError,
+  seedLocalIntegrationReferenceData,
 } from './local-supabase-fixtures';
 
 describe('local Supabase integration fixtures', () => {
@@ -50,5 +51,16 @@ describe('local Supabase integration fixtures', () => {
       .mockResolvedValueOnce(new Response(null, { status: 500 }));
     await expect(createLocalIntegrationUsers({ apiUrl: 'http://localhost:54321', anonKey: 'anon' }, fetcher))
       .rejects.toMatchObject({ name: 'LocalIntegrationUsersError', createdUsers: [expect.objectContaining({ userId: 'user-a' })] } satisfies Partial<LocalIntegrationUsersError>);
+  });
+
+  it('seeds deterministic instruments and aliases through the service-role API', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 201 }))
+      .mockResolvedValueOnce(new Response(null, { status: 201 }));
+    await seedLocalIntegrationReferenceData({ apiUrl: 'http://localhost:54321', serviceRoleKey: 'service' }, fetcher);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(String(fetcher.mock.calls[0][0])).toContain('/rest/v1/instruments?on_conflict=id');
+    expect(JSON.parse(String(fetcher.mock.calls[1][1]?.body))[0]).toMatchObject({ symbol: 'AAPL', effective_to: null });
+    expect(fetcher.mock.calls[0][1]).toMatchObject({ method: 'POST', headers: { authorization: 'Bearer service' } });
   });
 });

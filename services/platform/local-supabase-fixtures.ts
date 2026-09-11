@@ -34,6 +34,20 @@ export const LOCAL_INTEGRATION_USERS = [
   },
 ] as const;
 
+export const LOCAL_INTEGRATION_INSTRUMENTS = [{
+  id: '11111111-1111-4111-8111-111111111111',
+  asset_type: 'stock',
+  display_name: 'Apple Inc.',
+}] as const;
+
+export const LOCAL_INTEGRATION_ALIASES = [{
+  id: '22222222-2222-4222-8222-222222222222',
+  instrument_id: LOCAL_INTEGRATION_INSTRUMENTS[0].id,
+  symbol: 'AAPL',
+  effective_from: '1980-12-12',
+  effective_to: null,
+}] as const;
+
 type Fetcher = typeof fetch;
 
 function parseEnvValue(value: string): string {
@@ -100,4 +114,19 @@ export async function deleteLocalIntegrationUsers(
     });
     if (!response.ok && response.status !== 404) throw new Error(`Local Auth fixture cleanup failed with HTTP ${response.status}.`);
   }
+}
+
+/** Seeds deterministic reference data through the service-role boundary. */
+export async function seedLocalIntegrationReferenceData(
+  credentials: Pick<LocalSupabaseCredentials, 'apiUrl' | 'serviceRoleKey'>,
+  fetcher: Fetcher = fetch,
+): Promise<void> {
+  const base = credentials.apiUrl.replace(/\/$/, '');
+  const headers = { apikey: credentials.serviceRoleKey, authorization: `Bearer ${credentials.serviceRoleKey}`, 'content-type': 'application/json', prefer: 'resolution=merge-duplicates,return=minimal' };
+  const seed = async (table: string, rows: readonly unknown[]) => {
+    const response = await fetcher(`${base}/rest/v1/${table}?on_conflict=id`, { method: 'POST', headers, body: JSON.stringify(rows) });
+    if (!response.ok) throw new Error(`Local reference fixture ${table} seed failed with HTTP ${response.status}.`);
+  };
+  await seed('instruments', LOCAL_INTEGRATION_INSTRUMENTS);
+  await seed('instrument_aliases', LOCAL_INTEGRATION_ALIASES);
 }
