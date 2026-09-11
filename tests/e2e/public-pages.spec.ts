@@ -22,10 +22,15 @@ test('sign-in page keeps unavailable credentials explicit', async ({ page }) => 
 });
 
 test('dashboard demo is clearly labeled as synthetic', async ({ page }) => {
+  const chartWarnings: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'warning' && message.text().includes('width(-1) and height(-1)')) chartWarnings.push(message.text());
+  });
   await page.goto('/demo');
   await expect(page.getByText('Synthetic demo · no account connected')).toBeVisible();
   await expect(page.getByRole('heading', { name: /portfolio example/i })).toBeVisible();
   await expect(page.getByText(/fictional long-term portfolio/i)).toBeVisible();
+  expect(chartWarnings, 'the responsive portfolio chart should not render with negative dimensions').toEqual([]);
 });
 
 test('configured dashboard does not render private data while signed out', async ({ page }) => {
