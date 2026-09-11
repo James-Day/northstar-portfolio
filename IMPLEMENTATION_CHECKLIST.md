@@ -15,7 +15,7 @@ This file is the current implementation plan. Work through the numbered steps in
 
 **Current count: 102 tasks — 67 checked, 35 unchecked, across 13 ordered steps.**
 
-**Progress view:** 95 tasks have implementation or verification evidence (67 complete and 28 partial); 7 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
+**Progress view:** 96 tasks have implementation or verification evidence (67 complete and 29 partial); 6 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -203,7 +203,7 @@ Owner: integration/platform. Depends on all earlier acceptance gates.
 - [ ] **13.05** Choose final product name/domain, check conflicts, and apply/verify logo/favicon consistently. Partial evidence: Northstar’s compass mark is now shared by the React wordmark and `public/favicon.svg`; document, application, and Open Graph metadata use the same Northstar title. Final name/domain conflict clearance and hosted visual verification remain.
 - [ ] **13.06** Confirm production market-data storage/display rights and an approved commercial plan before paid launch; free Marketstack remains development-only unless verified rights establish otherwise. Do not upgrade automatically.
 - [x] **13.07** Verify operating costs against $45–75/month before marketing, escalating estimates above $100; use current provider allowances/prices rather than old planning assumptions. Evidence: integer-cent budget assessment, current Marketstack plan table, 20% reserve capacity calculation, environment thresholds and documentation in commit `a879f23`.
-- [ ] **13.08** Gate: record all passing launch evidence, production configuration, recovery/rollback procedure and deployed version before inviting paying users.
+- [ ] **13.08** Gate: record all passing launch evidence, production configuration, recovery/rollback procedure and deployed version before inviting paying users. Partial evidence: `services/platform/launch-evidence.ts`, `scripts/verify-launch-evidence.ts`, `docs/LAUNCH_EVIDENCE.md`, and `docs/evidence/launch-evidence.example.json` aggregate baseline, preflight, hosted verification, provenance rights, backup/restore, rollback, and deployed revision evidence with fail-closed blockers. A completed staging/production record remains required.
 
 ## External inputs and scope
 
@@ -217,6 +217,7 @@ Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/sh
 
 | Date | Scope | Evidence | Limits |
 | --- | --- | --- | --- |
+| 2026-09-13 | 13.08 - Launch evidence aggregator (partial) | Added a deterministic `aggregateLaunchEvidence` validator and `npm run launch:evidence` CLI that combines baseline checks, warning-free preflight, validated backup/restore, market-data rights approval, hosted service checks, deployment revisions, and rollback evidence. Focused tests and typecheck pass; all hosted requirements fail closed until recorded as passed. | No completed staging/production evidence, independent rights approval, or deployed revision record is present yet. |
 | 2026-09-13 | 13.01 — CI integration path (partial) | Added a separate GitHub Actions Ubuntu job that starts an isolated Supabase stack, resets migrations, creates one disposable Auth fixture without repository secrets, starts the frontend with ephemeral public credentials, and runs an authenticated Playwright sign-in/dashboard assertion. Existing quality checks remain unchanged. | GitHub-hosted execution, real RLS/Storage assertions, and authenticated import/report flows still require a passing CI run and broader fixtures. |
 | 2026-09-11 | 11.06 — Local billing lifecycle boundary (partial) | Added regression coverage for server-owned Stripe customer mapping precedence, duplicate/reordered lifecycle reducer behavior, and cancellation preserving authenticated activity export and deletion request access. Focused billing/API tests (51) and typecheck passed. | Live Stripe test-mode products, signed delivery/replay against hosted Supabase, and hosted cancellation verification remain open. |
 

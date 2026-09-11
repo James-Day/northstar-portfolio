@@ -1,0 +1,9 @@
+{
+  "baseline": { "typecheck": "pass", "tests": "pass", "build": "pass", "browserSecretScan": "pass" },
+  "preflight": { "environment": "staging", "passed": false, "checks": [] },
+  "backupRestore": { "valid": false, "errors": ["Replace with validated hosted drill evidence."] },
+  "provenance": { "rightsReview": "blocked", "commercialPlan": "" },
+  "hosted": { "supabase": "not-run", "auth": "not-run", "storage": "not-run", "queues": "not-run", "cron": "not-run", "stripe": "not-run", "rls": "not-run", "imports": "not-run", "deletion": "not-run", "restore": "not-run", "browser": "not-run" },
+  "deployment": { "environment": "staging", "workerRevision": "", "migrationRevision": "", "deployedAt": "" },
+  "rollback": { "runbookPresent": true, "lastKnownGoodWorkerRevision": "", "migrationRecovery": "", "queueRecovery": "", "owner": "", "verifiedAt": "" }
+}
