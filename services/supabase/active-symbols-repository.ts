@@ -12,6 +12,7 @@ export type SupabaseActiveSymbolsRepositoryOptions = {
   fetcher?: typeof fetch;
   pageSize?: number;
 };
+export type ActiveSymbolDiscovery = { symbols: string[]; unresolvedInstrumentIds: string[] };
 
 /** Finds one shared current ticker list for the scheduled EOD job. */
 export class SupabaseActiveSymbolsRepository {
@@ -30,6 +31,10 @@ export class SupabaseActiveSymbolsRepository {
   }
 
   async list(): Promise<string[]> {
+    return (await this.listDetailed()).symbols;
+  }
+
+  async listDetailed(): Promise<ActiveSymbolDiscovery> {
     const pageSize = this.options.pageSize ?? 1000;
     if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 5000)
       throw new Error(
@@ -55,7 +60,7 @@ export class SupabaseActiveSymbolsRepository {
       if (page.length < pageSize) break;
     }
     const instrumentIds = [...new Set(lots.map((lot) => lot.instrument_id))];
-    if (instrumentIds.length === 0) return [];
+    if (instrumentIds.length === 0) return { symbols: [], unresolvedInstrumentIds: [] };
 
     const aliasesUrl = new URL("/rest/v1/instrument_aliases", this.baseUrl);
     aliasesUrl.searchParams.set("select", "instrument_id,symbol");
@@ -73,14 +78,15 @@ export class SupabaseActiveSymbolsRepository {
       );
     const aliases = z.array(aliasSchema).parse(await aliasesResponse.json());
     const wanted = new Set(instrumentIds);
-    return [
+    const resolvedInstrumentIds = new Set(aliases.map((alias) => alias.instrument_id));
+    return { symbols: [
       ...new Set(
         aliases
           .filter((alias) => wanted.has(alias.instrument_id))
           .map((alias) => alias.symbol.trim().toUpperCase())
           .filter(Boolean),
       ),
-    ].sort();
+    ].sort(), unresolvedInstrumentIds: instrumentIds.filter((id) => !resolvedInstrumentIds.has(id)).sort() };
   }
 
   private headers() {

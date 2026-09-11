@@ -100,4 +100,10 @@ describe("Supabase active-symbol repository", () => {
     expect(fetcher.mock.calls[0][0].searchParams.get("offset")).toBe("0");
     expect(fetcher.mock.calls[1][0].searchParams.get("offset")).toBe("2");
   });
+
+  it('reports active instruments whose current alias is missing', async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify([{ instrument_id: "11111111-1111-4111-8111-111111111111" }, { instrument_id: "22222222-2222-4222-8222-222222222222" }]))).mockResolvedValueOnce(new Response(JSON.stringify([{ instrument_id: "11111111-1111-4111-8111-111111111111", symbol: "AAPL" }])));
+    const repository = new SupabaseActiveSymbolsRepository({ supabaseUrl: "https://supabase.test", serviceRoleKey: "secret", fetcher: fetcher as typeof fetch });
+    await expect(repository.listDetailed()).resolves.toEqual({ symbols: ['AAPL'], unresolvedInstrumentIds: ['22222222-2222-4222-8222-222222222222'] });
+  });
 });
