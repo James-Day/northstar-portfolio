@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-10 | 10.09 — Authenticated browser boundary (partial) | Extended `tests/e2e/authenticated-workspace.spec.ts` to cover private dashboard entry, optional account-scope switching, and clean sign-out back to `/sign-in`. The fixture remains environment-gated and makes no hosted execution claim. | Live Supabase-backed value reconciliation, cross-account isolation, and full enabled-action traversal remain required. |
+
 | 2026-09-10 | 12.08 — Local privacy and continuity acceptance boundary (partial) | Added `services/platform/privacy-acceptance.test.ts`, composing raw-file retention/deletion, normalized-activity preservation, formula-safe export, deduplicated deletion plans, completed deletion transitions, canceled-entitlement denial, and fail-closed restore-evidence validation. Focused tests and typecheck pass. | An isolated hosted retention/export/deletion/restore run and revoked deleted-user verification remain required. |
 
 | 2026-09-10 | 13.02 — Local product journey contract (partial) | Added `services/product-journey.integration.test.ts`, which drives authenticated session, individual brokerage and traditional IRA account creation, Robinhood CSV staging, review lookup, unsupported-row resolution, atomic commit, snapshot-backed report, first-import trial status, and server-owned monthly Checkout through injectable adapters. Two deterministic variants pass without hosted-service claims. | Live Supabase/RLS/Storage, report recomputation, Stripe delivery, and authenticated browser traversal remain required. |
