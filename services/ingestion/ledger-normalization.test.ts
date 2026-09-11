@@ -56,6 +56,18 @@ describe('Robinhood ledger normalization', () => {
     expect(entries.filter((entry) => entry.entryType === 'drip_buy')).toHaveLength(1);
   });
 
+  it('keeps a supported stock split out of the cash and lot ledger projection', () => {
+    const rows = parseRobinhoodActivityCsv([
+      'Activity Date,Trans Code,Instrument,Quantity,Price,Amount,Description',
+      '2024-10-01,Buy,SCHD,10,$70,($700),Bought before split',
+      '2024-10-11,SPL,SCHD,20,,,Stock split',
+    ].join('\n'));
+    const entries = normalizeRobinhoodRowsForLedger(rows, new Map([['SCHD', 'instrument-schd']]));
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ entryType: 'buy', cashAmount: '-700', quantity: '10' });
+    expect(entries.some((entry) => entry.entryType === 'split')).toBe(false);
+  });
+
   it('preserves signs for cash activity and marks only deposits and withdrawals as external flows', () => {
     const rows = parseRobinhoodActivityCsv('Activity Date,Trans Code,Amount\n2026-01-02,ACH Deposit,$100\n2026-01-03,IRA Incentive,$10\n2026-01-04,ACH Withdrawal,$5\n2026-01-05,Fee,$1');
     expect(normalizeRobinhoodRowsForLedger(rows, new Map())).toEqual([
