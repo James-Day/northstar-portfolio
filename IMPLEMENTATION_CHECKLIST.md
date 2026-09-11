@@ -13,9 +13,9 @@ This file is the current implementation plan. Work through the numbered steps in
 - Keep commits large and coherent. Record meaningful milestone evidence rather than a log entry for every small UI change.
 - Never commit secrets. Configure credentials through local ignored environment files or the service's secret interface.
 
-**Current count: 102 tasks — 72 checked, 30 unchecked, across 13 ordered steps.**
+**Current count: 102 tasks — 73 checked, 29 unchecked, across 13 ordered steps.**
 
-**Progress view:** 102 tasks have implementation or verification evidence (72 complete and 30 partial); 0 tasks have no documented progress. Partial evidence never substitutes for the acceptance gates below.
+**Progress view:** 102 tasks have implementation or verification evidence (73 complete and 29 partial); 0 tasks have no documented progress. Partial evidence never substitutes for the acceptance gates below.
 
 Run `npm run checklist:audit` after checklist edits to verify the 102 stable task IDs and checked/unchecked header totals.
 
