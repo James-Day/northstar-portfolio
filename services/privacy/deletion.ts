@@ -31,5 +31,8 @@ export type UserDataDeletionPlan = {
 /** The executor must complete each durable action before marking the request complete. */
 export function createUserDataDeletionPlan(userId: string, accountIds: string[], rawObjectPaths: string[], hasBillingCustomer: boolean): UserDataDeletionPlan {
   if (!userId) throw new Error('Deletion plan requires a user ID.');
+  if (rawObjectPaths.some((path) => !path.startsWith(`${userId}/`) || path.includes('..') || path.includes('\\') || path.includes('\0') || path.split('/').some((part) => part.length === 0))) {
+    throw new Error('Deletion plan contains an invalid user-owned object path.');
+  }
   return { userId, cancelBillingCustomer: hasBillingCustomer, deleteRawObjectPaths: [...new Set(rawObjectPaths)], deleteAccountIds: [...new Set(accountIds)], deleteProfile: true };
 }

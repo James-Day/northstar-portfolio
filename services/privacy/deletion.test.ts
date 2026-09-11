@@ -13,4 +13,9 @@ describe('user data deletion', () => {
   it('collects raw files, accounts, profile, and billing cleanup without duplicate targets', () => {
     expect(createUserDataDeletionPlan('user', ['account', 'account'], ['user/statement.csv', 'user/statement.csv'], true)).toEqual({ userId: 'user', cancelBillingCustomer: true, deleteRawObjectPaths: ['user/statement.csv'], deleteAccountIds: ['account'], deleteProfile: true });
   });
+
+  it('rejects cross-user and traversal object paths before persistence', () => {
+    expect(() => createUserDataDeletionPlan('user', [], ['other-user/statement.csv'], false)).toThrow('invalid user-owned object path');
+    expect(() => createUserDataDeletionPlan('user', [], ['user/../other.csv'], false)).toThrow('invalid user-owned object path');
+  });
 });
