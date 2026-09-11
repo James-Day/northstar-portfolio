@@ -15,7 +15,7 @@ This file is the current implementation plan. Work through the numbered steps in
 
 **Current count: 102 tasks — 63 checked, 39 unchecked, across 13 ordered steps.**
 
-**Progress view:** 85 tasks have implementation or verification evidence (66 complete and 19 partial); 17 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
+**Progress view:** 85 tasks have implementation or verification evidence (67 complete and 18 partial); 17 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -162,7 +162,7 @@ Owner: product UI. Depends on step 09.
 - [x] **10.02** Live overview reads snapshots/freshness, renders holdings/value history/income/cash/gains where supplied, and has account selection plus loading/error/retry/awaiting-report states. Synthetic activity is hidden for authenticated users.
 - [x] **10.03** Persisted import review/history/commit/discard/latest-only undo controls exist; public skip links and active-navigation labels exist.
 - [x] **10.04** Implement persisted activity list with pagination/filtering and ledger-to-source-row detail. The authenticated Activity view now uses the account-scoped API with loading, empty, error, retry and pagination states; demo activity remains isolated.
-- [ ] **10.05** Finish value/return period controls, consolidated/account selection, allocation, invested capital/net deposits, dividend and realized-lot detail views.
+- [x] **10.05** Finish value/return period controls, consolidated/account selection, allocation, invested capital/net deposits, dividend and realized-lot detail views. Evidence: period/scope controls and allocation metrics in `components/portfolio-app.tsx`; persisted snapshot dividend and realized-event payloads in `services/reporting/snapshot-builder.ts`; dated dividend and FIFO lot detail states in the authenticated dashboard.
 - [x] **10.06** Complete opening-history and actionable warning flows; distinguish no holdings, missing report, stale report, partial history and unavailable prices without synthetic fallback. Evidence: typed warning classifier and authenticated Overview actions for import, opening-history review and retry in commits `4176951` and `dda6349`.
 - [ ] **10.07** Verify dialog focus/keyboard/screen-reader behavior, accessible tables, mobile layouts and 200% enlargement across authenticated flows.
 - [x] **10.08** Audit any retained WebMCP hooks against actual authorized app actions/state; no WebMCP hooks or unsupported action claims are retained. Evidence: `docs/WEBMCP_AUDIT.md`.
