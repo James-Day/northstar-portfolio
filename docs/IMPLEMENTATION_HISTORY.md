@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-11 | 01.07 — Refresh baseline gate evidence | `npm run baseline:gate` passed with typecheck, 146 Vitest files/563 tests, production build, and generated-browser secret scan. | This was run from the current checkout; a fresh-clone execution, database-isolation reset in the same gate, and live browser acceptance remain open. |
+
 | 2026-09-11 | 01.06/02.08/05.07 — Live local RLS and Storage acceptance | `npm run integration:local -- --rls` passed against Docker Desktop 29.7.2: two real Auth sessions verified owner account access, guessed-ID isolation, cross-user update/delete denial, invalid-session denial, private Storage isolation, service-only global writes, and cleanup. | The probe covers targeted account/global/storage boundaries; all user-owned tables, hosted roles, queued import redelivery, and authenticated browser traversal remain open. |
 
 | 2026-09-11 | 11.06 — Deterministic billing lifecycle acceptance (partial) | Added `services/platform/billing-lifecycle-acceptance.test.ts` to drive signed-event-shaped lifecycle payloads through the customer ownership resolver and entitlement reducer, covering duplicate IDs, delayed cancellation, equal-timestamp ordering, and conflicting event metadata. Expanded API cancellation coverage to verify both activity and report CSV exports plus deletion requests remain available. Focused billing/API tests (45) and typecheck passed. | Live Stripe test-mode delivery, hosted cancellation, and real signed webhook replay remain open. |
