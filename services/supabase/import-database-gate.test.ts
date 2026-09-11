@@ -131,4 +131,28 @@ describe('database-shaped import acceptance gate', () => {
     expect(state.ledger).toHaveLength(0);
     expect(state.audit.map((event) => event.kind)).toEqual(['commit', 'undo']);
   });
+
+  it('serializes different imports at the account boundary without losing either commit', async () => {
+    const state = createState();
+    stage(state, { id: 'account-import-a', fileHash: 'hash-a', rows: [activity({ amount: decimalString('-100') })] });
+    stage(state, { id: 'account-import-b', fileHash: 'hash-b', rows: [activity({ effectiveDate: isoDate('2026-01-03'), amount: decimalString('-25') })] });
+
+    // This queue models PostgreSQL's transaction-scoped account advisory lock:
+    // operations for one account wait for one another, while each transaction
+    // still commits its full ledger projection atomically.
+    const tails = new Map<string, Promise<void>>();
+    const serializeAccount = (accountId: string, operation: () => void) => {
+      const previous = tails.get(accountId) ?? Promise.resolve();
+      const current = previous.then(operation);
+      tails.set(accountId, current.catch(() => undefined));
+      return current;
+    };
+    await Promise.all([
+      serializeAccount('account-1', () => commit(state, 'account-import-a')),
+      serializeAccount('account-1', () => commit(state, 'account-import-b')),
+    ]);
+    expect([...state.imports.values()].map((item) => item.status)).toEqual(['committed', 'committed']);
+    expect(state.ledger.map((entry) => entry.importId)).toEqual(['account-import-a', 'account-import-b']);
+    expect(state.audit.map((event) => event.kind)).toEqual(['commit', 'commit']);
+  });
 });
