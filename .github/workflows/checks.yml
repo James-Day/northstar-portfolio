@@ -18,3 +18,85 @@ jobs:
       - run: npm run test:security
       - run: npm run test:e2e:install
       - run: npm run test:e2e
+
+  integration:
+    name: Supabase and authenticated browser integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:e2e:install
+      - name: Reset isolated Supabase and run authenticated browser flow
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          supabase_log="${RUNNER_TEMP}/supabase.log"
+          app_log="${RUNNER_TEMP}/northstar-app.log"
+          env_file="${RUNNER_TEMP}/supabase.env"
+          app_pid=""
+          safe_tail() {
+            tail -n 60 "$1" | sed -E \
+              -e 's/(eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/[REDACTED_TOKEN]/g' \
+              -e 's/((ANON|SERVICE_ROLE|JWT_SECRET|POSTGRES_PASSWORD|DASHBOARD_PASSWORD)[=: ]+)[^[:space:]]+/\1[REDACTED]/Ig'
+          }
+          cleanup() {
+            if [[ -n "${app_pid}" ]]; then
+              kill "${app_pid}" 2>/dev/null || true
+              wait "${app_pid}" 2>/dev/null || true
+            fi
+            npx --yes supabase stop --no-backup >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          if ! npx --yes supabase start >"${supabase_log}" 2>&1; then
+            echo 'Supabase failed to start on the GitHub runner.' >&2
+            safe_tail "${supabase_log}" >&2
+            exit 1
+          fi
+          if ! npx --yes supabase db reset >"${supabase_log}" 2>&1; then
+            echo 'Supabase migrations or seed reset failed on the GitHub runner.' >&2
+            safe_tail "${supabase_log}" >&2
+            exit 1
+          fi
+          npx --yes supabase status -o env >"${env_file}"
+          set -a
+          # This is the local runner's ephemeral environment, never a repository secret.
+          source "${env_file}"
+          set +a
+          export SUPABASE_URL="${API_URL}"
+          export NEXT_PUBLIC_SUPABASE_URL="${API_URL}"
+          export SUPABASE_ANON_KEY="${ANON_KEY}"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="${ANON_KEY}"
+          export NEXT_PUBLIC_API_URL="http://127.0.0.1:8787"
+
+          curl --fail-with-body --silent --show-error \
+            -X POST "${API_URL}/auth/v1/signup" \
+            -H "apikey: ${ANON_KEY}" \
+            -H 'content-type: application/json' \
+            --data '{"email":"portfolio-integration-a@example.test","password":"local-integration-a-2026-only"}' \
+            >/dev/null
+
+          npm run dev -- --host 127.0.0.1 >"${app_log}" 2>&1 &
+          app_pid=$!
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:3000/ >/dev/null; then break; fi
+            if ! kill -0 "${app_pid}" 2>/dev/null; then
+              echo 'Northstar frontend exited before becoming healthy.' >&2
+              safe_tail "${app_log}" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+          if ! curl --fail --silent http://127.0.0.1:3000/ >/dev/null; then
+            echo 'Northstar frontend did not become healthy within 60 seconds.' >&2
+            safe_tail "${app_log}" >&2
+            exit 1
+          fi
+          E2E_AUTH_EMAIL='portfolio-integration-a@example.test' \
+          E2E_AUTH_PASSWORD='local-integration-a-2026-only' \
+          npm run test:e2e -- tests/e2e/authenticated-workspace.spec.ts
