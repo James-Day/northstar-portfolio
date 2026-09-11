@@ -3307,7 +3307,7 @@ function ImportReview({
                     <td className="p-3 text-slate-500">{row.message ?? '—'}</td>
                     <td className="p-3">
                       {row.status === 'unsupported' && !resolvedIssueRowIds.has(row.id) ? (
-                        <button disabled={isStaging} onClick={() => void onResolveUnsupportedIssue(row.id)} className="font-semibold text-[#185da8] hover:text-[#154f8e]">Mark non-reportable</button>
+                        <button type="button" disabled={isStaging} onClick={() => void onResolveUnsupportedIssue(row.id)} className="font-semibold text-[#185da8] hover:text-[#154f8e]">Mark non-reportable</button>
                       ) : row.status === 'unsupported' ? 'Resolved' : '—'}
                     </td>
                   </tr>

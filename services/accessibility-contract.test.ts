@@ -33,6 +33,7 @@ describe('authenticated workspace accessibility contract', () => {
     expect(portfolioApp).toMatch(/id="main-content"[\s\S]*?tabIndex=\{?-1\}?/);
     expect(portfolioApp).toMatch(/<button\s+type="button"\s+onClick=\{signOut\}/);
     expect(portfolioApp).toMatch(/<button\s+key=\{label\}\s+type="button"/);
+    expect(portfolioApp).toMatch(/<button\s+type="button"\s+disabled=\{isStaging\}[\s\S]*?onResolveUnsupportedIssue/);
   });
 
   it('keeps dialogs usable at small widths and gives each one a labelled description', () => {
