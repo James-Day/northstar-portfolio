@@ -11,6 +11,13 @@ describe('SupabaseReportInputRepository', () => {
     expect(String(fetcher.mock.calls[0][0])).toContain('trading_date=lte.2026-01-03');
   });
 
+  it('rejects malformed instrument IDs before constructing a PostgREST filter', async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const repo = new SupabaseReportInputRepository({ supabaseUrl: 'https://db.test', serviceRoleKey: 'secret', fetcher });
+    await expect(repo.listCloses({ instrumentIds: ['not-a-uuid' as never], from: isoDate('2026-01-01'), through: isoDate('2026-01-02') })).rejects.toThrow('invalid instrument ID');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it('excludes unvalidated action rows at the query boundary', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify([{ instrument_id: '11111111-1111-4111-8111-111111111111', action_date: '2026-01-02', action_type: 'split', ratio_numerator: '2', ratio_denominator: '1', status: 'validated' }]), { status: 200 }));
     const repo = new SupabaseReportInputRepository({ supabaseUrl: 'https://db.test', serviceRoleKey: 'secret', fetcher });

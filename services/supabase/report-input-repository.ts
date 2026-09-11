@@ -22,7 +22,7 @@ export class SupabaseReportInputRepository {
   }
 
   async listCloses(input: { instrumentIds: InstrumentId[]; from: IsoDate; through: IsoDate }): Promise<DailyClose[]> {
-    const ids = [...new Set(input.instrumentIds)].filter(Boolean);
+    const ids = validatedInstrumentIds(input.instrumentIds);
     if (ids.length === 0) return [];
     const url = new URL('/rest/v1/daily_prices', this.baseUrl);
     url.searchParams.set('select', 'instrument_id,trading_date,close,price_revisions!inner(source,source_revision)');
@@ -35,7 +35,7 @@ export class SupabaseReportInputRepository {
   }
 
   async listCorrections(input: { instrumentIds: InstrumentId[]; from: IsoDate; through: IsoDate }): Promise<PriceCorrection[]> {
-    const ids = [...new Set(input.instrumentIds)].filter(Boolean);
+    const ids = validatedInstrumentIds(input.instrumentIds);
     if (ids.length === 0) return [];
     const url = new URL('/rest/v1/price_corrections', this.baseUrl);
     url.searchParams.set('select', 'instrument_id,trading_date,corrected_close,evidence,correction_version');
@@ -47,7 +47,7 @@ export class SupabaseReportInputRepository {
   }
 
   async listValidatedCorporateActions(input: { instrumentIds: InstrumentId[]; from: IsoDate; through: IsoDate }): Promise<Array<CorporateAction & { effectiveDate: IsoDate }>> {
-    const ids = [...new Set(input.instrumentIds)].filter(Boolean);
+    const ids = validatedInstrumentIds(input.instrumentIds);
     if (ids.length === 0) return [];
     const url = new URL('/rest/v1/corporate_actions', this.baseUrl);
     url.searchParams.set('select', 'instrument_id,action_date,action_type,ratio_numerator,ratio_denominator,status');
@@ -76,4 +76,12 @@ export class SupabaseReportInputRepository {
     if (!response.ok) throw new Error(`Supabase report-input query failed with HTTP ${response.status}.`);
     return response.json();
   }
+}
+
+function validatedInstrumentIds(values: InstrumentId[]): string[] {
+  const ids = [...new Set(values.map((value) => String(value).trim()).filter(Boolean))];
+  if (ids.some((id) => !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))) {
+    throw new Error('Report input contains an invalid instrument ID.');
+  }
+  return ids;
 }
