@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-12 | 07.04 — Machine-readable provenance and compliance gate (partial) | Added `config/market-data/dolthub-stocks.provenance.json` with source repository/table/revision query, observed CC BY-SA 4.0 terms, attribution and change/share-alike obligations, storage/display policy, and an explicit paid-launch hold. Added `evaluateDoltHubProvenanceCompliance` plus tests that verify the recorded obligations and fail closed until rights review is explicitly approved. | This records engineering requirements only; legal/rights review for the exact stored subset and paid user-facing display remains open. |
+
 | Date | Checklist ID / deliverable | Evidence | Remaining limitation |
 | --- | --- | --- | --- |
 | 2026-09-12 | 13.05 — Brand asset consistency (partial) | Aligned the accessible `BrandMark` component and `public/favicon.svg` compass geometry, added document/application/Open Graph metadata for the Northstar name, and added `services/branding-contract.test.ts` to guard the relationship. Focused branding tests (3) and typecheck passed. | Final product-name/domain conflict review and hosted browser/favicon verification remain. |

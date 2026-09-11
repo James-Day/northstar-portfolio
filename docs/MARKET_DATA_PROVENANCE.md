@@ -19,6 +19,14 @@ revision is not hard-coded: each API page records the `dolt_log` commit hash in
 `sourceRevision`, and the reader fails closed if that revision changes during a
 page read.
 
+The machine-readable record is
+[`config/market-data/dolthub-stocks.provenance.json`](../config/market-data/dolthub-stocks.provenance.json).
+It is the source of truth for the repository boundary, observed license terms,
+required storage metadata, display attribution, change notice/share-alike plan,
+and launch gate. `services/market-data/provenance-compliance.ts` checks that
+recorded obligations are present and keeps paid storage/display blocked while
+the rights review is pending.
+
 ## Product handling decision
 
 Until a rights review confirms that our planned paid storage and user-facing
@@ -37,3 +45,7 @@ Required launch evidence:
 3. Recheck the repository license and terms before enabling paid production
    ingestion; a source revision alone is not licensing clearance.
 
+The compliance evaluator is deliberately conservative: a local or development
+run may verify that the required fields are recorded, but only an explicit
+`approved` rights-review state can open the paid launch gate. This is an
+engineering control, not a legal conclusion.

@@ -1,0 +1,56 @@
+{
+  "manifestVersion": 1,
+  "datasetId": "dolthub-post-no-preference-stocks",
+  "provider": "DoltHub",
+  "repository": {
+    "url": "https://www.dolthub.com/repositories/post-no-preference/stocks",
+    "branch": "master",
+    "table": "ohlcv",
+    "revisionQuery": "SELECT commit_hash FROM dolt_log LIMIT 1",
+    "retrieval": "DoltHub SQL API"
+  },
+  "license": {
+    "spdxId": "CC-BY-SA-4.0",
+    "name": "Creative Commons Attribution-ShareAlike 4.0 International",
+    "url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "observedOn": "2026-09-12",
+    "commercialUse": "observed_permitted_subject_to_terms",
+    "obligations": {
+      "attribution": true,
+      "indicateChanges": true,
+      "shareAlikeForAdaptedDatabase": true,
+      "noAdditionalRestrictions": true
+    },
+    "rightsReview": "pending"
+  },
+  "sourceFields": {
+    "valuationField": "close",
+    "dateField": "date",
+    "symbolField": "act_symbol",
+    "priceAdjustment": "unadjusted"
+  },
+  "storagePolicy": {
+    "preserveSource": true,
+    "preserveSourceRevision": true,
+    "preserveLicenseNotice": true,
+    "storedSubset": "daily_unadjusted_close_only",
+    "adaptedDatabaseClassification": "pending_rights_review"
+  },
+  "displayPolicy": {
+    "attributionRequired": true,
+    "attributionText": "Historical daily prices sourced from the DoltHub post-no-preference/stocks dataset, licensed CC BY-SA 4.0.",
+    "sourceLink": "https://www.dolthub.com/repositories/post-no-preference/stocks",
+    "licenseLink": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "changeNoticeRequired": true,
+    "shareAlikeNoticeRequired": true,
+    "implementationStatus": "required_before_user_facing_paid_use"
+  },
+  "launchGate": {
+    "paidStorageAndDisplay": "blocked_pending_rights_review",
+    "requiredEvidence": [
+      "rights review covers the exact stored subset and paid user-facing display",
+      "attribution and license notice are present wherever the dataset or adapted database is distributed",
+      "change notice and compatible share-alike terms are approved for any adapted database distribution"
+    ]
+  }
+}
