@@ -100,4 +100,19 @@ describe('accepted Robinhood fixture gate', () => {
     expect(result.quantitiesBySymbol).toEqual({ SCHD: '29' });
     expect(result.cashAmount).toBe('-665');
   });
+
+  it('fails closed when a fixture sells more shares than its reconciled position', () => {
+    const csv = [
+      'Activity Date,Trans Code,Instrument,Quantity,Price,Amount',
+      '2026-01-02,Buy,VTI,1,$100,($100)',
+      '2026-01-03,Sell,VTI,1.1,$100,$110',
+    ].join('\n');
+    expect(() => reconcileAcceptedFixture(parseRobinhoodActivityCsv(csv), {
+      resolvedSymbols: ['VTI'],
+      rows: [
+        { rowNumber: 2, type: 'buy', symbol: 'VTI', quantity: '1', amount: '-100' },
+        { rowNumber: 3, type: 'sell', symbol: 'VTI', quantity: '1.1', amount: '110' },
+      ],
+    })).toThrow(/sells more VTI shares/);
+  });
 });

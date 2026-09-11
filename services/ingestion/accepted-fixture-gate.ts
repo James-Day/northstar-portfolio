@@ -85,6 +85,10 @@ export function reconcileAcceptedFixture(
       if (!new Decimal(activity.quantity).eq(expectedAdded)) throw new Error(`Accepted fixture row ${row.rowNumber} split quantity does not reconcile to the position.`);
       quantities.set(activity.symbol, before.times(ratio));
     }
+    if (activity.type === 'sell' && activity.symbol && activity.quantity !== null) {
+      const held = quantities.get(activity.symbol) ?? new Decimal(0);
+      if (new Decimal(activity.quantity).gt(held)) throw new Error(`Accepted fixture row ${row.rowNumber} sells more ${activity.symbol} shares than the reconciled position holds.`);
+    }
     cash = cash.plus(activity.amount);
     // A DRIP buy is a separate cash outflow. Only the explicit dividend row
     // contributes to income, preventing a reinvestment from being counted as
