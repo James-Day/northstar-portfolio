@@ -3,6 +3,7 @@ import { decimalString } from '@/lib/domain/money';
 import { isoDate, type DailyClose } from '@/lib/domain/types';
 import { valueLedgerHistory } from '@/services/calculations/valuation';
 import { applyLinkedLotTransfers, type InternalTransfer } from '@/services/ledger/transfers';
+import { applyFifoLedger } from '@/services/ledger/fifo';
 import type { LedgerEvent } from '@/services/ledger/fifo';
 import { composePersistedReportInputs, type PersistedReportInputs } from '@/services/reporting/compose-report-inputs';
 import { calculateConsolidatedReport, type ConsolidatedAccountInput } from '@/services/reporting/consolidated';
@@ -95,6 +96,15 @@ function activeAfterUndo(events: LedgerEvent[]): LedgerEvent[] {
 }
 
 describe('persisted accounting reconciliation fixture', () => {
+  it('keeps realized gains unavailable when persisted opening basis is unknown', () => {
+    const result = applyFifoLedger([
+      { id: 'unknown-basis-sale', date: date('2026-01-03'), type: 'sell', instrumentId: instrument, quantity: d('1'), grossAmount: d('75'), fee: d('1') },
+    ], [{ id: 'opening-unknown', instrumentId: instrument, acquiredOn: null, quantity: d('1'), totalCostBasis: null }]);
+    expect(result.cash).toBe('74');
+    expect(result.realizedGainLoss).toBeNull();
+    expect(result.sales).toEqual([expect.objectContaining({ eventId: 'unknown-basis-sale', proceeds: '74', matchedCostBasis: null, gainLoss: null, basisKnown: false })]);
+  });
+
   it('reconciles cash, positions, FIFO gains, fees, DRIP, transfer cancellation, and split order', () => {
     const events = fixtureEvents();
     const taxable = reportInputs(events.taxable);
