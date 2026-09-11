@@ -7,6 +7,7 @@ export type AcceptedFixtureRowExpectation = {
   symbol: string | null;
   quantity: string | null;
   amount: string;
+  splitRatio?: { numerator: string; denominator: string };
 };
 
 export type AcceptedFixtureExpectation = {
@@ -54,6 +55,13 @@ export function reconcileAcceptedFixture(
     const activity = row.activity;
     if (activity.type !== expectedRow.type || activity.symbol !== expectedRow.symbol || activity.quantity !== expectedRow.quantity) {
       throw new Error(`Accepted fixture row ${row.rowNumber} quantity/activity mismatch.`);
+    }
+    if (expectedRow.splitRatio) {
+      if (activity.type !== 'split' || !activity.corporateAction || activity.corporateAction.ratioNumerator !== expectedRow.splitRatio.numerator || activity.corporateAction.ratioDenominator !== expectedRow.splitRatio.denominator) {
+        throw new Error(`Accepted fixture row ${row.rowNumber} split ratio mismatch.`);
+      }
+    } else if (activity.type === 'split' && !activity.corporateAction) {
+      throw new Error(`Accepted fixture row ${row.rowNumber} has no validated split ratio.`);
     }
     assertDecimal(activity.amount, `row ${row.rowNumber} amount`);
     const amount = new Decimal(activity.amount);

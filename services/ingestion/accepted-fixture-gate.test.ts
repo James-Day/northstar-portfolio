@@ -48,4 +48,21 @@ describe('accepted Robinhood fixture gate', () => {
       rows: [{ rowNumber: 2, type: 'buy', symbol: 'VTI', quantity: '1', amount: '100' }],
     })).toThrow(/invalid positive cash amount/);
   });
+
+  it('reconciles split evidence without treating the corporate action as cash activity', () => {
+    const csv = [
+      'Activity Date,Trans Code,Instrument,Quantity,Price,Amount',
+      '2024-10-01,Buy,SCHD,10,$70,($700)',
+      '2024-10-11,SPL,SCHD,20,,,',
+    ].join('\n');
+    const result = reconcileAcceptedFixture(parseRobinhoodActivityCsv(csv), {
+      resolvedSymbols: ['SCHD'],
+      rows: [
+        { rowNumber: 2, type: 'buy', symbol: 'SCHD', quantity: '10', amount: '-700' },
+        { rowNumber: 3, type: 'split', symbol: 'SCHD', quantity: '20', amount: '0', splitRatio: { numerator: '3', denominator: '1' } },
+      ],
+    });
+    expect(result.cashAmount).toBe('-700');
+    expect(result.quantitiesBySymbol).toEqual({ SCHD: '10' });
+  });
 });
