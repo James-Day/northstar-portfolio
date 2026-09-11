@@ -43,8 +43,8 @@ jobs:
           app_pid=""
           safe_tail() {
             tail -n 60 "$1" | sed -E \
-              -e 's/(eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/[REDACTED_TOKEN]/g' \
-              -e 's/((ANON|SERVICE_ROLE|JWT_SECRET|POSTGRES_PASSWORD|DASHBOARD_PASSWORD)[=: ]+)[^[:space:]]+/\1[REDACTED]/Ig'
+            -e 's/(eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/[REDACTED_TOKEN]/g' \
+              -e 's/((ANON|SERVICE_ROLE|JWT_SECRET|POSTGRES_PASSWORD|DASHBOARD_PASSWORD|ACCESS_TOKEN|REFRESH_TOKEN|PASSWORD)[=: ]+)[^[:space:]]+/\1[REDACTED]/Ig'
           }
           cleanup() {
             if [[ -n "${api_pid}" ]]; then

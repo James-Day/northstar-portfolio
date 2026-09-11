@@ -44,7 +44,8 @@ describe('authenticated CI integration contract', () => {
     expect(workflow).not.toMatch(/unset SERVICE_ROLE_KEY POSTGRES_PASSWORD DASHBOARD_PASSWORD JWT_SECRET\n\n          npm run dev/);
     expect(workflow).toMatch(/safe_tail/);
     expect(workflow).toMatch(/REDACTED_TOKEN/);
-    expect(workflow).toMatch(/\(ANON\|SERVICE_ROLE\|JWT_SECRET\|POSTGRES_PASSWORD\|DASHBOARD_PASSWORD\)/);
+    expect(workflow).toMatch(/ACCESS_TOKEN\|REFRESH_TOKEN\|PASSWORD/);
+    expect(workflow).toMatch(/\(ANON\|SERVICE_ROLE\|JWT_SECRET\|POSTGRES_PASSWORD\|DASHBOARD_PASSWORD\|ACCESS_TOKEN\|REFRESH_TOKEN\|PASSWORD\)/);
     expect(workflow).not.toMatch(/export NEXT_PUBLIC_\w*(SERVICE_ROLE|PASSWORD|JWT_SECRET)/);
   });
 });
