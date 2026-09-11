@@ -1,0 +1,17 @@
+name = "northstar-portfolio-api-local"
+main = "workers/api.ts"
+compatibility_date = "2026-05-22"
+compatibility_flags = ["nodejs_compat"]
+
+# The local HTTP/browser harness does not execute scheduled jobs or queue
+# consumers. Keeping those deployment-only bindings out of this config avoids
+# Wrangler's Windows local-runtime crash while preserving the full production
+# contract in wrangler.api.toml.
+[vars]
+APP_ENV = "development"
+MARKETSTACK_MONTHLY_CAP = "100"
+MARKETSTACK_SCHEDULE_ENABLED = "false"
+MARKET_CALENDAR_CLOSED_DATES = ""
+MARKET_CALENDAR_OPEN_DATES = ""
+REPORT_THROUGH_DATE = ""
+REPORT_MAX_LOOKBACK_DAYS = "1830"

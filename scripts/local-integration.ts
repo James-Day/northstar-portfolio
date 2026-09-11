@@ -62,7 +62,10 @@ async function startApps(credentials: LocalSupabaseCredentials, browser = false)
     } : {}),
   };
   const specs = [
-    { name: 'api', command: 'npx', args: ['wrangler', 'dev', '--config', 'wrangler.api.toml', ...(browser ? ['--port', String(apiPort)] : [])], url: `http://127.0.0.1:${apiPort}/health` },
+    // Use the HTTP-only local config here. Deployment bindings remain in
+    // wrangler.api.toml and are exercised by the staging/launch contracts;
+    // Wrangler's Windows local queue/DO runtime is not needed for this smoke.
+    { name: 'api', command: 'npx', args: ['wrangler', 'dev', '--config', 'wrangler.api.local.toml', ...(browser ? ['--port', String(apiPort)] : [])], url: `http://127.0.0.1:${apiPort}/health` },
     { name: 'frontend', command: 'npm', args: ['run', 'dev', '--', '--host', '127.0.0.1', ...(browser ? ['--port', String(frontendPort)] : [])], url: `http://localhost:${frontendPort}/` },
   ];
   const handles: LocalProcessHandle[] = [];
