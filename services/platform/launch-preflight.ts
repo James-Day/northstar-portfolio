@@ -98,6 +98,7 @@ export function runLaunchPreflight(options: LaunchPreflightOptions = {}): Launch
   checks.push(fileCheckWithPath('deploy.wrangler-queues', wranglerPath, /IMPORT_QUEUE[\s\S]*REPORT_QUEUE[\s\S]*PRICE_QUEUE/));
   checks.push(fileCheckWithPath('deploy.wrangler-consumers', wranglerPath, /dead_letter_queue\s*=\s*"northstar-imports-dlq"[\s\S]*dead_letter_queue\s*=\s*"northstar-reports-dlq"[\s\S]*dead_letter_queue\s*=\s*"northstar-prices-dlq"/));
   checks.push(fileCheckWithPath('deploy.runbook', resolve(root, 'docs/LAUNCH_RUNBOOK.md'), /rollback[\s\S]*migration[\s\S]*queue/i));
+  checks.push(fileCheckWithPath('deploy.backup-restore-drill', resolve(root, 'docs/BACKUP_RESTORE_DRILL.md'), /RPO[\s\S]*RTO[\s\S]*isolated/i));
   checks.push(existsPath(resolve(root, 'supabase/migrations')) ? check('deploy.migrations', 'pass', `Verified ${resolve(root, 'supabase/migrations')}`) : check('deploy.migrations', 'fail', `Required launch path is missing: ${resolve(root, 'supabase/migrations')}`));
 
   // Staging may use test Stripe credentials, but a production launch must

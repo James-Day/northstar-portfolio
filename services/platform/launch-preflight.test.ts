@@ -21,12 +21,13 @@ function files(): Record<string, string> {
   return {
     'wrangler.api.toml': 'IMPORT_QUEUE REPORT_QUEUE PRICE_QUEUE dead_letter_queue = "northstar-imports-dlq" dead_letter_queue = "northstar-reports-dlq" dead_letter_queue = "northstar-prices-dlq"',
     'docs/LAUNCH_RUNBOOK.md': 'rollback migration queue',
+    'docs/BACKUP_RESTORE_DRILL.md': 'RPO RTO isolated',
     'supabase/migrations': 'migration',
   };
 }
 
 function run(env: Record<string, string | undefined> = baseEnv) {
-  const keyFor = (path: string) => path.includes('wrangler.api.toml') ? 'wrangler.api.toml' : path.includes('LAUNCH_RUNBOOK.md') ? 'docs/LAUNCH_RUNBOOK.md' : path.includes('supabase') ? 'supabase/migrations' : path;
+  const keyFor = (path: string) => path.includes('wrangler.api.toml') ? 'wrangler.api.toml' : path.includes('LAUNCH_RUNBOOK.md') ? 'docs/LAUNCH_RUNBOOK.md' : path.includes('BACKUP_RESTORE_DRILL.md') ? 'docs/BACKUP_RESTORE_DRILL.md' : path.includes('supabase') ? 'supabase/migrations' : path;
   return runLaunchPreflight({
     env,
     repoRoot: '/repo',
@@ -40,6 +41,16 @@ describe('launch preflight', () => {
     const result = run();
     expect(result.passed).toBe(true);
     expect(result.checks.find((item) => item.id === 'env.SUPABASE_SERVICE_ROLE_KEY')?.message).not.toContain('service');
+  });
+
+  it('requires the backup and restore drill procedure', () => {
+    const result = runLaunchPreflight({
+      env: baseEnv,
+      repoRoot: '/repo',
+      readFile: (path) => path.includes('BACKUP_RESTORE_DRILL.md') ? '' : files()[path.includes('wrangler.api.toml') ? 'wrangler.api.toml' : path.includes('LAUNCH_RUNBOOK.md') ? 'docs/LAUNCH_RUNBOOK.md' : path.includes('supabase') ? 'supabase/migrations' : path] ?? '',
+      existsPath: (path) => !path.includes('BACKUP_RESTORE_DRILL.md') && Boolean(files()[path.includes('wrangler.api.toml') ? 'wrangler.api.toml' : path.includes('LAUNCH_RUNBOOK.md') ? 'docs/LAUNCH_RUNBOOK.md' : path.includes('supabase') ? 'supabase/migrations' : path]),
+    });
+    expect(result.checks.find((item) => item.id === 'deploy.backup-restore-drill')?.status).toBe('fail');
   });
 
   it('fails closed when a required secret is missing', () => {

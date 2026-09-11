@@ -4,6 +4,10 @@ This runbook is required evidence for checklist items 13.04 and 13.08. The
 preflight command validates the repository-side portion; an operator must fill
 in the hosted evidence below during staging and before a paid launch.
 
+The backup and restore drill procedure is maintained separately in
+`docs/BACKUP_RESTORE_DRILL.md`. A successful isolated drill is required before
+claiming recovery readiness.
+
 ## Preflight
 
 Run `npm run preflight:launch` with the target environment variables loaded.
