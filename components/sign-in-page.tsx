@@ -6,11 +6,12 @@ import Link from 'next/link';
 import { BrandMark } from '@/components/brand-mark';
 import { createSupabaseAuthService } from '@/services/auth/supabase-auth';
 import { createPublicSupabaseClient } from '@/services/supabase/client';
+import { buildAuthRedirectUrl } from '@/lib/auth/redirects';
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
 type Mode = 'sign-in' | 'sign-up';
 
-export function SignInPage({ supabaseConfig }: { supabaseConfig?: PublicSupabaseConfig }) {
+export function SignInPage({ supabaseConfig, authRedirectOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'] }: { supabaseConfig?: PublicSupabaseConfig; authRedirectOrigins?: readonly string[] }) {
   const [mode, setMode] = useState<Mode>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,7 +27,7 @@ export function SignInPage({ supabaseConfig }: { supabaseConfig?: PublicSupabase
     setIsSubmitting(true);
     try {
       if (mode === 'sign-up') {
-        await auth.signUp({ email, password }, `${window.location.origin}/auth/callback`);
+        await auth.signUp({ email, password }, buildAuthRedirectUrl(window.location.origin, 'callback', authRedirectOrigins));
         setMessage('Check your email to confirm your account, then return here to sign in.');
       } else {
         await auth.signIn({ email, password });
@@ -52,7 +53,7 @@ export function SignInPage({ supabaseConfig }: { supabaseConfig?: PublicSupabase
     setMessage(undefined);
     setIsSubmitting(true);
     try {
-      await auth.startGoogleSignIn(`${window.location.origin}/auth/callback`);
+      await auth.startGoogleSignIn(buildAuthRedirectUrl(window.location.origin, 'callback', authRedirectOrigins));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Google sign-in could not start.');
       setIsSubmitting(false);
@@ -64,7 +65,7 @@ export function SignInPage({ supabaseConfig }: { supabaseConfig?: PublicSupabase
     setMessage(undefined);
     setIsSubmitting(true);
     try {
-      await auth.sendPasswordReset(email, `${window.location.origin}/auth/recovery`);
+      await auth.sendPasswordReset(email, buildAuthRedirectUrl(window.location.origin, 'recovery', authRedirectOrigins));
       setMessage('If that email has an account, a password-reset link is on its way.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Password reset could not start.');
