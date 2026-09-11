@@ -46,7 +46,7 @@ Owner: platform/integration. Start here; later steps rely on a repeatable local 
 - [x] **01.02** Local Supabase configuration, migrations, private bucket/RLS definitions and setup documentation exist. Evidence: `supabase/`, `README.md`.
 - [x] **01.03** Standalone Hono API Worker, cron/queue declarations, environment template and server-side provider configuration exist. Evidence: `workers/api.ts`, `wrangler.api.toml`, `.env.example`.
 - [x] **01.04** CI runs typecheck, Vitest and build; Playwright scripts and three public-page tests exist. Evidence: `.github/workflows/checks.yml`, `tests/e2e/public-pages.spec.ts`. Browser tests are not yet in CI.
-- [ ] **01.05** Add a repeatable local integration harness: reset/apply migrations, seed two isolated users plus instrument aliases, start API/frontend, and clean up test data. Read `docs/DOCKER_WINDOWS_RECOVERY.md` before Docker repairs.
+- [ ] **01.05** Add a repeatable local integration harness: reset/apply migrations, seed two isolated users plus instrument aliases, start API/frontend, and clean up test data. The harness supports installed or `npx` Supabase CLI execution and fails safely with captured Docker diagnostics; read `docs/DOCKER_WINDOWS_RECOVERY.md` before Docker repairs.
 - [ ] **01.06** Automate database constraints/RLS tests for every user-owned table, private objects and service-only global writes; test guessed IDs and direct database writes, not only mocked repositories.
 - [ ] **01.07** Gate: run the documented workflow from a fresh checkout and record migration, database-isolation, typecheck, unit and build results. Confirm browser output excludes service/provider secrets.
 
