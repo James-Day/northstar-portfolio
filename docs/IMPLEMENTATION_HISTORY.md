@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-13 | 05.02/08.09 — Wire the declared price queue consumer | Added the provider-neutral `price-queue-runtime` adapter and exported the `northstar-prices` Worker consumer. Jobs use the existing server-only provider, persistence, quota, calendar, and retry path; provider publication gaps retry instead of acknowledging incomplete prices. Ten focused queue/Worker tests and typecheck passed. | Cloudflare queue delivery and production Supabase/Marketstack execution remain unverified. |
+
 | 2026-09-13 | 01.05 — Recover partial local Auth fixture cleanup (partial) | Added a typed creation error carrying users created before a later fixture fails, and taught the local integration harness to pass those users through its cleanup path. Five fixture tests, typecheck, and diff checks passed. | Docker/Supabase availability and full API/frontend isolation execution remain unverified. |
 
 | 2026-09-13 | 07.06 — Complete independent historical verification fixture set | Replaced placeholder cases with six reviewed fixtures covering AAPL, SPY, the FB/META ticker transition, delisted TWTR, and the AAPL split period. Recorded second-source URLs, retrieval dates, locators, expected closes, and source comparison metadata; the manifest gate now accepts all six cases. | The second sources support verification only; DoltHub licensing and live seed/RLS execution remain separate launch gates. |

@@ -29,6 +29,8 @@ import { createSupabaseReportContextLoader } from '@/services/reporting/supabase
 import { resolveReportRange } from '@/services/reporting/report-range';
 import { isoDate } from '@/lib/domain/types';
 import { isMarketstackScheduledRefreshEnabled } from '@/services/platform/marketstack-development';
+import { createPriceQueueHandler } from '@/services/market-data/price-queue-runtime';
+import { runAndRecordDailyPriceRefresh } from '@/services/market-data/daily-refresh';
 type WorkerBindings = ApiBindings & { REPORT_QUEUE?: QueueProducer; MARKET_CALENDAR_CLOSED_DATES?: string; MARKET_CALENDAR_OPEN_DATES?: string; RATE_LIMIT_COUNTER?: DurableObjectNamespace; REFRESH_CLAIM?: DurableObjectNamespace; REPORT_THROUGH_DATE?: string; REPORT_MAX_LOOKBACK_DAYS?: string; STRIPE_SECRET_KEY?: string; MARKETSTACK_SCHEDULE_ENABLED?: string };
 function scheduledDependencies(environment: WorkerBindings) { if (!environment.SUPABASE_URL || !environment.SUPABASE_SERVICE_ROLE_KEY || !environment.MARKETSTACK_API_KEY) throw new Error('Scheduled pricing requires SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and MARKETSTACK_API_KEY secrets.'); const cap = Number(environment.MARKETSTACK_MONTHLY_CAP ?? '100'); const recorder = new SupabaseMarketDataJobRunsRepository({ supabaseUrl: environment.SUPABASE_URL, serviceRoleKey: environment.SUPABASE_SERVICE_ROLE_KEY }); return { symbols: new SupabaseActiveSymbolsRepository({ supabaseUrl: environment.SUPABASE_URL, serviceRoleKey: environment.SUPABASE_SERVICE_ROLE_KEY }), provider: new MarketstackProvider({ apiKey: environment.MARKETSTACK_API_KEY, requestBudget: new MonthlyRequestBudget(cap) }), persistence: new SupabaseDailyPricesRepository({ supabaseUrl: environment.SUPABASE_URL, serviceRoleKey: environment.SUPABASE_SERVICE_ROLE_KEY }), recorder, quota: { monthlyCap: cap, getUsedUnits: (now: Date) => recorder.getMonthlyQuotaUsage(now) }, claimStore: environment.REFRESH_CLAIM ? new CloudflareDurableObjectRefreshClaimStore(environment.REFRESH_CLAIM) : undefined, calendarOverrides: readCalendarOverrides(environment) }; }
 export { RateLimitCounterDurableObject };
@@ -76,6 +78,38 @@ export const reportQueue = createReportQueueHandler(resolveReportHandlers, {
   queueName: 'northstar-reports',
   resolveFailureRecorder: (environment) => {
     if (!environment.SUPABASE_URL || !environment.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Report queue requires Supabase service-role secrets.');
+    return new SupabaseQueueFailureRepository({ supabaseUrl: environment.SUPABASE_URL, serviceRoleKey: environment.SUPABASE_SERVICE_ROLE_KEY });
+  },
+});
+
+export const priceQueue = createPriceQueueHandler<WorkerBindings>(async (environment) => {
+  const dependencies = scheduledDependencies(environment);
+  return {
+    refresh: async (job) => {
+      // Queue jobs are emitted only for an already-eligible NY trading date.
+      // 23:00Z is after the U.S. close in both standard and daylight time.
+      const result = await runAndRecordDailyPriceRefresh(
+        new Date(`${job.date}T23:00:00.000Z`),
+        job.symbols,
+        dependencies.provider,
+        dependencies.persistence,
+        dependencies.recorder,
+        undefined,
+        dependencies.quota,
+        dependencies.calendarOverrides,
+      );
+      if (result.status === 'persisted' && result.tradingDate !== job.date) {
+        throw new Error(`Price queue job date ${job.date} resolved to ${result.tradingDate}.`);
+      }
+      if (result.status === 'skipped' && result.reason === 'provider_data_pending') {
+        throw new Error(`Price provider has not published all closes for ${job.date}.`);
+      }
+    },
+  };
+}, {
+  queueName: 'northstar-prices',
+  resolveFailureRecorder: (environment) => {
+    if (!environment.SUPABASE_URL || !environment.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Price queue requires Supabase service-role secrets.');
     return new SupabaseQueueFailureRepository({ supabaseUrl: environment.SUPABASE_URL, serviceRoleKey: environment.SUPABASE_SERVICE_ROLE_KEY });
   },
 });
