@@ -20,7 +20,7 @@ describe('staging configuration contract', () => {
   it('requires staging evidence to remain distinct from production approval', async () => {
     const runbook = await readFile(new URL('../../docs/LAUNCH_RUNBOOK.md', import.meta.url), 'utf8');
     expect(runbook).toMatch(/operator must fill\s+in the hosted evidence/i);
-    expect(runbook).toMatch(/warn is acceptable for staging/i);
+    expect(runbook).toMatch(/`warn`\s+is acceptable for staging/i);
     expect(runbook).toMatch(/do not invite paying users/i);
   });
 });
