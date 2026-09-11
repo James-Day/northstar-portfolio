@@ -63,6 +63,21 @@ describe('accepted Robinhood fixture gate', () => {
       ],
     });
     expect(result.cashAmount).toBe('-700');
-    expect(result.quantitiesBySymbol).toEqual({ SCHD: '10' });
+    expect(result.quantitiesBySymbol).toEqual({ SCHD: '30' });
+  });
+
+  it('rejects split share additions that do not match the declared ratio', () => {
+    const rows = parseRobinhoodActivityCsv([
+      'Activity Date,Trans Code,Instrument,Quantity,Price,Amount',
+      '2024-10-01,Buy,SCHD,10,$70,($700)',
+      '2024-10-11,SPL,SCHD,10,,,',
+    ].join('\n'));
+    expect(() => reconcileAcceptedFixture(rows, {
+      resolvedSymbols: ['SCHD'],
+      rows: [
+        { rowNumber: 2, type: 'buy', symbol: 'SCHD', quantity: '10', amount: '-700' },
+        { rowNumber: 3, type: 'split', symbol: 'SCHD', quantity: '10', amount: '0', splitRatio: { numerator: '3', denominator: '1' } },
+      ],
+    })).toThrow(/split quantity/);
   });
 });
