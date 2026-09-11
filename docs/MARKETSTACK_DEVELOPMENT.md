@@ -24,7 +24,7 @@ Before enabling the recurring schedule, run one deliberately tiny smoke fetch:
 npm run marketstack:dev-smoke -- --symbol AAPL --date 2026-09-09 --allowance 100
 ```
 
-The command accepts exactly one symbol and date, makes one bounded provider
+The command requires an explicit positive `--allowance`, accepts exactly one symbol and date, makes one bounded provider
 request, and prints only the normalized close, provider name, exchange/date
 metadata, and request-unit count. It never prints the API key. Replace the
 example date with a date that has a published close and set `--allowance` to

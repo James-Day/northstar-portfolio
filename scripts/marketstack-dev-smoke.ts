@@ -12,6 +12,10 @@ const confirmedAllowance = argument('allowance');
 const parsedAllowance = confirmedAllowance === undefined ? undefined : Number(confirmedAllowance);
 
 try {
+  if (typeof parsedAllowance !== 'number' || !Number.isInteger(parsedAllowance) || parsedAllowance < 1) {
+    throw new Error('Smoke fetch requires --allowance with the confirmed positive monthly allowance.');
+  }
+  const allowance = parsedAllowance as number;
   const request = validateMarketstackDevelopmentSmokeRequest(
     {
       APP_ENV: process.env.APP_ENV,
@@ -19,7 +23,7 @@ try {
       MARKETSTACK_MONTHLY_CAP: process.env.MARKETSTACK_MONTHLY_CAP,
       MARKETSTACK_SCHEDULE_ENABLED: process.env.MARKETSTACK_SCHEDULE_ENABLED,
     },
-    { symbol, tradingDate, confirmedAllowance: parsedAllowance },
+    { symbol, tradingDate, confirmedAllowance: allowance },
   );
   const budget = new MonthlyRequestBudget(request.monthlyCap);
   const provider = new MarketstackProvider({
