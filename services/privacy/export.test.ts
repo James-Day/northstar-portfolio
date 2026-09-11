@@ -4,6 +4,8 @@ import { escapeCsvCell, toCsv } from './export';
 describe('safe CSV export', () => {
   it('escapes CSV syntax and neutralizes formula-like values', () => {
     expect(escapeCsvCell('=SUM(A1:A2)')).toBe("'=SUM(A1:A2)");
+    expect(escapeCsvCell('  =SUM(A1:A2)')).toBe("'  =SUM(A1:A2)");
+    expect(escapeCsvCell('\t+CMD|/C calc')).toBe("'\t+CMD|/C calc");
     expect(escapeCsvCell('hello, "world"\nnext')).toBe('"hello, ""world""\nnext"');
   });
 

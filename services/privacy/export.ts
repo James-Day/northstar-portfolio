@@ -1,7 +1,7 @@
 /** Escapes a value for RFC 4180 CSV and neutralizes spreadsheet formulas. */
 export function escapeCsvCell(value: unknown): string {
   const text = value === null || value === undefined ? '' : String(value);
-  const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
+  const safe = /^[\t\r\n ]*[=+\-@]/.test(text) ? `'${text}` : text;
   return /[",\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
 
