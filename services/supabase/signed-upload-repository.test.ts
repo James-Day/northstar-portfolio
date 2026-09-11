@@ -32,7 +32,7 @@ describe('SupabaseSignedUploadRepository', () => {
       .mockResolvedValueOnce(new Response(bytes, { status: 200 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
     const repository = new SupabaseSignedUploadRepository({ supabaseUrl: 'https://supabase.test', supabaseAnonKey: 'anon', accounts: { get: vi.fn().mockResolvedValue({ id: 'account-1' }) } as never, fetcher: fetcher as typeof fetch });
-    await expect(repository.bind?.('user-1', 'session-1', 'account-1', 'import-1', 'user-1/account-1/object.csv', hash, bytes.byteLength)).resolves.toBeUndefined();
+    await expect(repository.bind?.('user-1', 'session-1', 'account-1', 'import-1', 'user-1/account-1/object.csv', hash, bytes.byteLength)).resolves.toBe(true);
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(String(fetcher.mock.calls[1][0])).toContain('/rest/v1/rpc/bind_import_object');
     expect(String(fetcher.mock.calls[1][1]?.body)).toContain(hash);

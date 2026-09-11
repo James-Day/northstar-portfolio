@@ -1526,6 +1526,32 @@ describe('standalone API', () => {
     });
   });
 
+  it('binds a verified private object only through the authenticated account route', async () => {
+    const bind = vi.fn().mockResolvedValue(true);
+    const app = createApi({ verifySession: async () => ({ id: 'user-123' }), signedUploadRepository: { create: vi.fn(), bind } });
+    const response = await app.request('http://api.test/v1/accounts/account-123/imports/import-123/object', {
+      method: 'POST',
+      headers: { authorization: 'Bearer session-token', 'content-type': 'application/json' },
+      body: JSON.stringify({ objectPath: 'user-123/account-123/object.csv', sha256: 'a'.repeat(64), size: 128 }),
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ bound: true });
+    expect(bind).toHaveBeenCalledWith('user-123', 'session-token', 'account-123', 'import-123', 'user-123/account-123/object.csv', 'a'.repeat(64), 128);
+  });
+
+  it('rejects incomplete object metadata before invoking the binding repository', async () => {
+    const bind = vi.fn();
+    const app = createApi({ verifySession: async () => ({ id: 'user-123' }), signedUploadRepository: { create: vi.fn(), bind } });
+    const response = await app.request('http://api.test/v1/accounts/account-123/imports/import-123/object', {
+      method: 'POST',
+      headers: { authorization: 'Bearer session-token', 'content-type': 'application/json' },
+      body: JSON.stringify({ objectPath: 'user-123/account-123/object.csv', size: 128 }),
+    });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'object_metadata_required' });
+    expect(bind).not.toHaveBeenCalled();
+  });
+
   it('rejects oversized JSON before repository work and preserves a correlation id', async () => {
     let called = false;
     const app = createApi({

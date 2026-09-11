@@ -878,7 +878,7 @@ export function createApi(dependencies: ApiDependencies = {}) {
         body.sha256,
         body.size,
       );
-      if (bound === undefined) return context.json({ error: 'not_found' }, 404);
+      if (!bound) return context.json({ error: 'not_found' }, 404);
       return context.json({ bound: true });
     },
   );
