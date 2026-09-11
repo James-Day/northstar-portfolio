@@ -17,6 +17,7 @@ export type AcceptedFixtureExpectation = {
 export type AcceptedFixtureReconciliation = {
   rowCount: number;
   cashAmount: string;
+  dividendIncome: string;
   quantitiesBySymbol: Record<string, string>;
 };
 
@@ -37,6 +38,7 @@ export function reconcileAcceptedFixture(
 
   const resolvedSymbols = new Set(expected.resolvedSymbols.map((symbol) => symbol.trim().toUpperCase()));
   let cash = new Decimal(0);
+  let dividendIncome = new Decimal(0);
   const quantities = new Map<string, Decimal>();
   const expectedRowNumbers = new Set<number>();
 
@@ -66,6 +68,10 @@ export function reconcileAcceptedFixture(
     }
 
     cash = cash.plus(activity.amount);
+    // A DRIP buy is a separate cash outflow. Only the explicit dividend row
+    // contributes to income, preventing a reinvestment from being counted as
+    // a second dividend during fixture reconciliation.
+    if (activity.type === 'dividend') dividendIncome = dividendIncome.plus(activity.amount);
     if (activity.symbol && activity.quantity !== null && ['buy', 'drip_buy', 'sell'].includes(activity.type)) {
       const signedQuantity = ['sell'].includes(activity.type) ? new Decimal(activity.quantity).negated() : new Decimal(activity.quantity);
       quantities.set(activity.symbol, (quantities.get(activity.symbol) ?? new Decimal(0)).plus(signedQuantity));
@@ -75,7 +81,7 @@ export function reconcileAcceptedFixture(
   const expectedCash = expected.rows.reduce((total, row) => total.plus(row.amount), new Decimal(0));
   if (!cash.eq(expectedCash)) throw new Error('Accepted fixture cash total did not reconcile.');
   const quantitiesBySymbol = Object.fromEntries([...quantities.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([symbol, quantity]) => [symbol, quantity.toFixed()]));
-  return { rowCount: rows.length, cashAmount: cash.toFixed(), quantitiesBySymbol };
+  return { rowCount: rows.length, cashAmount: cash.toFixed(), dividendIncome: dividendIncome.toFixed(), quantitiesBySymbol };
 }
 
 function assertDecimal(value: string, label: string): void {

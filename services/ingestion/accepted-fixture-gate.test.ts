@@ -12,6 +12,7 @@ describe('accepted Robinhood fixture gate', () => {
     const result = reconcileAcceptedFixture(parseRobinhoodActivityCsv(csv), expected);
     expect(result.rowCount).toBe(expected.rows.length);
     expect(result.cashAmount).toBe(expected.rows.reduce((total, row) => total.plus(row.amount), new Decimal(0)).toFixed());
+    expect(result.dividendIncome).toBe(expected.rows.filter((row) => row.type === 'dividend').reduce((total, row) => total.plus(row.amount), new Decimal(0)).toFixed());
     expect(Object.values(result.quantitiesBySymbol)).not.toContain('NaN');
   });
 
@@ -24,5 +25,18 @@ describe('accepted Robinhood fixture gate', () => {
 
     const unknownCode = parseRobinhoodActivityCsv('Activity Date,Trans Code,Amount\n2026-01-02,Corporate Mystery,$100');
     expect(() => reconcileAcceptedFixture(unknownCode as ParsedRobinhoodRow[], { resolvedSymbols: [], rows: [{ rowNumber: 2, type: 'interest', symbol: null, quantity: null, amount: '100' }] })).toThrow(/unsupported/);
+  });
+
+  it('counts an explicit dividend once when it is followed by a DRIP buy', () => {
+    const csv = 'Activity Date,Trans Code,Instrument,Quantity,Amount\n2026-01-02,CDIV,VTI,,0.24\n2026-01-02,Buy,VTI,0.0008,-0.24';
+    const result = reconcileAcceptedFixture(parseRobinhoodActivityCsv(csv), {
+      resolvedSymbols: ['VTI'],
+      rows: [
+        { rowNumber: 2, type: 'dividend', symbol: 'VTI', quantity: null, amount: '0.24' },
+        { rowNumber: 3, type: 'buy', symbol: 'VTI', quantity: '0.0008', amount: '-0.24' },
+      ],
+    });
+    expect(result.dividendIncome).toBe('0.24');
+    expect(result.cashAmount).toBe('0');
   });
 });
