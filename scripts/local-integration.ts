@@ -9,9 +9,11 @@ import {
   type LocalSupabaseCredentials,
 } from '../services/platform/local-supabase-fixtures.ts';
 import { boundedRedactedOutput, startLocalProcess, stopLocalProcesses, waitForLocalHttp, type LocalProcessHandle } from './local-processes.ts';
+import { runLocalRlsAcceptance } from '../services/platform/local-rls-acceptance.ts';
 
 const keepRunning = process.argv.includes('--keep');
 const withApp = process.argv.includes('--with-app');
+const withRls = process.argv.includes('--rls');
 
 type Command = { executable: string; prefix: string[] };
 
@@ -102,6 +104,10 @@ async function main() {
       throw error;
     }
     console.log(`Created ${users.length} deterministic local Auth users in memory for the isolation suite.`);
+    if (withRls) {
+      if (users.length !== 2) throw new Error('The RLS acceptance suite requires both deterministic Auth users.');
+      await runLocalRlsAcceptance(credentials, [users[0], users[1]]);
+    }
     if (withApp) {
       console.log('Starting API and frontend processes…');
       apps = await startApps(credentials);

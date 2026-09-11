@@ -23,6 +23,13 @@ services; stop them with Ctrl+C. Process output is bounded and credentials are
 redacted. If Docker is unavailable, the harness preserves the Supabase CLI
 diagnostic and exits without attempting unsafe Docker repairs.
 
+Run `npm run integration:local -- --rls` for the live database boundary probe.
+It uses two temporary Auth sessions to test owner reads, guessed-ID isolation,
+cross-user update/delete denial, invalid-session denial, private Storage access,
+and service-only global reference writes. The probe removes its temporary users
+and uploaded object on completion. A successful run is required before marking
+the live RLS checklist gates complete.
+
 ## Architecture direction
 
 The present UI is a Vinext/Sites application. The planned production system keeps a separate Cloudflare Hono API boundary and uses Supabase over HTTP for authentication, PostgreSQL, and private storage. Financial values cross API boundaries as canonical decimal strings and will be stored as `NUMERIC(38,12)` in PostgreSQL. Economic dates are `YYYY-MM-DD`; system events will use UTC timestamps.
