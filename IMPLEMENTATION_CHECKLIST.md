@@ -17,6 +17,8 @@ This file is the current implementation plan. Work through the numbered steps in
 
 **Progress view:** 102 tasks have implementation or verification evidence (67 complete and 35 partial); 0 tasks have no documented progress. Partial evidence never substitutes for the acceptance gates below.
 
+Run `npm run checklist:audit` after checklist edits to verify the 102 stable task IDs and checked/unchecked header totals.
+
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
 ## Audit conclusion
