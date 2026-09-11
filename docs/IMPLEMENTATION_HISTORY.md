@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-10 | 10.07 — Workspace accessibility contract (partial) | Added static coverage for keyboard landmarks, labeled account navigation, table column scopes, responsive table regions, status/alert messaging, and icon-only button labeling. | Live authenticated keyboard traversal, screen-reader output, dialog focus behavior and 200% enlargement remain to be verified. |
+
 | 2026-09-10 | 07.04 — Harden provenance link safety (partial) | Provenance compliance now requires HTTPS URLs for the license, upstream repository and display attribution links, with focused coverage for malformed or executable link schemes. | Exact dataset rights review and paid-use approval remain pending. |
 
 | 2026-09-10 | 12.07 — Actionable operational monitoring boundary (partial) | Operational status now emits stable component codes, severity, actionable next steps, import/recovery signals, and rejects invalid negative or fractional durable counters. Focused monitoring tests and typecheck pass. | Hosted metrics, backup/restore execution and alert delivery remain required. |
