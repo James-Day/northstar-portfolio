@@ -6,8 +6,10 @@ import {
   type LocalIntegrationUser,
   type LocalSupabaseCredentials,
 } from '../services/platform/local-supabase-fixtures.ts';
+import { startLocalProcess, stopLocalProcesses, waitForLocalHttp, type LocalProcessHandle } from './local-processes.ts';
 
 const keepRunning = process.argv.includes('--keep');
+const withApp = process.argv.includes('--with-app');
 
 type Command = { executable: string; prefix: string[] };
 
@@ -37,10 +39,32 @@ function assertCliAvailable() {
   supabaseCommand();
 }
 
+function startApps(credentials: LocalSupabaseCredentials): LocalProcessHandle[] {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    SUPABASE_URL: credentials.apiUrl,
+    SUPABASE_ANON_KEY: credentials.anonKey,
+    SUPABASE_SERVICE_ROLE_KEY: credentials.serviceRoleKey,
+  };
+  return [
+    startLocalProcess({ name: 'api', command: 'npx', args: ['wrangler', 'dev', '--config', 'wrangler.api.toml'], url: 'http://127.0.0.1:8787/health' }, { env, output: (line) => process.stdout.write(`${line}\n`) }),
+    startLocalProcess({ name: 'frontend', command: 'npm', args: ['run', 'dev', '--', '--host', '127.0.0.1'], url: 'http://127.0.0.1:3000/' }, { env, output: (line) => process.stdout.write(`${line}\n`) }),
+  ];
+}
+
+async function waitForInterrupt(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    const done = () => { process.off('SIGINT', done); process.off('SIGTERM', done); resolve(); };
+    process.once('SIGINT', done);
+    process.once('SIGTERM', done);
+  });
+}
+
 async function main() {
   let started = false;
   let credentials: LocalSupabaseCredentials | undefined;
   let users: LocalIntegrationUser[] = [];
+  let apps: LocalProcessHandle[] = [];
   try {
     assertCliAvailable();
     console.log('Starting isolated local Supabase services…');
@@ -51,8 +75,17 @@ async function main() {
     credentials = parseSupabaseStatusEnv(run(['status', '-o', 'env'], false));
     users = await createLocalIntegrationUsers(credentials);
     console.log(`Created ${users.length} deterministic local Auth users in memory for the isolation suite.`);
-    console.log('Local database reset and Auth fixtures completed. Start the API/frontend and run the authenticated isolation suite.');
+    if (withApp) {
+      console.log('Starting API and frontend processes…');
+      apps = startApps(credentials);
+      await Promise.all(apps.map((app) => waitForLocalHttp(app)));
+      console.log('API and frontend are ready. Run the authenticated isolation suite.');
+      if (keepRunning) await waitForInterrupt();
+    } else {
+      console.log('Local database reset and Auth fixtures completed. Use --with-app to start the API/frontend smoke harness.');
+    }
   } finally {
+    await stopLocalProcesses(apps);
     if (credentials && users.length && !keepRunning) {
       await deleteLocalIntegrationUsers(credentials, users);
       console.log('Removed deterministic local Auth users.');

@@ -15,6 +15,14 @@ fixtures; it does not touch a hosted project. Use the local Auth API to create
 two test users and verify that each can see only its own accounts before
 running authenticated browser tests.
 
+The repeatable harness runs the same reset and creates two temporary Auth
+users. Run `npm run integration:local -- --with-app` to also start the local
+API and frontend, wait for `/health` and the frontend URL, then clean up the
+child processes and users. Add `--keep` when manually exercising the running
+services; stop them with Ctrl+C. Process output is bounded and credentials are
+redacted. If Docker is unavailable, the harness preserves the Supabase CLI
+diagnostic and exits without attempting unsafe Docker repairs.
+
 ## Architecture direction
 
 The present UI is a Vinext/Sites application. The planned production system keeps a separate Cloudflare Hono API boundary and uses Supabase over HTTP for authentication, PostgreSQL, and private storage. Financial values cross API boundaries as canonical decimal strings and will be stored as `NUMERIC(38,12)` in PostgreSQL. Economic dates are `YYYY-MM-DD`; system events will use UTC timestamps.
