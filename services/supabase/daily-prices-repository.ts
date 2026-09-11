@@ -18,7 +18,7 @@ export class SupabaseDailyPricesRepository {
 
   /** Returns only symbols without a stored close for the requested date. */
   async getMissingSymbols(symbols: string[], tradingDate: string): Promise<string[]> {
-    const requested = [...new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))];
+    const requested = validatedSymbols(symbols);
     if (requested.length === 0) return [];
     const aliasUrl = new URL('/rest/v1/instrument_aliases', this.baseUrl);
     aliasUrl.searchParams.set('select', 'instrument_id,symbol');
@@ -42,7 +42,7 @@ export class SupabaseDailyPricesRepository {
 
   async persist(input: { tradingDate: string; prices: DailyPrice[] }): Promise<{ upserted: number }> {
     if (input.prices.length === 0) return { upserted: 0 };
-    const normalizedSymbols = input.prices.map((price) => price.symbol.trim().toUpperCase());
+    const normalizedSymbols = validatedSymbols(input.prices.map((price) => price.symbol), false);
     if (input.prices.some((price) => price.tradingDate !== input.tradingDate)) throw new Error('Daily price payload contains a date different from the requested trading date.');
     if (new Set(normalizedSymbols).size !== normalizedSymbols.length) throw new Error('Daily price payload contains duplicate symbols.');
     // A revision identifies the logical provider snapshot, so symbol order in
@@ -80,4 +80,13 @@ export class SupabaseDailyPricesRepository {
   }
 
   private headers() { return { apikey: this.options.serviceRoleKey, authorization: `Bearer ${this.options.serviceRoleKey}` }; }
+}
+
+function validatedSymbols(values: string[], deduplicate = true): string[] {
+  const normalized = values.map((value) => value.trim().toUpperCase()).filter(Boolean);
+  const symbols = deduplicate ? [...new Set(normalized)] : normalized;
+  if (symbols.some((symbol) => !/^[A-Z0-9][A-Z0-9._-]{0,14}$/u.test(symbol))) {
+    throw new Error('Daily price payload contains an invalid ticker symbol.');
+  }
+  return symbols;
 }

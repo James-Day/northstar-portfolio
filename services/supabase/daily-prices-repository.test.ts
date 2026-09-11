@@ -52,4 +52,12 @@ describe('Supabase daily prices repository', () => {
     await expect(repository.persist({ tradingDate: '2026-07-06', prices: [{ ...price, tradingDate: '2026-07-06' as never }, { ...price, tradingDate: '2026-07-06' as never }] })).rejects.toThrow('duplicate symbols');
     expect(fetcher).not.toHaveBeenCalled();
   });
+
+  it('rejects malformed ticker symbols before constructing an alias filter', async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const repository = new SupabaseDailyPricesRepository({ supabaseUrl: 'https://db.test', serviceRoleKey: 'secret', fetcher });
+
+    await expect(repository.getMissingSymbols(['AAPL,MSFT'], '2026-07-06')).rejects.toThrow('invalid ticker symbol');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 });
