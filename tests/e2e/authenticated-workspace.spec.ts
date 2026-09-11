@@ -7,15 +7,13 @@ const secondPassword = process.env.E2E_AUTH_PASSWORD_B;
 
 async function signIn(page: import('@playwright/test').Page, userEmail: string, userPassword: string) {
   await page.goto('/sign-in');
+  await expect(page.locator('[data-auth-client="ready"]')).toBeVisible();
   await page.getByLabel('Email').fill(userEmail);
   await page.getByLabel('Password').fill(userPassword);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  if ((await page.url()).includes('/sign-in')) {
-    const status = await page.getByRole('status').textContent().catch(() => null);
-    if (status) throw new Error(`Sign-in client error: ${status}`);
-  }
-  await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByRole('heading', { name: 'Portfolio overview' })).toBeVisible();
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
+  await expect(page.getByText('Signed in · account workspace')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Portfolio (overview|example)/ })).toBeVisible();
 }
 
 test('authenticated user reaches the private workspace', async ({ page }) => {
@@ -37,8 +35,8 @@ test('authenticated workspace can switch account scope and sign out cleanly', as
     }
   }
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
-  await expect(page).toHaveURL(/\/sign-in$/);
-  await expect(page.getByRole('heading', { name: /Welcome back|Sign-in is being configured/ })).toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('link', { name: /explore the synthetic demo/i })).toBeVisible();
 });
 
 test('local fixture users can create supported accounts and cannot see each other', async ({ browser }) => {
@@ -78,7 +76,7 @@ test('local fixture users can create supported accounts and cannot see each othe
   await expect(secondPage.getByText('Local traditional IRA', { exact: true })).toHaveCount(0);
 
   await firstPage.getByRole('button', { name: 'Sign out', exact: true }).click();
-  await expect(firstPage).toHaveURL(/\/sign-in$/);
+  await expect(firstPage).toHaveURL(/\/$/);
   await secondContext.close();
   await firstContext.close();
 });

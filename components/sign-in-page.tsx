@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ArrowRight, CheckCircle2, LockKeyhole } from 'lucide-react';
 import Link from 'next/link';
 import { BrandMark } from '@/components/brand-mark';
@@ -17,6 +17,8 @@ export function SignInPage({ supabaseConfig, authRedirectOrigins = ['http://loca
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState<string>();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+  useEffect(() => setIsHydrated(true), []);
   const client = useMemo(() => supabaseConfig ? createPublicSupabaseClient(supabaseConfig) : undefined, [supabaseConfig]);
   const auth = useMemo(() => client ? createSupabaseAuthService(client.auth) : undefined, [client]);
 
@@ -74,7 +76,7 @@ export function SignInPage({ supabaseConfig, authRedirectOrigins = ['http://loca
     }
   }
 
-  return <main id="auth-content" className="grid min-h-screen bg-[#f5f7fb] lg:grid-cols-[1.05fr_.95fr]">
+  return <main id="auth-content" data-auth-client={isHydrated ? 'ready' : 'loading'} className="grid min-h-screen bg-[#f5f7fb] lg:grid-cols-[1.05fr_.95fr]">
     <a href="#auth-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-bold focus:text-[#185da8] focus:shadow-lg">Skip to content</a>
     <section className="relative hidden overflow-hidden bg-[#152b4a] p-12 text-white lg:block">
       <Link href="/" className="relative z-10 flex items-center gap-2.5 font-bold tracking-tight"><BrandMark inverse /><span>northstar</span></Link>
