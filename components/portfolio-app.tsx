@@ -1191,6 +1191,12 @@ export function PortfolioApp({
   if (client && !userId) return <SignedOutWorkspaceState />;
   return (
     <main className="min-h-screen bg-[#f5f7fb] text-[#13233a]">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-bold focus:text-[#185da8] focus:shadow-lg"
+      >
+        Skip to content
+      </a>
       <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-[#f5f7fb]/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-4 md:px-8">
           <Link
@@ -1204,6 +1210,7 @@ export function PortfolioApp({
             <div className="flex items-center gap-3">
               <Pill tone="green">Signed in · account workspace</Pill>
               <button
+                type="button"
                 onClick={signOut}
                 className="text-sm font-bold text-[#185da8] hover:text-[#154f8e]"
               >
@@ -1238,6 +1245,7 @@ export function PortfolioApp({
             {nav.map(([label, Icon]) => (
               <button
                 key={label}
+                type="button"
                 onClick={() => {
                   setActive(label);
                   setMenuOpen(false);
@@ -1270,7 +1278,11 @@ export function PortfolioApp({
             onClick={() => setMenuOpen(false)}
           />
         )}
-        <section id="top" className="min-w-0 flex-1 px-4 py-7 md:px-8 md:py-10">
+        <section
+          id="main-content"
+          tabIndex={-1}
+          className="min-w-0 flex-1 px-4 py-7 outline-none md:px-8 md:py-10"
+        >
           <button
             ref={menuButtonRef}
             type="button"
@@ -2769,7 +2781,7 @@ function Accounts({
         </>
       )}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="rounded-3xl bg-white p-6 md:p-8">
+        <DialogContent className="max-h-[90vh] max-w-lg overflow-auto rounded-3xl bg-white p-6 md:p-8">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">
               Add a Robinhood account
