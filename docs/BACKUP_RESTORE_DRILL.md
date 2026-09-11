@@ -44,6 +44,23 @@ and measured data loss before accepting these targets for production.
    project, investigate, and repeat the drill after the corrective migration
    or backup change.
 
+## Validate the evidence record
+
+After completing the hosted drill, copy the evidence fields into a JSON file
+and run:
+
+```text
+npm run backup:verify -- path/to/backup-restore-evidence.json
+```
+
+The validator checks that all recovery invariants and alert delivery are
+explicitly marked `pass`, timestamps are UTC and chronological, measured RPO
+and RTO are within 24-hour and 4-hour targets, and evidence references do not
+contain credentials. It validates the record's structure only; it cannot prove
+that a hosted backup, restore, notification, or reconciliation actually ran.
+A safe, non-secret template is at
+`docs/evidence/backup-restore-drill.example.json`.
+
 ## Evidence record
 
 Complete this table for every drill:
@@ -63,4 +80,4 @@ Complete this table for every drill:
 | Evidence links and follow-up issue |  |
 
 The launch gate remains incomplete until the table is filled from a successful
-isolated drill and the evidence is reviewed.
+isolated drill, the JSON validator passes, and the evidence is reviewed.

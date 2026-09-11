@@ -20,7 +20,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
-    "baseline:gate": "node --experimental-strip-types scripts/baseline-gate.ts"
+    "baseline:gate": "node --experimental-strip-types scripts/baseline-gate.ts",
+    "backup:verify": "node --experimental-strip-types scripts/verify-backup-restore.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",
