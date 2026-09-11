@@ -25,4 +25,23 @@ describe('createSupabaseReportContextLoader', () => {
     await expect(loader({ kind: 'report.recompute', accountId: 'account-1', requestedBy: 'user-1', reason: 'price_updated' })).resolves.toMatchObject({ priceRevisionId: '22222222-2222-4222-8222-222222222222' });
     expect(findPriceRevisionId).toHaveBeenCalledWith({ source: 'dolthub', sourceRevision: 'commit-1' });
   });
+
+  it('loads evidence-backed corrections into the queue revision without inventing missing dates', async () => {
+    const instrumentId = '11111111-1111-4111-8111-111111111111';
+    const replay = { events: [{ id: 'buy-1', date: isoDate('2026-01-02'), type: 'buy' as const, instrumentId, quantity: '1', grossAmount: '100', fee: '0' }], openingLots: [], activityCoveredThrough: isoDate('2026-01-02'), sourceEntryIds: ['entry-1'] };
+    const findPriceRevisionId = vi.fn().mockResolvedValue('22222222-2222-4222-8222-222222222222');
+    const loader = createSupabaseReportContextLoader({
+      ledger: { get: vi.fn().mockResolvedValue(replay) },
+      market: {
+        listCloses: vi.fn().mockResolvedValue([{ instrumentId, tradingDate: isoDate('2026-01-02'), close: '101', source: 'dolthub', sourceRevision: 'commit-1' }]),
+        listCorrections: vi.fn().mockResolvedValue([{ instrumentId, tradingDate: isoDate('2026-01-02'), correctedClose: '110', evidence: 'issuer record', correctionVersion: 'correction-1' }]),
+        listValidatedCorporateActions: vi.fn().mockResolvedValue([]), findPriceRevisionId,
+      },
+      resolveRange: vi.fn().mockResolvedValue({ from: isoDate('2026-01-02'), through: isoDate('2026-01-05') }),
+    });
+    const context = await loader({ kind: 'report.recompute', accountId: 'account-1', requestedBy: 'user-1', reason: 'price_updated' });
+    expect(context).toMatchObject({ priceRevisionId: '22222222-2222-4222-8222-222222222222', inputs: { valuation: { closes: [{ close: '110', source: 'manual_correction', sourceRevision: 'correction-1' }] }, pricesThrough: '2026-01-02', priceDependencies: [{ sourceRevision: 'commit-1', correctionVersion: 'correction-1' }] } });
+    expect(context?.inputs.valuation.dates).toEqual([{ date: isoDate('2026-01-02'), canChainFromPrevious: false }, { date: isoDate('2026-01-05'), canChainFromPrevious: true }]);
+    expect(findPriceRevisionId).toHaveBeenCalledWith({ source: 'dolthub', sourceRevision: 'commit-1' });
+  });
 });
