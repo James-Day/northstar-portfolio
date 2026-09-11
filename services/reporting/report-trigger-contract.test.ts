@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const migration = fileURLToPath(new URL('../../supabase/migrations/20260911110000_report_trigger_deduplication.sql', import.meta.url));
+const migration = fileURLToPath(new URL('../../supabase/migrations/20260911110001_report_trigger_deduplication.sql', import.meta.url));
 
 describe('database report trigger contract', () => {
   it('deduplicates commit and undo outbox events by source import', async () => {

@@ -9,6 +9,11 @@ describe('local process harness contracts', () => {
       .toBe('SERVICE_ROLE_KEY=[REDACTED] Bearer [REDACTED]');
   });
 
+  it('redacts credentials from Supabase JSON status output', () => {
+    const output = '{"API_URL":"http://127.0.0.1:54321","ANON_KEY":"anon-secret","SERVICE_ROLE_KEY":"service-secret","JWT_SECRET":"jwt-secret"}';
+    expect(redactProcessOutput(output)).toBe('{"API_URL":"http://127.0.0.1:54321","ANON_KEY":"[REDACTED]","SERVICE_ROLE_KEY":"[REDACTED]","JWT_SECRET":"[REDACTED]"}');
+  });
+
   it('bounds redacted CLI diagnostics while retaining the newest failure lines', () => {
     const output = ['SERVICE_ROLE_KEY=secret-value', 'old diagnostic', 'another diagnostic', 'latest failure'].join('\n');
     expect(boundedRedactedOutput(output, ['secret-value'], 2)).toBe('[diagnostics truncated to 2 lines]\nanother diagnostic\nlatest failure');

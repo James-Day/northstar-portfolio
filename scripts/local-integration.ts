@@ -41,17 +41,32 @@ function assertCliAvailable() {
   supabaseCommand();
 }
 
-function startApps(credentials: LocalSupabaseCredentials): LocalProcessHandle[] {
+async function startApps(credentials: LocalSupabaseCredentials): Promise<LocalProcessHandle[]> {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     SUPABASE_URL: credentials.apiUrl,
     SUPABASE_ANON_KEY: credentials.anonKey,
     SUPABASE_SERVICE_ROLE_KEY: credentials.serviceRoleKey,
   };
-  return [
-    startLocalProcess({ name: 'api', command: 'npx', args: ['wrangler', 'dev', '--config', 'wrangler.api.toml'], url: 'http://127.0.0.1:8787/health' }, { env, output: (line) => process.stdout.write(`${line}\n`) }),
-    startLocalProcess({ name: 'frontend', command: 'npm', args: ['run', 'dev', '--', '--host', '127.0.0.1'], url: 'http://127.0.0.1:3000/' }, { env, output: (line) => process.stdout.write(`${line}\n`) }),
+  const specs = [
+    { name: 'api', command: 'npx', args: ['wrangler', 'dev', '--config', 'wrangler.api.toml'], url: 'http://127.0.0.1:8787/health' },
+    { name: 'frontend', command: 'npm', args: ['run', 'dev', '--', '--host', '127.0.0.1'], url: 'http://127.0.0.1:3000/' },
   ];
+  const handles: LocalProcessHandle[] = [];
+  for (const spec of specs) {
+    try {
+      const probeUrl = spec.name === 'frontend' ? 'http://localhost:3000/' : spec.url;
+      const response = await fetch(probeUrl);
+      if (response.status < 500) {
+        console.log(`${spec.name} already available; reusing the existing process.`);
+        continue;
+      }
+    } catch {
+      // Start the process below when no listener is available.
+    }
+    handles.push(startLocalProcess(spec, { env, output: (line) => process.stdout.write(`${line}\n`) }));
+  }
+  return handles;
 }
 
 async function waitForInterrupt(): Promise<void> {
@@ -70,7 +85,11 @@ async function main() {
   try {
     assertCliAvailable();
     console.log('Starting isolated local Supabase services…');
-    run(['start']);
+    // Supabase start prints a JSON block containing local credentials. Keep
+    // that output out of the terminal; status credentials are consumed only
+    // in memory below.
+    run(['start'], false);
+    console.log('Local Supabase services started.');
     started = true;
     console.log('Applying all migrations and deterministic fixtures…');
     run(['db', 'reset']);
@@ -85,7 +104,7 @@ async function main() {
     console.log(`Created ${users.length} deterministic local Auth users in memory for the isolation suite.`);
     if (withApp) {
       console.log('Starting API and frontend processes…');
-      apps = startApps(credentials);
+      apps = await startApps(credentials);
       await Promise.all(apps.map((app) => waitForLocalHttp(app)));
       console.log('API and frontend are ready. Run the authenticated isolation suite.');
       if (keepRunning) await waitForInterrupt();

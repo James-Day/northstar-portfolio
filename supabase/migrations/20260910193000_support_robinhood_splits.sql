@@ -125,7 +125,7 @@ begin
       if (v_activity -> 'corporateAction') is null
          or nullif(v_activity #>> '{corporateAction,ratioNumerator}', '') is null
          or nullif(v_activity #>> '{corporateAction,ratioDenominator}', '') is null then
-        raise exception 'Split source row % is missing an inferred ratio.' using errcode = '22023';
+        raise exception 'Split source row % is missing an inferred ratio.', v_row.row_number using errcode = '22023';
       end if;
       select count(*) into v_existing_count
       from public.corporate_actions

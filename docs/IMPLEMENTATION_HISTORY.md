@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-13 | 01.05 — Live local integration harness | Fixed PostgreSQL generated-key immutability, duplicate migration versions, split-import exception diagnostics, local Auth confirmation settings, idempotent alias seeding, credential redaction, and reuse of an existing frontend listener. `npm run integration:local` and `npm run integration:local -- --with-app` passed with migration reset, two Auth users, reference fixtures, API `/health` 200, frontend readiness, and cleanup. | Live RLS isolation and hosted deployment acceptance remain separate gates. |
+
 | 2026-09-13 | 01.07 — Full suite refresh after auth hardening (partial) | Reran the full Vitest suite after private-route failure handling: 145 files/560 tests passed. | The latest run was the complete test suite; fresh-checkout migration/database isolation and hosted browser acceptance remain required. |
 
 | 2026-09-13 | 02.05 — Fail closed on private-session verifier errors (partial) | Private dashboard routing now catches Supabase session verifier failures and redirects to sign-in before rendering any private UI. Four private-route tests and typecheck passed. | Hosted cookie handoff, provider configuration, and authenticated browser traversal remain required. |

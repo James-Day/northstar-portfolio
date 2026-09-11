@@ -5,8 +5,8 @@ drop index if exists public.report_snapshots_publication_key_unique;
 alter table public.report_snapshots drop column if exists publication_key;
 alter table public.report_snapshots
   add column publication_key text generated always as (
-    user_id::text || ':' || coalesce(account_id::text, 'consolidated') || ':' || report_type || ':' ||
-    as_of_date::text || ':' || import_state_revision || ':' || coalesce(price_revision_id::text, 'none')
+    encode(uuid_send(user_id), 'hex') || ':' || coalesce(encode(uuid_send(account_id), 'hex'), 'consolidated') || ':' || report_type || ':' ||
+    (as_of_date - date '2000-01-01')::text || ':' || import_state_revision || ':' || coalesce(encode(uuid_send(price_revision_id), 'hex'), 'none')
   ) stored;
 
 create unique index report_snapshots_publication_key_unique

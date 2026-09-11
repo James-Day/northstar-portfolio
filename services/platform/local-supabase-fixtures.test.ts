@@ -30,7 +30,7 @@ describe('local Supabase integration fixtures', () => {
       { label: 'b', email: 'portfolio-integration-b@example.test', userId: 'user-b' },
     ]);
     expect(fetcher).toHaveBeenCalledTimes(2);
-    expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({ email: 'portfolio-integration-a@example.test', password: 'local-integration-a-2026-only' });
+    expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({ email: 'portfolio-integration-a@example.test', password: 'Local-integration-a-2026-only' });
   });
 
   it('deletes only the users created by the run and tolerates already-cleaned users', async () => {
@@ -60,6 +60,7 @@ describe('local Supabase integration fixtures', () => {
     await seedLocalIntegrationReferenceData({ apiUrl: 'http://localhost:54321', serviceRoleKey: 'service' }, fetcher);
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(String(fetcher.mock.calls[0][0])).toContain('/rest/v1/instruments?on_conflict=id');
+    expect(String(fetcher.mock.calls[1][0])).toContain('/rest/v1/instrument_aliases?on_conflict=instrument_id,symbol,effective_from');
     expect(JSON.parse(String(fetcher.mock.calls[1][1]?.body))[0]).toMatchObject({ symbol: 'AAPL', effective_to: null });
     expect(fetcher.mock.calls[0][1]).toMatchObject({ method: 'POST', headers: { authorization: 'Bearer service' } });
   });

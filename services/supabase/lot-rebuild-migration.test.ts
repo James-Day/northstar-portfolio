@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const migration = readFileSync(new URL('../../supabase/migrations/20260910220000_rebuild_fifo_lots.sql', import.meta.url), 'utf8');
+const migration = readFileSync(new URL('../../supabase/migrations/20260910220001_rebuild_fifo_lots.sql', import.meta.url), 'utf8');
 
 describe('persisted FIFO lot rebuild migration', () => {
   it('replaces lot projections and records sale-to-lot matches in chronological FIFO order', () => {

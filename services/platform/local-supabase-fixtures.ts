@@ -25,12 +25,12 @@ export const LOCAL_INTEGRATION_USERS = [
   {
     label: 'a' as const,
     email: 'portfolio-integration-a@example.test',
-    password: 'local-integration-a-2026-only',
+    password: 'Local-integration-a-2026-only',
   },
   {
     label: 'b' as const,
     email: 'portfolio-integration-b@example.test',
-    password: 'local-integration-b-2026-only',
+    password: 'Local-integration-b-2026-only',
   },
 ] as const;
 
@@ -91,7 +91,10 @@ export async function createLocalIntegrationUsers(
       headers: authHeaders(credentials.anonKey),
       body: JSON.stringify({ email: fixture.email, password: fixture.password }),
     });
-    if (!response.ok) throw new LocalIntegrationUsersError(`Local Auth fixture ${fixture.label} creation failed with HTTP ${response.status}.`, created);
+    if (!response.ok) {
+      const detail = (await response.text()).trim().slice(0, 240);
+      throw new LocalIntegrationUsersError(`Local Auth fixture ${fixture.label} creation failed with HTTP ${response.status}${detail ? `: ${detail}` : '.'}`, created);
+    }
     const body = (await response.json()) as { user?: { id?: unknown } | null; access_token?: unknown };
     if (typeof body.user?.id !== 'string' || typeof body.access_token !== 'string') {
       throw new LocalIntegrationUsersError(`Local Auth fixture ${fixture.label} did not return a user session.`, created);
@@ -123,10 +126,10 @@ export async function seedLocalIntegrationReferenceData(
 ): Promise<void> {
   const base = credentials.apiUrl.replace(/\/$/, '');
   const headers = { apikey: credentials.serviceRoleKey, authorization: `Bearer ${credentials.serviceRoleKey}`, 'content-type': 'application/json', prefer: 'resolution=merge-duplicates,return=minimal' };
-  const seed = async (table: string, rows: readonly unknown[]) => {
-    const response = await fetcher(`${base}/rest/v1/${table}?on_conflict=id`, { method: 'POST', headers, body: JSON.stringify(rows) });
+  const seed = async (table: string, rows: readonly unknown[], conflictTarget = 'id') => {
+    const response = await fetcher(`${base}/rest/v1/${table}?on_conflict=${conflictTarget}`, { method: 'POST', headers, body: JSON.stringify(rows) });
     if (!response.ok) throw new Error(`Local reference fixture ${table} seed failed with HTTP ${response.status}.`);
   };
   await seed('instruments', LOCAL_INTEGRATION_INSTRUMENTS);
-  await seed('instrument_aliases', LOCAL_INTEGRATION_ALIASES);
+  await seed('instrument_aliases', LOCAL_INTEGRATION_ALIASES, 'instrument_id,symbol,effective_from');
 }

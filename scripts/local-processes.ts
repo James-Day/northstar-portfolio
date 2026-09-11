@@ -32,6 +32,7 @@ export function redactProcessOutput(value: string, secrets: string[] = []): stri
     redacted = redacted.split(secret).join('[REDACTED]');
   }
   return redacted
+    .replace(/("(?:ANON_KEY|SERVICE_ROLE_KEY|JWT_SECRET|PUBLISHABLE_KEY|SECRET_KEY|S3_PROTOCOL_ACCESS_KEY_ID|S3_PROTOCOL_ACCESS_KEY_SECRET)"\s*:\s*")[^"]*(")/gi, '$1[REDACTED]$2')
     .replace(/((?:service[_-]?role|anon|access|refresh|marketstack)[_-]?key\s*[:=]\s*)[^\s,;]+/gi, '$1[REDACTED]')
     .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, '$1[REDACTED]');
 }
