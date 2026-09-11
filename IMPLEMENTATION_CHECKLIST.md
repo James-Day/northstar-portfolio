@@ -15,7 +15,7 @@ This file is the current implementation plan. Work through the numbered steps in
 
 **Current count: 102 tasks — 67 checked, 35 unchecked, across 13 ordered steps.**
 
-**Progress view:** 97 tasks have implementation or verification evidence (67 complete and 30 partial); 5 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
+**Progress view:** 98 tasks have implementation or verification evidence (67 complete and 31 partial); 4 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -190,7 +190,7 @@ Owner: privacy/platform. Depends on working storage, reports and billing.
 - [x] **12.05** Complete settings UI for exports, deletion and billing; publish accurate privacy/terms and retention explanations. Evidence: `components/settings-panel.tsx`, `app/privacy/page.tsx`, `app/terms/page.tsx`, commit `7ddffaf`.
 - [ ] **12.06** Enforce rate limits, request validation, redacted logs, least-privilege roles and secret handling across all execution paths. API and Worker paths now emit injectable redacted request metadata with pathname-only logging, enforce shared Durable Object limits when configured, fail closed in production when that binding is absent, and keep provider/database secrets server-side; hosted execution-role verification remains open.
 - [ ] **12.07** Add actionable import/queue/report/provider monitoring; configure backups and document a successful restore drill with recovery targets. Secret-free operational status and a repository-side drill procedure now exist in `services/platform/operational-status.ts` and `docs/BACKUP_RESTORE_DRILL.md`; A hosted backup, restore, reconciliation and alert delivery run remains required; the local evidence validator and secret-free template are in `services/platform/backup-restore-evidence.ts`, `scripts/verify-backup-restore.ts`, and `docs/evidence/backup-restore-drill.example.json`.
-- [ ] **12.08** Gate: actual retention/export/deletion and restore tests pass in an isolated environment; canceled/deleted-user behavior is verified.
+- [ ] **12.08** Gate: actual retention/export/deletion and restore tests pass in an isolated environment; canceled/deleted-user behavior is verified. Local acceptance coverage now composes raw-file deletion with normalized-activity retention, formula-safe export, deduplicated deletion planning, completed deletion transitions, canceled-entitlement denial, and fail-closed restore-evidence validation in `services/platform/privacy-acceptance.test.ts`; isolated hosted execution remains required.
 
 ## 13 — Prove the complete MVP and prepare deployment
 
