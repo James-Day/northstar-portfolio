@@ -62,4 +62,37 @@ describe('consolidated report publisher', () => {
       }),
     }));
   });
+
+  it('publishes unavailable valuations when a consolidated holding has no stored close', async () => {
+    const dates = [{ date: isoDate('2026-02-02'), canChainFromPrevious: false }, { date: isoDate('2026-02-03'), canChainFromPrevious: true }];
+    const publish = vi.fn().mockResolvedValue('snapshot-unavailable');
+    await publishConsolidatedReportSnapshot({
+      publisher: { publish }, userId: 'user-1',
+      accounts: [{ accountId: 'ira', inputs: {
+        valuation: {
+          dates,
+          events: [
+            { id: 'deposit', date: isoDate('2026-02-02'), type: 'deposit', amount: decimalString('100') },
+            { id: 'buy', date: isoDate('2026-02-02'), type: 'buy', instrumentId: 'instrument-missing', quantity: decimalString('1'), grossAmount: decimalString('100'), fee: decimalString('0') },
+          ],
+          openingLots: [], closes: [], corporateActions: [],
+        },
+        ledger: { cash: decimalString('0'), openLots: [], realizedGainLoss: decimalString('0'), dividendIncome: decimalString('0'), netDeposits: decimalString('0'), sales: [] },
+        activityCoveredThrough: isoDate('2026-02-02'), pricesThrough: null, importStateRevision: 'ledger:ira',
+      } }],
+    });
+
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({
+      payload: expect.objectContaining({
+        totalValue: null,
+        cash: null,
+        pricesThrough: null,
+        valueHistory: [{ date: '2026-02-02', value: null }, { date: '2026-02-03', value: null }],
+        unavailableDates: [
+          { date: '2026-02-02', reason: 'non_contiguous_period' },
+          { date: '2026-02-03', reason: 'missing_valuation' },
+        ],
+      }),
+    }));
+  });
 });
