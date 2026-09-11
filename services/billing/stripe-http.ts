@@ -191,6 +191,55 @@ export function createStripeApi(
   };
 }
 
+export type StripeCustomerCancellationOptions = {
+  secretKey: string;
+  fetcher?: typeof fetch;
+};
+
+/** Server-only deletion helper. Stripe's customer object is retained, while
+ * every still-billable subscription is canceled before local billing data is
+ * removed. Re-running after a timeout is safe because canceled subscriptions
+ * are skipped and an already-missing subscription is treated as complete. */
+export function createStripeCustomerCancellation(
+  options: StripeCustomerCancellationOptions,
+): (customerId: string) => Promise<void> {
+  const secretKey = options.secretKey.trim();
+  if (!secretKey)
+    throw new BillingConfigurationError("STRIPE_SECRET_KEY is not configured.");
+  const fetcher = options.fetcher ?? ((input, init) => fetch(input, init));
+  return async (customerId: string) => {
+    if (!/^cus_[A-Za-z0-9]+$/.test(customerId))
+      throw new Error("Stripe customer ID is invalid.");
+    let startingAfter: string | undefined;
+    for (let page = 0; page < 10; page += 1) {
+      const url = new URL("https://api.stripe.com/v1/subscriptions");
+      url.searchParams.set("customer", customerId);
+      url.searchParams.set("status", "all");
+      url.searchParams.set("limit", "100");
+      if (startingAfter) url.searchParams.set("starting_after", startingAfter);
+      const response = await fetcher(url, {
+        headers: { authorization: `Bearer ${secretKey}` },
+      });
+      const payload: unknown = await response.json().catch(() => undefined);
+      if (!response.ok || !isRecord(payload) || !Array.isArray(payload.data))
+        throw new Error(`Stripe subscription lookup failed with HTTP ${response.status}.`);
+      const subscriptions = payload.data.filter(isRecord).filter((item) => typeof item.id === "string" && typeof item.status === "string");
+      for (const subscription of subscriptions) {
+        if (!["active", "trialing", "past_due", "unpaid", "incomplete"].includes(String(subscription.status))) continue;
+        const cancelResponse = await fetcher(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(String(subscription.id))}`, {
+          method: "DELETE",
+          headers: { authorization: `Bearer ${secretKey}` },
+        });
+        if (!cancelResponse.ok && cancelResponse.status !== 404)
+          throw new Error(`Stripe subscription cancellation failed with HTTP ${cancelResponse.status}.`);
+      }
+      if (payload.has_more !== true || subscriptions.length === 0) return;
+      startingAfter = String(subscriptions[subscriptions.length - 1].id);
+    }
+    throw new Error("Stripe subscription pagination exceeded the safety limit.");
+  };
+}
+
 export type BillingPlan = "monthly" | "annual";
 
 export class BillingConfigurationError extends Error {

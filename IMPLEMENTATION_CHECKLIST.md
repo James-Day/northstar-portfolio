@@ -15,7 +15,7 @@ This file is the current implementation plan. Work through the numbered steps in
 
 **Current count: 102 tasks — 63 checked, 39 unchecked, across 13 ordered steps.**
 
-**Progress view:** 83 tasks have implementation or verification evidence (63 complete and 20 partial); 19 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
+**Progress view:** 84 tasks have implementation or verification evidence (63 complete and 21 partial); 18 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 

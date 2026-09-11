@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createStripeApi } from "./stripe-http";
+import { createStripeApi, createStripeCustomerCancellation } from "./stripe-http";
 
 describe("Stripe API adapter", () => {
   it("creates a subscription Checkout session with server-owned metadata", async () => {
@@ -69,5 +69,19 @@ describe("Stripe API adapter", () => {
       ),
     );
     expect(body.get("customer")).toBe("cus_123");
+  });
+
+  it("cancels billable subscriptions across pages and skips already-canceled records", async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: "sub_active", status: "active" }, { id: "sub_done", status: "canceled" }], has_more: true }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "sub_active", status: "canceled" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: "sub_trial", status: "trialing" }], has_more: false }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "sub_trial", status: "canceled" }), { status: 200 }));
+    const cancel = createStripeCustomerCancellation({ secretKey: "sk_test_123", fetcher });
+    await cancel("cus_123");
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    expect(String(fetcher.mock.calls[0][0])).toContain("customer=cus_123");
+    expect(String(fetcher.mock.calls[2][0])).toContain("starting_after=sub_done");
+    expect((fetcher.mock.calls[1][1] as RequestInit).method).toBe("DELETE");
   });
 });
