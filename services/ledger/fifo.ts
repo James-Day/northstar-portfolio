@@ -29,12 +29,20 @@ export type RealizedSale = {
   basisKnown: boolean;
 };
 
+export type DividendIncomeEvent = {
+  eventId: string;
+  date: IsoDate;
+  amount: DecimalString;
+};
+
 export type LedgerResult = {
   cash: DecimalString;
   dividendIncome: DecimalString;
   netDeposits: DecimalString;
   realizedGainLoss: DecimalString | null;
   sales: RealizedSale[];
+  /** Individual imported dividend events, retained for report detail. */
+  dividendEvents?: DividendIncomeEvent[];
   openLots: OpenLot[];
 };
 
@@ -66,6 +74,7 @@ export function applyFifoLedger(events: LedgerEvent[], openingLots: LotInput[] =
   let knownRealized = zero();
   let hasUnknownRealizedBasis = false;
   const sales: RealizedSale[] = [];
+  const dividendEvents: DividendIncomeEvent[] = [];
 
   for (const event of events) {
     switch (event.type) {
@@ -115,6 +124,7 @@ export function applyFifoLedger(events: LedgerEvent[], openingLots: LotInput[] =
         requireNonNegative(event.amount, 'Dividend amount');
         cash = cash.plus(event.amount);
         dividendIncome = dividendIncome.plus(event.amount);
+        dividendEvents.push({ eventId: event.id, date: event.date, amount: event.amount });
         break;
       case 'interest':
         requireNonNegative(event.amount, 'Interest amount');
@@ -159,6 +169,7 @@ export function applyFifoLedger(events: LedgerEvent[], openingLots: LotInput[] =
     netDeposits: asString(netDeposits),
     realizedGainLoss: hasUnknownRealizedBasis ? null : asString(knownRealized),
     sales,
+    dividendEvents,
     openLots: openLots.filter((lot) => asDecimal(lot.remainingQuantity).gt(0)),
   };
 }

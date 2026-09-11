@@ -20,7 +20,7 @@ export async function publishReportSnapshot(input: {
   activityCoveredThrough: IsoDate | null;
   pricesThrough: IsoDate | null;
   priceDependencies?: PriceDependency[];
-  ledger?: Pick<LedgerResult, 'netDeposits' | 'dividendIncome' | 'realizedGainLoss'>;
+  ledger?: Pick<LedgerResult, 'netDeposits' | 'dividendIncome' | 'realizedGainLoss'> & Partial<Pick<LedgerResult, 'dividendEvents'>>;
 }): Promise<string> {
   const payload = buildReportSnapshotPayload(input);
   if (!payload.valuationThrough) throw new Error('Cannot publish a report without an as-of valuation date.');

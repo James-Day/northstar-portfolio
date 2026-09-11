@@ -23,4 +23,20 @@ describe('report snapshot builder', () => {
     const history = valueLedgerHistory({ dates: [{ date: isoDate('2026-01-01'), canChainFromPrevious: true }], events: [], closes: [] });
     expect(buildReportSnapshotPayload({ history, activityCoveredThrough: null, pricesThrough: null, ledger: { netDeposits: '100' as never, dividendIncome: '4.25' as never, realizedGainLoss: '-2.5' as never } })).toMatchObject({ netDeposits: '100', dividendIncome: '4.25', realizedGainLoss: '-2.5' });
   });
+
+  it('retains dividend event detail alongside the aggregate income total', () => {
+    const history = valueLedgerHistory({ dates: [{ date: isoDate('2026-01-01'), canChainFromPrevious: true }], events: [], closes: [] });
+    const payload = buildReportSnapshotPayload({
+      history,
+      activityCoveredThrough: null,
+      pricesThrough: null,
+      ledger: {
+        netDeposits: '0' as never,
+        dividendIncome: '10' as never,
+        realizedGainLoss: '0' as never,
+        dividendEvents: [{ eventId: 'dividend-1', date: isoDate('2026-01-01'), amount: '10' as never }],
+      },
+    });
+    expect(payload.dividends).toEqual([{ eventId: 'dividend-1', date: '2026-01-01', amount: '10' }]);
+  });
 });

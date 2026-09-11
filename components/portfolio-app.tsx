@@ -176,6 +176,11 @@ type LiveRealizedSale = {
   gainLoss: string | null;
   basisKnown: boolean;
 };
+type LiveDividend = {
+  eventId: string;
+  date: string;
+  amount: string;
+};
 type LiveReportSnapshot = {
   asOfDate: string;
   payload: {
@@ -186,6 +191,7 @@ type LiveReportSnapshot = {
     dividendIncome?: string | null;
     realizedGainLoss?: string | null;
     realizedSales?: LiveRealizedSale[];
+    dividends?: LiveDividend[];
     valueHistory?: Array<{ date: string; value: string | null }>;
     activityCoveredThrough: string | null;
     pricesThrough: string | null;
@@ -1859,6 +1865,7 @@ function Overview({
         netDeposits={liveNetDeposits ?? null}
         holdings={reportSnapshot?.payload.holdings}
         realizedSales={reportSnapshot?.payload.realizedSales}
+        dividends={reportSnapshot?.payload.dividends}
       />
     </>
   );
@@ -1931,6 +1938,7 @@ function ReportDetails({
   netDeposits,
   holdings,
   realizedSales,
+  dividends,
 }: {
   isLiveAccount: boolean;
   totalValue: string | null;
@@ -1938,10 +1946,12 @@ function ReportDetails({
   netDeposits: string | null;
   holdings?: LiveReportHolding[];
   realizedSales?: LiveRealizedSale[];
+  dividends?: LiveDividend[];
 }) {
   const rows = buildAllocationRows(holdings ?? [], cash, totalValue);
   const hasReport = totalValue !== null || holdings !== undefined;
   const sales = realizedSales ?? [];
+  const dividendEvents = dividends ?? [];
   return (
     <div className="mt-6 grid gap-6 xl:grid-cols-2">
       <section
@@ -2092,6 +2102,42 @@ function ReportDetails({
               </tbody>
             </table>
           </div>
+        )}
+      </section>
+      <section
+        aria-label="Dividend detail"
+        className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+      >
+        <div className="mb-5">
+          <h2 className="text-lg font-bold">Dividend detail</h2>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Cash income events recorded from your imported activity.
+          </p>
+        </div>
+        {isLiveAccount && dividends === undefined && (
+          <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
+            Dividend detail will appear after a report with income events is published.
+          </p>
+        )}
+        {isLiveAccount && dividends !== undefined && dividendEvents.length === 0 && (
+          <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
+            No dividend events in the latest report.
+          </p>
+        )}
+        {!isLiveAccount && (
+          <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
+            Dividend detail is unavailable in the synthetic example.
+          </p>
+        )}
+        {dividendEvents.length > 0 && (
+          <ul aria-label="Dividend events" className="divide-y divide-slate-100">
+            {dividendEvents.map((dividend) => (
+              <li key={dividend.eventId} className="flex items-center justify-between gap-3 py-3 text-sm">
+                <span className="text-slate-500">{dividend.date}</span>
+                <span className="font-bold text-emerald-600">{precise.format(Number(dividend.amount))}</span>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </div>
