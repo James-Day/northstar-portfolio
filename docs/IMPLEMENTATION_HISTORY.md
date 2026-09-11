@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-11 | 01.07 — Complete fresh-checkout baseline gate | Cloned `github/main` into an isolated temporary checkout, installed dependencies and native build tools, passed `npm run baseline:gate` (typecheck, 147 test files/564 tests, production build, generated-browser secret scan), and passed `npm run integration:local` with migration reset and Auth fixture cleanup. | Hosted browser traversal and deployment evidence remain separate checklist gates. |
+
 | 2026-09-11 | 07.08 — Complete historical seed acceptance gate | Added `npm run historical-seed:smoke` with an opt-in one-page DoltHub read and optional local Supabase persistence. Live AAPL 2024-01-02 retrieval captured source revision `sunb0786icgj6gaejsih1ujkb8pndmcv`; persistence and an idempotent repeat passed. Existing seed-gate tests cover quarantine, cursor restart, alias resolution and repeat safety, while the six-case independent verification manifest covers representative prices. | Production-scale seed execution and hosted RLS remain outside this local acceptance gate. |
 
 | 2026-09-11 | 01.06 — Complete local RLS/Storage acceptance gate | Combined migration-wide static policy contracts with a live `npm run integration:local -- --rls` run. Two real local Auth sessions verified owner account access, guessed-ID isolation, cross-user update/delete denial, invalid-session rejection, private Storage isolation, cleanup, and service-only global writes. | Hosted role verification and broader authenticated browser traversal remain separate gates. |
