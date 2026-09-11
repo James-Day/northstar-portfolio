@@ -1,0 +1,42 @@
+import { MarketstackProvider, MonthlyRequestBudget } from '../services/market-data/marketstack.ts';
+import { validateMarketstackDevelopmentSmokeRequest } from '../services/platform/marketstack-development.ts';
+
+function argument(name: string): string | undefined {
+  const index = process.argv.indexOf(`--${name}`);
+  return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+const symbol = argument('symbol');
+const tradingDate = argument('date');
+const confirmedAllowance = argument('allowance');
+const parsedAllowance = confirmedAllowance === undefined ? undefined : Number(confirmedAllowance);
+
+try {
+  const request = validateMarketstackDevelopmentSmokeRequest(
+    {
+      APP_ENV: process.env.APP_ENV,
+      MARKETSTACK_API_KEY: process.env.MARKETSTACK_API_KEY,
+      MARKETSTACK_MONTHLY_CAP: process.env.MARKETSTACK_MONTHLY_CAP,
+      MARKETSTACK_SCHEDULE_ENABLED: process.env.MARKETSTACK_SCHEDULE_ENABLED,
+    },
+    { symbol, tradingDate, confirmedAllowance: parsedAllowance },
+  );
+  const budget = new MonthlyRequestBudget(request.monthlyCap);
+  const provider = new MarketstackProvider({
+    apiKey: process.env.MARKETSTACK_API_KEY!,
+    requestBudget: budget,
+    maxSymbolsPerRequest: 1,
+  });
+  const prices = await provider.getDailyPrices([request.symbol], request.tradingDate as never);
+  console.log(JSON.stringify({
+    symbol: request.symbol,
+    tradingDate: request.tradingDate,
+    close: prices[0]?.close ?? null,
+    provider: prices[0]?.provider ?? null,
+    providerMetadata: prices[0]?.providerMetadata ?? null,
+    requestUnits: budget.usedUnits,
+  }, null, 2));
+} catch (error) {
+  console.error(error instanceof Error ? error.message : 'Marketstack development smoke fetch failed.');
+  process.exitCode = 1;
+}

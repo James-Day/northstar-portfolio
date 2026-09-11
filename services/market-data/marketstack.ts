@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { decimalString } from "@/lib/domain/money";
-import { isoDate, type IsoDate } from "@/lib/domain/types";
+import { decimalString } from "../../lib/domain/money.ts";
+import { isoDate, type IsoDate } from "../../lib/domain/types.ts";
 import type {
   DailyPrice,
   DailyPriceProvider,
   PriceRequestBudget,
-} from "@/services/market-data/types";
+} from "./types.ts";
 
 const marketstackResponse = z.object({
   data: z.array(
@@ -27,8 +27,10 @@ const marketstackResponse = z.object({
 
 export class MonthlyRequestBudget implements PriceRequestBudget {
   private used = 0;
+  private readonly cap: number;
 
-  constructor(private readonly cap: number) {
+  constructor(cap: number) {
+    this.cap = cap;
     if (!Number.isInteger(cap) || cap < 1)
       throw new Error("Market-data request cap must be a positive integer.");
   }
@@ -63,8 +65,10 @@ type MarketstackOptions = {
 export class MarketstackProvider implements DailyPriceProvider {
   private readonly fetcher: typeof fetch;
   private readonly baseUrl: string;
+  private readonly options: MarketstackOptions;
 
-  constructor(private readonly options: MarketstackOptions) {
+  constructor(options: MarketstackOptions) {
+    this.options = options;
     if (!options.apiKey.trim())
       throw new Error(
         "MARKETSTACK_API_KEY is required for Marketstack requests.",
