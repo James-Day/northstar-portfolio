@@ -137,4 +137,44 @@ describe('persisted import to report pipeline', () => {
     expect(snapshots.get(originalKey)).toEqual(originalSnapshot);
     expect(publisher.publish).toHaveBeenCalledTimes(4);
   });
+
+  it('converges duplicate queue delivery to one stored publication without mutating its revision', async () => {
+    const inputs = composePersistedReportInputs({
+      replay: {
+        events: [{ id: 'buy-1', date: isoDate('2026-01-01'), type: 'buy', instrumentId, quantity: decimalString('1'), grossAmount: decimalString('100'), fee: decimalString('0') }],
+        openingLots: [],
+        activityCoveredThrough: isoDate('2026-01-01'),
+        sourceEntryIds: ['entry-1'],
+      },
+      dates: [{ date: isoDate('2026-01-01'), canChainFromPrevious: false }],
+      closes: [{ instrumentId: instrumentId as never, tradingDate: isoDate('2026-01-01'), close: decimalString('100'), source: 'dolthub', sourceRevision: 'seed-1' }],
+    });
+    const stored = new Map<string, ReportSnapshotInput & { id: string }>();
+    const publisher = {
+      publish: vi.fn(async (input: ReportSnapshotInput) => {
+        const key = `${input.userId}|${input.accountId}|${input.reportType}|${input.asOfDate}|${input.importStateRevision}|${input.priceRevisionId ?? 'none'}`;
+        const existing = stored.get(key);
+        if (existing) return existing.id;
+        const record = { ...input, payload: structuredClone(input.payload), id: `snapshot-${stored.size + 1}` };
+        stored.set(key, record);
+        return record.id;
+      }),
+    };
+    const duplicate = () => message({ kind: 'report.recompute', accountId, requestedBy: userId, reason: 'import_committed' });
+    const first = duplicate();
+    const second = duplicate();
+    const resolve = async () => ({ load: async () => ({ userId, accountId, inputs, priceRevisionId: null }), isCurrent: async () => true, publisher });
+
+    await expect(consumeReportQueueBatch({ messages: [first, second] }, {}, {} as ExecutionContext, resolve)).resolves.toEqual({ acknowledged: 2, retried: 0, rejected: 0 });
+    expect(first.ack).toHaveBeenCalledOnce();
+    expect(second.ack).toHaveBeenCalledOnce();
+    expect(publisher.publish).toHaveBeenCalledTimes(2);
+    expect(stored).toHaveLength(1);
+    const original = structuredClone([...stored.values()][0]);
+
+    // A duplicate with a changed payload cannot overwrite the original
+    // publication when it carries the same dependency revision.
+    await expect(publisher.publish({ ...original, payload: { ...original.payload, totalValue: '999' } })).resolves.toBe(original.id);
+    expect(stored.get([...stored.keys()][0])).toEqual(original);
+  });
 });
