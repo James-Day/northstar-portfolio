@@ -34,7 +34,8 @@ describe('authenticated CI integration contract', () => {
     expect(workflow).toMatch(/export NEXT_PUBLIC_SUPABASE_ANON_KEY="\$\{ANON_KEY\}"/);
     expect(workflow).toMatch(/export SUPABASE_SERVICE_ROLE_KEY="\$\{SERVICE_ROLE_KEY\}"/);
     expect(workflow).toMatch(/export NEXT_PUBLIC_API_URL="http:\/\/127\.0\.0\.1:8787"/);
-    expect(workflow).toMatch(/unset SERVICE_ROLE_KEY POSTGRES_PASSWORD DASHBOARD_PASSWORD JWT_SECRET/);
+    expect(workflow).toMatch(/unset SERVICE_ROLE_KEY SUPABASE_SERVICE_ROLE_KEY SUPABASE_URL SUPABASE_ANON_KEY POSTGRES_PASSWORD DASHBOARD_PASSWORD JWT_SECRET/);
+    expect(workflow).not.toMatch(/unset SERVICE_ROLE_KEY POSTGRES_PASSWORD DASHBOARD_PASSWORD JWT_SECRET\n\n          npm run dev/);
     expect(workflow).toMatch(/safe_tail/);
     expect(workflow).toMatch(/REDACTED_TOKEN/);
     expect(workflow).toMatch(/\(ANON\|SERVICE_ROLE\|JWT_SECRET\|POSTGRES_PASSWORD\|DASHBOARD_PASSWORD\)/);

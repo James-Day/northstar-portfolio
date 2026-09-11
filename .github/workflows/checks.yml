@@ -108,7 +108,7 @@ jobs:
 
           # The frontend receives only public configuration. Never let the
           # service key or local database credentials leak into this process.
-          unset SERVICE_ROLE_KEY POSTGRES_PASSWORD DASHBOARD_PASSWORD JWT_SECRET
+          unset SERVICE_ROLE_KEY SUPABASE_SERVICE_ROLE_KEY SUPABASE_URL SUPABASE_ANON_KEY POSTGRES_PASSWORD DASHBOARD_PASSWORD JWT_SECRET
 
           npm run dev -- --host 127.0.0.1 >"${app_log}" 2>&1 &
           app_pid=$!
