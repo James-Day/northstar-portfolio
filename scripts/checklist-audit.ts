@@ -21,4 +21,10 @@ if (!countLine) throw new Error('Checklist header is missing the current count l
 if (Number(countLine[1]) !== tasks.length || Number(countLine[2]) !== checked || Number(countLine[3]) !== unchecked) {
   throw new Error(`Checklist header is stale: header=${countLine[1]}/${countLine[2]}/${countLine[3]}, parsed=${tasks.length}/${checked}/${unchecked}.`);
 }
-console.log(JSON.stringify({ total: tasks.length, checked, unchecked, taskIds: ids }, null, 2));
+const progressLine = source.match(/(?:\*\*)?Progress view:(?:\*\*)? (\d+) tasks have implementation or verification evidence \((\d+) complete and (\d+) partial\); (\d+) tasks have no documented progress\./);
+if (!progressLine) throw new Error('Checklist header is missing the progress view line.');
+const progress = { total: Number(progressLine[1]), complete: Number(progressLine[2]), partial: Number(progressLine[3]), noDocumentedProgress: Number(progressLine[4]) };
+if (progress.total !== tasks.length || progress.complete !== checked || progress.complete + progress.partial + progress.noDocumentedProgress !== tasks.length) {
+  throw new Error(`Checklist progress view is stale: header=${progress.total}/${progress.complete}/${progress.partial}/${progress.noDocumentedProgress}, parsed=${tasks.length}/${checked}/${unchecked}/unknown.`);
+}
+console.log(JSON.stringify({ total: tasks.length, checked, unchecked, inProgress: progress.total, noDocumentedProgress: progress.noDocumentedProgress, taskIds: ids }, null, 2));
