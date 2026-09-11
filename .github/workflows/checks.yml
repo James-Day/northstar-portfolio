@@ -14,9 +14,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
+      - run: npm run baseline:gate
       - run: npm run test:security
-      - run: npm run build
       - run: npm run test:e2e:install
       - run: npm run test:e2e

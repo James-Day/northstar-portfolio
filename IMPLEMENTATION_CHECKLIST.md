@@ -13,9 +13,9 @@ This file is the current implementation plan. Work through the numbered steps in
 - Keep commits large and coherent. Record meaningful milestone evidence rather than a log entry for every small UI change.
 - Never commit secrets. Configure credentials through local ignored environment files or the service's secret interface.
 
-**Current count: 102 tasks — 64 checked, 38 unchecked, across 13 ordered steps.**
+**Current count: 102 tasks — 67 checked, 35 unchecked, across 13 ordered steps.**
 
-**Progress view:** 87 tasks have implementation or verification evidence (67 complete and 20 partial); 15 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
+**Progress view:** 88 tasks have implementation or verification evidence (67 complete and 21 partial); 14 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -48,7 +48,7 @@ Owner: platform/integration. Start here; later steps rely on a repeatable local 
 - [x] **01.04** CI runs typecheck, Vitest, build, Playwright browser installation and the public browser suite. Evidence: `.github/workflows/checks.yml`, `playwright.config.ts`, `tests/e2e/public-pages.spec.ts`; five public-flow tests pass locally.
 - [ ] **01.05** Add a repeatable local integration harness: reset/apply migrations, seed two isolated users plus instrument aliases, start API/frontend, and clean up test data. The harness supports installed or `npx` Supabase CLI execution and fails safely with captured Docker diagnostics; read `docs/DOCKER_WINDOWS_RECOVERY.md` before Docker repairs. Evidence: `scripts/local-integration.ts`, `scripts/local-processes.ts`, `services/platform/local-supabase-fixtures.ts`, and focused tests now parse local status credentials, create two deterministic Auth users after reset, optionally start and health-check API/frontend with bounded redacted output capture, and terminate child process trees before removing only users created by the run; the executable harness reached `supabase start` and captured the current unavailable `dockerDesktopLinuxEngine` daemon, so live API/frontend and isolation execution remain unverified.
 - [ ] **01.06** Automate database constraints/RLS tests for every user-owned table, private objects and service-only global writes; test guessed IDs and direct database writes, not only mocked repositories. Migration-wide static contracts now classify every table, require `auth.uid()` ownership policies, enforce private Storage policy coverage, and revoke browser writes for immutable evidence, derived projections, service tables, and global market-reference data; live guessed-ID/direct-write execution remains open.
-- [ ] **01.07** Gate: run the documented workflow from a fresh checkout and record migration, database-isolation, typecheck, unit and build results. Confirm browser output excludes service/provider secrets.
+- [ ] **01.07** Gate: run the documented workflow from a fresh checkout and record migration, database-isolation, typecheck, unit and build results. Confirm browser output excludes service/provider secrets. Partial evidence: `npm run baseline:gate` now runs typecheck, Vitest, production build, and a secret-free generated-browser scan; the complete workflow is documented in `docs/VERIFICATION_BASELINE.md` and CI invokes the same baseline gate. Fresh-checkout migration/database-isolation and live browser acceptance evidence remain open.
 
 ## 02 — Finish identity and account access
 

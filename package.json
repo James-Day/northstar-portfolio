@@ -19,7 +19,8 @@
     "integration:local": "node --experimental-strip-types scripts/local-integration.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:e2e:install": "playwright install chromium"
+    "test:e2e:install": "playwright install chromium",
+    "baseline:gate": "node --experimental-strip-types scripts/baseline-gate.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",
