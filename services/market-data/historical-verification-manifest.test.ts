@@ -21,14 +21,14 @@ const verified = (): HistoricalVerificationManifestCase => ({
 });
 
 describe('historical verification manifest contract', () => {
-  it('keeps the checked-in candidate manifest explicitly pending', () => {
+  it('accepts the checked-in independently reviewed manifest', () => {
     const manifest = JSON.parse(readFileSync(new URL('../../config/market-data/historical-verification-cases.json', import.meta.url), 'utf8')) as { status: string; cases: HistoricalVerificationManifestCase[] };
     const result = validateHistoricalVerificationManifest(manifest.cases);
-    expect(manifest.status).toBe('pending_independent_review');
-    expect(result.ready).toBe(false);
+    expect(manifest.status).toBe('verified');
+    expect(result.ready).toBe(true);
     expect(result.errors).toEqual([]);
-    expect(result.pending).toHaveLength(6);
-    expect(result.verifiedCases).toEqual([]);
+    expect(result.pending).toHaveLength(0);
+    expect(result.verifiedCases).toHaveLength(6);
   });
 
   it('keeps pending candidate rows out of the verified fixture set', () => {
