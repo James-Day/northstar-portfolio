@@ -4,7 +4,7 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
-| 2026-09-13 | 08.07 — Fail-closed development smoke boundary (partial) | Added `validateMarketstackDevelopmentSmokeRequest` and focused coverage to normalize exactly one symbol/date, reject production or enabled recurring schedules, validate calendar dates, and enforce a confirmed allowance ceiling without exposing secrets. Focused Marketstack development tests (10) and typecheck passed. | A user-supplied free key, provider allowance confirmation, local Supabase write, and live smoke evidence remain required; no network call or plan change was performed. |
+| 2026-09-13 | 08.07 - Fail-closed development smoke boundary (partial) | Added `validateMarketstackDevelopmentSmokeRequest` with focused coverage to normalize exactly one symbol/date, reject production or recurring schedules, validate trading dates, and require an explicit allowance ceiling without exposing secrets. | A user-supplied free key, current allowance confirmation, local Supabase write, and live smoke evidence remain required; no network call or plan change was performed. |
 
 | 2026-09-10 | 10.09 — Authenticated browser boundary (partial) | Extended `tests/e2e/authenticated-workspace.spec.ts` to cover private dashboard entry, optional account-scope switching, and clean sign-out back to `/sign-in`. The fixture remains environment-gated and makes no hosted execution claim. | Live Supabase-backed value reconciliation, cross-account isolation, and full enabled-action traversal remain required. |
 
