@@ -16,4 +16,14 @@ describe('readOAuthCallbackError', () => {
   it('returns no error for a normal callback', () => {
     expect(readOAuthCallbackError('?code=oauth-code')).toBeNull();
   });
+
+  it('reads fragment errors without exposing fragment tokens', () => {
+    const message = readOAuthCallbackError('', '#error=access_denied&access_token=secret-token');
+    expect(message).toContain('cancelled');
+    expect(message).not.toContain('secret-token');
+  });
+
+  it('prefers a query error over an unrelated fragment value', () => {
+    expect(readOAuthCallbackError('?error=server_error', '#error=access_denied')).toContain('could not be completed');
+  });
 });

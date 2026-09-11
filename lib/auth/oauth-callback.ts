@@ -8,8 +8,13 @@ const CALLBACK_ERROR_MESSAGES: Record<string, string> = {
  * Converts an OAuth callback error into a safe, user-facing message. Provider
  * descriptions are treated as untrusted input and are bounded before display.
  */
-export function readOAuthCallbackError(search: string): string | null {
-  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+export function readOAuthCallbackError(search: string, hash = ''): string | null {
+  const searchParams = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  const hashParams = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash);
+  // OAuth providers use query parameters for authorization-code errors and
+  // fragments for implicit-flow errors. Read only error fields from either
+  // location; tokens and other fragment values are never copied to UI text.
+  const params = searchParams.has('error') ? searchParams : hashParams;
   const code = params.get('error')?.trim().toLowerCase();
   if (!code) return null;
 

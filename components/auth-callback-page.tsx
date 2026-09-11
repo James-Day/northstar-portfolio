@@ -13,7 +13,7 @@ export function AuthCallbackPage({ supabaseConfig }: { supabaseConfig?: PublicSu
   const client = useMemo(() => supabaseConfig ? createPublicSupabaseClient(supabaseConfig) : undefined, [supabaseConfig]);
 
   useEffect(() => {
-    const callbackError = readOAuthCallbackError(window.location.search);
+    const callbackError = readOAuthCallbackError(window.location.search, window.location.hash);
     if (callbackError) {
       setMessage(callbackError);
       return;
