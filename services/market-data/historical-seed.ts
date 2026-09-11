@@ -41,6 +41,8 @@ export type HistoricalSeedJobRepository = {
   getOrCreate(input: { symbols: string[]; from: IsoDate; through: IsoDate; pageLimit: number }): Promise<HistoricalSeedJobState>;
   recordPage(input: {
     jobId: string;
+    /** Stable boundary key makes a replay after a crash a no-op. */
+    pageKey: string;
     sourceRevision: string;
     cursor: DoltHubCloseCursor | null;
     accepted: HistoricalPriceUpsert[];
@@ -100,7 +102,7 @@ export async function runHistoricalSeedJob(input: {
       const pageQuarantine = prepared.quarantined.map((item) => ({ jobId: state.id, sourceRevision: revision, record: item.record, reason: item.reason, status: 'pending' as const }));
       const mappings = prepared.accepted.filter((record) => record.sourceSymbol).map((record) => ({ jobId: state.id, sourceRevision: revision, symbol: record.sourceSymbol as string, tradingDate: record.tradingDate, instrumentId: record.instrumentId }));
       // The cursor is advanced only after the whole page is durably accounted for.
-      await input.jobs.recordPage({ jobId: state.id, sourceRevision: revision, cursor: page.nextCursor, accepted: prepared.accepted, mappings, quarantined: pageQuarantine, continuityIssues: prepared.continuityIssues, upserted: persisted.upserted });
+      await input.jobs.recordPage({ jobId: state.id, pageKey: historicalSeedPageKey(cursor, page.nextCursor), sourceRevision: revision, cursor: page.nextCursor, accepted: prepared.accepted, mappings, quarantined: pageQuarantine, continuityIssues: prepared.continuityIssues, upserted: persisted.upserted });
       upserted += persisted.upserted;
       quarantined += pageQuarantine.length;
       pages += 1;
@@ -116,4 +118,10 @@ export async function runHistoricalSeedJob(input: {
     await input.jobs.fail(state.id, message);
     throw error;
   }
+}
+
+/** The source revision and both cursor boundaries uniquely identify a page. */
+function historicalSeedPageKey(start: DoltHubCloseCursor | undefined, end: DoltHubCloseCursor | null): string {
+  const encode = (cursor: DoltHubCloseCursor | null | undefined) => cursor ? `${cursor.tradingDate}:${cursor.symbol}` : 'start';
+  return `${encode(start)}->${encode(end)}`;
 }

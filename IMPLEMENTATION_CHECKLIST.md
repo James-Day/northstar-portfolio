@@ -15,7 +15,7 @@ This file is the current implementation plan. Work through the numbered steps in
 
 **Current count: 102 tasks — 67 checked, 35 unchecked, across 13 ordered steps.**
 
-**Progress view:** 96 tasks have implementation or verification evidence (67 complete and 29 partial); 6 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
+**Progress view:** 97 tasks have implementation or verification evidence (67 complete and 30 partial); 5 tasks still have no documented progress. Partial evidence never substitutes for the acceptance gates below.
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
@@ -125,7 +125,7 @@ Owner: market data. Depends on instrument identity in step 06; licensing researc
 - [x] **07.05** Add a runnable resumable seed job with durable cursor, instrument mapping, quarantine storage and operator review; execute a bounded seed and record rows/revision. Evidence: resumable DoltHub seed runner, durable job state/mappings/quarantine migration and repository boundary in commit `8b4bb54`.
 - [ ] **07.06** Independently verify representative stocks, ETFs, delisted names, ticker transitions and split boundaries; record expected/actual values and source evidence. Keep dividends sourced from brokerage activity. `verifyHistoricalCases` now emits an auditable check row for every case (including passes), with expected/actual close, category, operator evidence, source and source revision, and distinguishes missing, duplicate and mismatched records; independent fixture values and evidence still need to be populated and reviewed.
 - [x] **07.07** Prevent same-version price/correction overwrite; select authoritative revisions deterministically and track all source/correction dependencies needed to reproduce a report. Evidence: immutable revision triggers, fail-closed same-version conflict detection, explicit provider/correction precedence and report dependency payloads in commit `cb1a7d9`.
-- [ ] **07.08** Gate: repeat seed is safe, quarantined data cannot value portfolios, and representative stored prices are independently verified and traceable.
+- [ ] **07.08** Gate: repeat seed is safe, quarantined data cannot value portfolios, and representative stored prices are independently verified and traceable. Partial evidence: `services/market-data/historical-seed-gate.test.ts` exercises a database-shaped page-marker store for repeat idempotency, source-revision traceability, date-effective `META` alias resolution, restart from a durable cursor after failure, and valuation exclusion of quarantined closes; `historical_seed_pages` persists page markers for the server repository. Independent upstream price verification and a live seed/RLS run remain open.
 
 ## 08 — Make daily pricing safe on the free development allowance
 

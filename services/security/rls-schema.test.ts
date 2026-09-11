@@ -44,6 +44,7 @@ const serviceOwnedTables = [
   'historical_seed_jobs',
   'historical_seed_mappings',
   'historical_seed_quarantine',
+  'historical_seed_pages',
   'billing_webhook_events',
 ];
 
