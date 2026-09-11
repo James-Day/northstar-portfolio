@@ -10,7 +10,13 @@ export async function requirePrivateSession(config: PrivateRouteConfig): Promise
   const token = (await cookies()).get(PRIVATE_SESSION_COOKIE)?.value;
   const signInPath = config.signInPath ?? '/sign-in?next=/dashboard';
   if (!token) redirect(signInPath);
-  const user = await verifySupabaseSession(new Request('https://northstar.internal/session', { headers: { authorization: `Bearer ${token}` } }), config);
+  let user: AuthenticatedUser | undefined;
+  try {
+    user = await verifySupabaseSession(new Request('https://northstar.internal/session', { headers: { authorization: `Bearer ${token}` } }), config);
+  } catch {
+    // A verifier outage or configuration failure must never render private UI.
+    redirect(signInPath);
+  }
   if (!user) redirect(signInPath);
   return user;
 }

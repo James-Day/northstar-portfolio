@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-13 | 02.05 — Fail closed on private-session verifier errors (partial) | Private dashboard routing now catches Supabase session verifier failures and redirects to sign-in before rendering any private UI. Four private-route tests and typecheck passed. | Hosted cookie handoff, provider configuration, and authenticated browser traversal remain required. |
+
 | 2026-09-13 | 01.07 — Baseline gate refresh (partial) | Reran `npm run baseline:gate` after the queue and local-fixture milestones: typecheck, 144 Vitest files/556 tests, production build, and generated-browser secret scan all passed. | Fresh-checkout migration/database isolation and hosted browser acceptance remain required. |
 
 | 2026-09-13 | 01.05 — Seed deterministic local reference fixtures (partial) | Extended the integration harness to upsert a stable AAPL instrument and alias through the service-role REST boundary after creating the two deterministic Auth users. Six fixture tests, typecheck, checklist audit, and diff checks passed. | Docker/Supabase execution, API/frontend startup, RLS isolation, and cleanup against a live local stack remain unverified. |

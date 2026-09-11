@@ -28,4 +28,11 @@ describe('private page route gate', () => {
     await expect(requirePrivateSession({ supabaseUrl: 'https://supabase.test', supabaseAnonKey: 'anon' })).rejects.toThrow('REDIRECT:/sign-in?next=/dashboard');
     fetcher.mockRestore();
   });
+
+  it('fails closed when session verification itself fails', async () => {
+    cookie.value = 'access-token-that-is-long-enough';
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Supabase unavailable'));
+    await expect(requirePrivateSession({ supabaseUrl: 'https://supabase.test', supabaseAnonKey: 'anon' })).rejects.toThrow('REDIRECT:/sign-in?next=/dashboard');
+    fetcher.mockRestore();
+  });
 });
