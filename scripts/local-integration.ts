@@ -5,7 +5,7 @@ import {
   parseSupabaseStatusEnv,
   type LocalIntegrationUser,
   type LocalSupabaseCredentials,
-} from '../services/platform/local-supabase-fixtures';
+} from '../services/platform/local-supabase-fixtures.ts';
 
 const keepRunning = process.argv.includes('--keep');
 
