@@ -11,6 +11,10 @@ describe('auth redirect allowlist', () => {
   it('rejects an origin outside the configured allowlist', () => {
     expect(() => buildAuthRedirectUrl('https://evil.example', 'callback', ['https://app.example.com']))
       .toThrow('not configured');
+    expect(() => buildAuthRedirectUrl('https://app.example.com.evil.test', 'callback', ['https://app.example.com']))
+      .toThrow('not configured');
+    expect(() => buildAuthRedirectUrl('https://app.example.com:444', 'callback', ['https://app.example.com']))
+      .toThrow('not configured');
   });
 
   it('rejects non-origin and credential-bearing values', () => {
