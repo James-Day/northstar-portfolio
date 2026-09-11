@@ -175,12 +175,25 @@ describe('standalone API', () => {
       activityRepository: {
         list: async () => ({ items: [], limit: 100, offset: 0, hasMore: false }),
       },
+      reportSnapshotReader: {
+        getLatest: async () => ({
+          asOfDate: '2026-09-11',
+          payload: { totalValue: '100.00', cash: '0.00', holdings: [] },
+        }),
+      } as never,
     });
     const exportResponse = await app.request('http://api.test/v1/accounts/account-1/activity.csv', {
       headers: { authorization: 'Bearer session-token' },
     });
     expect(exportResponse.status).toBe(200);
     expect(exportResponse.headers.get('content-type')).toContain('text/csv');
+
+    const reportExportResponse = await app.request('http://api.test/v1/accounts/account-1/report.csv', {
+      headers: { authorization: 'Bearer session-token' },
+    });
+    expect(reportExportResponse.status).toBe(200);
+    expect(reportExportResponse.headers.get('content-type')).toContain('text/csv');
+    expect(await reportExportResponse.text()).toContain('total_value');
 
     const deletionResponse = await app.request('http://api.test/v1/me/deletion-request', {
       method: 'POST',

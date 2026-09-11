@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-11 | 11.06 — Deterministic billing lifecycle acceptance (partial) | Added `services/platform/billing-lifecycle-acceptance.test.ts` to drive signed-event-shaped lifecycle payloads through the customer ownership resolver and entitlement reducer, covering duplicate IDs, delayed cancellation, equal-timestamp ordering, and conflicting event metadata. Expanded API cancellation coverage to verify both activity and report CSV exports plus deletion requests remain available. Focused billing/API tests (45) and typecheck passed. | Live Stripe test-mode delivery, hosted cancellation, and real signed webhook replay remain open. |
+
 | 2026-09-13 | 01.05 — Live local integration harness | Fixed PostgreSQL generated-key immutability, duplicate migration versions, split-import exception diagnostics, local Auth confirmation settings, idempotent alias seeding, credential redaction, and reuse of an existing frontend listener. `npm run integration:local` and `npm run integration:local -- --with-app` passed with migration reset, two Auth users, reference fixtures, API `/health` 200, frontend readiness, and cleanup. | Live RLS isolation and hosted deployment acceptance remain separate gates. |
 
 | 2026-09-13 | 01.07 — Full suite refresh after auth hardening (partial) | Reran the full Vitest suite after private-route failure handling: 145 files/560 tests passed. | The latest run was the complete test suite; fresh-checkout migration/database isolation and hosted browser acceptance remain required. |
