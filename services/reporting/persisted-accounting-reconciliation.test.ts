@@ -7,6 +7,7 @@ import type { LedgerEvent } from '@/services/ledger/fifo';
 import { composePersistedReportInputs, type PersistedReportInputs } from '@/services/reporting/compose-report-inputs';
 import { calculateConsolidatedReport, type ConsolidatedAccountInput } from '@/services/reporting/consolidated';
 import { SupabaseLedgerReplayRepository } from '@/services/ledger/persisted-replay';
+import { publishReportSnapshot } from '@/services/reporting/publish-snapshot';
 
 const d = decimalString;
 const date = (value: string) => isoDate(value);
@@ -191,6 +192,53 @@ describe('persisted accounting reconciliation fixture', () => {
     expect(undone.ledger.openLots.map((lot) => ({ quantity: lot.remainingQuantity, basis: lot.totalCostBasis }))).toEqual([{ quantity: '10', basis: '500' }]);
     expect(undone.importStateRevision).not.toBe(committed.importStateRevision);
     expect(undone.importStateRevision).toBe('ledger:44444444-4444-4444-8444-444444444441,44444444-4444-4444-8444-444444444442');
+  });
+
+  it('publishes matching committed and post-undo snapshots from the persisted replay', async () => {
+    const events = fixtureEvents();
+    const committed = reportInputs(events.taxable);
+    const undone = reportInputs(activeAfterUndo(events.taxable));
+    const published = new Map<string, Record<string, unknown>>();
+    const publisher = {
+      publish: vi.fn(async (input: { importStateRevision: string; payload: Record<string, unknown> }) => {
+        published.set(input.importStateRevision, structuredClone(input.payload));
+        return `snapshot-${published.size}`;
+      }),
+    };
+
+    await publishReportSnapshot({
+      publisher,
+      userId,
+      accountId,
+      reportType: 'account_daily',
+      importStateRevision: committed.importStateRevision,
+      priceRevisionId: null,
+      history: valueLedgerHistory(committed.valuation),
+      activityCoveredThrough: committed.activityCoveredThrough,
+      pricesThrough: committed.pricesThrough,
+      priceDependencies: committed.priceDependencies,
+      ledger: committed.ledger,
+    });
+    await publishReportSnapshot({
+      publisher,
+      userId,
+      accountId,
+      reportType: 'account_daily',
+      importStateRevision: undone.importStateRevision,
+      priceRevisionId: null,
+      history: valueLedgerHistory(undone.valuation),
+      activityCoveredThrough: undone.activityCoveredThrough,
+      pricesThrough: undone.pricesThrough,
+      priceDependencies: undone.priceDependencies,
+      ledger: undone.ledger,
+    });
+
+    const committedSnapshot = published.get(committed.importStateRevision);
+    const undoneSnapshot = published.get(undone.importStateRevision);
+    expect(committedSnapshot).toMatchObject({ totalValue: '1778', cash: '692', dividendIncome: '5', realizedGainLoss: '115.8', dividends: [{ eventId: 'dividend', amount: '5' }], methodology: { taxReporting: false } });
+    expect(undoneSnapshot).toMatchObject({ totalValue: '1817', cash: '377', dividendIncome: '0', realizedGainLoss: '0', dividends: [], methodology: { taxReporting: false } });
+    expect(committed.importStateRevision).not.toBe(undone.importStateRevision);
+    expect(committedSnapshot).not.toEqual(undoneSnapshot);
   });
 });
 
