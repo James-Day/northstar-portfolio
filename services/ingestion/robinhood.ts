@@ -54,7 +54,39 @@ const transactionCodes: Record<string, RobinhoodActivityType> = {
   SPL: 'split',
 };
 
-function normalizedHeader(header: string) { return header.trim().toLowerCase(); }
+/**
+ * Robinhood has used a couple of column labels over the years and users also
+ * commonly save the export through a spreadsheet, which can shorten labels.
+ * Keep one internal shape so all of those official export variants follow the
+ * same validation and ledger path.
+ */
+const headerAliases: Record<string, string> = {
+  'activity date': 'activity date',
+  'transaction date': 'activity date',
+  date: 'activity date',
+  'trans code': 'trans code',
+  'transaction code': 'trans code',
+  activity: 'trans code',
+  type: 'trans code',
+  instrument: 'instrument',
+  symbol: 'instrument',
+  ticker: 'instrument',
+  quantity: 'quantity',
+  'quantity transacted': 'quantity',
+  shares: 'quantity',
+  price: 'price',
+  'price per share': 'price',
+  'execution price': 'price',
+  amount: 'amount',
+  'net amount': 'amount',
+  description: 'description',
+  details: 'description',
+};
+
+function normalizedHeader(header: string) {
+  const normalized = header.trim().toLowerCase().replace(/\s+/g, ' ');
+  return headerAliases[normalized] ?? normalized;
+}
 
 function transactionTypeFor(code: string, description: string): RobinhoodActivityType | undefined {
   if (code === 'ACH') {
@@ -102,17 +134,21 @@ export function parseRobinhoodActivityCsv(csv: string): ParsedRobinhoodRow[] {
   // remain aligned with the original file for review and audit evidence.
   const headerRecordIndex = parsedRecords.findIndex((record) => record.some((value) => value.trim()));
   const headers = parsedRecords[headerRecordIndex]?.map(normalizedHeader) ?? [];
-  if (new Set(headers).size !== headers.length) throw new Error('CSV has duplicate column headers.');
+  // Report the most useful structural error first. For example, a generic
+  // two-column CSV may map both columns to "trans code" but is still missing
+  // the required activity date and amount fields.
+  const headerSet = new Set(headers);
+  if (headerRecordIndex >= 0) {
+    for (const required of ['activity date', 'trans code', 'amount']) {
+      if (!headerSet.has(required)) throw new Error(`Robinhood CSV is missing the required ${required} column.`);
+    }
+    if (headerSet.size !== headers.length) throw new Error('CSV has duplicate column headers.');
+  }
   const records = headerRecordIndex < 0
     ? []
     : parsedRecords.slice(headerRecordIndex + 1).map((values) => Object.fromEntries(headers.map((header, index) => [header, (values[index] ?? '').trim()])));
   if (headerRecordIndex < 0 || records.every((record) => Object.values(record).every((value) => !String(value ?? '').trim()))) throw new Error('CSV needs a header and at least one activity row.');
   if (records.length > MAX_ROWS) throw new Error('CSV exceeds the 50,000-row import limit.');
-
-  const headerSet = new Set(Object.keys(records[0]));
-  for (const required of ['activity date', 'trans code', 'amount']) {
-    if (!headerSet.has(required)) throw new Error(`Robinhood CSV is missing the required ${required} column.`);
-  }
 
   const parsedRows = records.flatMap<ParsedRobinhoodRow>((raw, index) => {
     // Include any records before the header so review points to the original

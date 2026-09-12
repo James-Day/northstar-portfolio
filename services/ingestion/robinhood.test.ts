@@ -61,6 +61,26 @@ describe('parseRobinhoodActivityCsv', () => {
     expect(rows[0]).toMatchObject({ rowNumber: 4, status: 'supported', activity: { effectiveDate: '2026-01-02', type: 'buy', symbol: 'VTI' } });
   });
 
+  it('accepts the shortened headers produced by spreadsheet copies of Robinhood exports', () => {
+    const rows = parseRobinhoodActivityCsv([
+      'Date,Activity,Symbol,Shares,Price Per Share,Net Amount,Details',
+      '4/3/2025,Buy,VOO,0.5,"$498.29","($249.14)",Vanguard S&P 500 ETF',
+      '4/3/2025,ACH,, , ,"$500.00",ACH Deposit',
+    ].join('\n'));
+
+    expect(rows).toMatchObject([
+      { status: 'supported', activity: { effectiveDate: '2025-04-03', type: 'buy', symbol: 'VOO', quantity: '0.5', price: '498.29', amount: '-249.14' } },
+      { status: 'supported', activity: { type: 'deposit', symbol: null, amount: '500' } },
+    ]);
+  });
+
+  it('rejects ambiguous aliases instead of silently choosing one column', () => {
+    expect(() => parseRobinhoodActivityCsv([
+      'Activity Date,Date,Trans Code,Amount',
+      '2025-04-03,2025-04-03,Buy,($1)',
+    ].join('\n'))).toThrow('duplicate column headers');
+  });
+
   it('preserves unfamiliar codes as visible unsupported rows', () => {
     const [row] = parseRobinhoodActivityCsv('Activity Date,Trans Code,Amount\n2026-01-02,Corporate Mystery,"$2.00"');
     expect(row).toMatchObject({ status: 'unsupported', rowNumber: 2, message: expect.stringContaining('Corporate Mystery') });
