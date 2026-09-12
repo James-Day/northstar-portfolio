@@ -16,12 +16,13 @@ two test users and verify that each can see only its own accounts before
 running authenticated browser tests.
 
 The repeatable harness runs the same reset and creates two temporary Auth
-users. Run `npm run integration:local -- --with-app` to also start the local
-API and frontend, wait for `/health` and the frontend URL, then clean up the
-child processes and users. Add `--keep` when manually exercising the running
-services; stop them with Ctrl+C. Process output is bounded and credentials are
-redacted. If Docker is unavailable, the harness preserves the Supabase CLI
-diagnostic and exits without attempting unsafe Docker repairs.
+users. Run `npm run integration:local -- --with-app --with-browser --keep` to
+start the local API on `http://127.0.0.1:8787` and the frontend on
+`http://localhost:3000`, then leave both services available for manual testing.
+Stop the harness with Ctrl+C and stop Supabase with `npx supabase stop` when
+you are finished. Process output is bounded and credentials are redacted. If
+Docker is unavailable, the harness preserves the Supabase CLI diagnostic and
+exits without attempting unsafe Docker repairs.
 
 Run `npm run integration:local -- --rls` for the live database boundary probe.
 It uses two temporary Auth sessions to test owner reads, guessed-ID isolation,

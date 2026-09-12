@@ -168,7 +168,7 @@ async function main() {
       console.log('Local database reset and Auth fixtures completed. Use --with-app to start the API/frontend smoke harness.');
     }
   } finally {
-    await stopLocalProcesses(apps);
+    if (!keepRunning) await stopLocalProcesses(apps);
     if (credentials && users.length && !keepRunning) {
       await deleteLocalIntegrationUsers(credentials, users);
       console.log('Removed deterministic local Auth users.');
