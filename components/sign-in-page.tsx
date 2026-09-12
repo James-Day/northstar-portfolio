@@ -8,6 +8,7 @@ import { createSupabaseAuthService } from '@/services/auth/supabase-auth';
 import { createPublicSupabaseClient } from '@/services/supabase/client';
 import { buildAuthRedirectUrl } from '@/lib/auth/redirects';
 import { establishBrowserSession } from '@/lib/auth/session-handoff';
+import { userFacingAuthError } from '@/lib/auth/user-facing-error';
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
 type Mode = 'sign-in' | 'sign-up';
@@ -40,7 +41,7 @@ export function SignInPage({ supabaseConfig, authRedirectOrigins = ['http://loca
         window.location.assign('/dashboard');
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'We could not complete that request.');
+      setMessage(userFacingAuthError(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -53,7 +54,7 @@ export function SignInPage({ supabaseConfig, authRedirectOrigins = ['http://loca
     try {
       await auth.startGoogleSignIn(buildAuthRedirectUrl(window.location.origin, 'callback', authRedirectOrigins));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Google sign-in could not start.');
+      setMessage(userFacingAuthError(error, 'Google sign-in could not start. Please try again or use email and password.'));
       setIsSubmitting(false);
     }
   }
@@ -66,7 +67,7 @@ export function SignInPage({ supabaseConfig, authRedirectOrigins = ['http://loca
       await auth.sendPasswordReset(email, buildAuthRedirectUrl(window.location.origin, 'recovery', authRedirectOrigins));
       setMessage('If that email has an account, a password-reset link is on its way.');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Password reset could not start.');
+      setMessage(userFacingAuthError(error, 'Password reset could not start.'));
     } finally {
       setIsSubmitting(false);
     }
