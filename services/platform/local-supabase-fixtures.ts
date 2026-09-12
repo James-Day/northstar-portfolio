@@ -38,6 +38,10 @@ export const LOCAL_INTEGRATION_INSTRUMENTS = [{
   id: '11111111-1111-4111-8111-111111111111',
   asset_type: 'stock',
   display_name: 'Apple Inc.',
+}, {
+  id: '33333333-3333-4333-8333-333333333333',
+  asset_type: 'etf',
+  display_name: 'Vanguard Total Stock Market ETF',
 }] as const;
 
 export const LOCAL_INTEGRATION_ALIASES = [{
@@ -45,6 +49,12 @@ export const LOCAL_INTEGRATION_ALIASES = [{
   instrument_id: LOCAL_INTEGRATION_INSTRUMENTS[0].id,
   symbol: 'AAPL',
   effective_from: '1980-12-12',
+  effective_to: null,
+}, {
+  id: '44444444-4444-4444-8444-444444444444',
+  instrument_id: LOCAL_INTEGRATION_INSTRUMENTS[1].id,
+  symbol: 'VTI',
+  effective_from: '2001-05-31',
   effective_to: null,
 }] as const;
 

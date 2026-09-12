@@ -10,11 +10,14 @@ import {
 } from '../services/platform/local-supabase-fixtures.ts';
 import { boundedRedactedOutput, startLocalProcess, stopLocalProcesses, waitForLocalHttp, type LocalProcessHandle } from './local-processes.ts';
 import { runLocalRlsAcceptance } from '../services/platform/local-rls-acceptance.ts';
+import { runLocalImportAcceptance } from '../services/platform/local-import-acceptance.ts';
+import { readFile } from 'node:fs/promises';
 
 const keepRunning = process.argv.includes('--keep');
 const withApp = process.argv.includes('--with-app');
 const withRls = process.argv.includes('--rls');
 const withBrowser = process.argv.includes('--browser');
+const withImport = process.argv.includes('--import');
 
 type Command = { executable: string; prefix: string[] };
 
@@ -122,10 +125,15 @@ async function main() {
       if (users.length !== 2) throw new Error('The RLS acceptance suite requires both deterministic Auth users.');
       await runLocalRlsAcceptance(credentials, [users[0], users[1]]);
     }
-    if (withApp || withBrowser) {
+    if (withApp || withBrowser || withImport) {
       console.log('Starting API and frontend processes…');
       apps = await startApps(credentials, withBrowser);
       await Promise.all(apps.map((app) => waitForLocalHttp(app, fetch, withBrowser ? { attempts: 60, delayMs: 500 } : undefined)));
+      if (withImport) {
+        const csv = await readFile(new URL('../fixtures/robinhood/individual-activity.csv', import.meta.url), 'utf8');
+        await runLocalImportAcceptance('http://127.0.0.1:8787', users[0], csv);
+        console.log('Local authenticated Robinhood staging/review/commit/undo acceptance passed.');
+      }
       if (withBrowser) {
         const sessionProbe = await fetch('http://localhost:3000/api/auth/session', {
           method: 'POST',
