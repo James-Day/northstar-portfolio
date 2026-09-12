@@ -144,11 +144,6 @@ async function main() {
       console.log('Starting API and frontend processes…');
       apps = await startApps(credentials, withBrowser);
       await Promise.all(apps.map((app) => waitForLocalHttp(app, fetch, withBrowser ? { attempts: 60, delayMs: 500 } : undefined)));
-      if (withImport) {
-        const csv = await readFile(new URL('../fixtures/robinhood/individual-activity.csv', import.meta.url), 'utf8');
-        await runLocalImportAcceptance('http://127.0.0.1:8787', users[0], csv);
-        console.log('Local authenticated Robinhood staging/review/commit/undo acceptance passed.');
-      }
       if (withBrowser) {
         const sessionProbe = await fetch('http://localhost:3000/api/auth/session', {
           method: 'POST',
@@ -177,6 +172,11 @@ async function main() {
         console.log('Authenticated browser acceptance passed.');
       } else {
         console.log('API and frontend are ready. Run the authenticated isolation suite.');
+      }
+      if (withImport) {
+        const csv = await readFile(new URL('../fixtures/robinhood/individual-activity.csv', import.meta.url), 'utf8');
+        await runLocalImportAcceptance('http://127.0.0.1:8787', users[0], csv);
+        console.log('Local authenticated Robinhood staging/review/commit/undo acceptance passed.');
       }
       if (keepRunning) await waitForInterrupt();
     } else {
