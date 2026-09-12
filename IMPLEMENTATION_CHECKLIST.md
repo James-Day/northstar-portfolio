@@ -1,6 +1,6 @@
 # Portfolio tracker implementation checklist
 
-Last audited: September 10, 2026. Source baseline: `e674210`.
+Last audited: September 11, 2026. Source baseline: `3a69876`.
 
 ## How to use this checklist
 
@@ -36,7 +36,7 @@ The frontend uses React/TypeScript/Tailwind with **Vinext/Vite and Sites**. A se
 | Prices | DoltHub ingestion/writers; Marketstack cron composition, retry and metrics code | Verified seed, daily fetch deduplication, accurate durable quota accounting, live execution |
 | Reports | Valuation/return functions, snapshot publisher/read API, snapshot-backed UI | Database input loader, outbox-to-report execution, consolidated/detail reports |
 | Billing/privacy | Pure entitlement, trial, retention and deletion rules; authenticated activity/report exports; idempotent deletion-plan persistence | Durable effects, Stripe HTTP integration, enforcement, export/deletion UI |
-| Tests | Typecheck and 238 tests across 67 files pass in the current audit | Real database, storage and authenticated browser regression suites |
+| Tests | Typecheck and **623 tests across 150 files** pass in the current audit; one test is intentionally skipped | Real hosted database, storage and authenticated browser regression suites |
 
 No hosted services, price datasets, provider credentials, or commercial licensing were reverified in this documentation audit. Previous local Supabase integration evidence is retained in [the historical log](docs/IMPLEMENTATION_HISTORY.md); it is not a fresh live test.
 
@@ -219,6 +219,7 @@ Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/sh
 
 | Date | Scope | Evidence | Limits |
 | --- | --- | --- | --- |
+| 2026-09-11 | Checklist evidence refresh | Re-audited the repository at `3a69876`; `npm run checklist:audit` confirms 102 stable task IDs with 73 checked and 29 unchecked, and `npm test -- --run` passes 150 files / 623 tests with one intentional skip. No unchecked task was promoted because each remaining item still names a live hosted, licensing, or production verification boundary. | This refresh updates documentation evidence only; no hosted services, licensing, or production deployment was verified. |
 | 2026-09-13 | 06.09/09.08 — Preserve unresolved transfer warnings in reports (partial) | Extended `ReportSnapshotPayload` and consolidated publication to retain unresolved internal transfer groups, IDs and reasons; added publisher coverage proving an unproven link is present in the stored payload rather than silently treated as reconciled. Focused reporting tests (15) and typecheck passed. | The dashboard does not yet render this payload field, and live transfer/RLS/report execution remains required. |
 | 2026-09-13 | 09.08/10.09 — Common consolidated valuation calendar (partial) | Added `services/reporting/consolidated-publisher.test.ts` coverage proving consolidated reports use only dates present in every persisted account input, preserve the shared date’s continuity state, and do not invent non-overlapping valuation points. Focused consolidated publisher tests (8) and typecheck passed. | This validates local calendar composition; live persisted calendar/price reads and authenticated browser reconciliation remain required. |
 | 2026-09-13 | 06.09 — Deduplicate consolidated split actions (partial) | Added `services/reporting/consolidated-publisher.test.ts` coverage proving an identical validated split present in two account inputs is applied once, yielding the expected post-split quantity/value in the consolidated snapshot. Focused consolidated publisher tests (7) and typecheck passed. | This validates local consolidation; live corporate-action persistence/validation and hosted report reconciliation remain required. |
