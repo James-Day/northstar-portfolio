@@ -1,5 +1,7 @@
 import type { LocalIntegrationUser } from './local-supabase-fixtures.ts';
 
+type CleanupOptions = { supabaseUrl: string; serviceRoleKey: string; userId: string };
+
 type ImportResponse = { import?: { id?: unknown; status?: unknown; review?: { acceptedRowCount?: unknown }; activityFrom?: unknown; activityThrough?: unknown } };
 
 /** Exercises the real API, Supabase Auth session and import RPCs together. */
@@ -8,6 +10,7 @@ export async function runLocalImportAcceptance(
   user: Pick<LocalIntegrationUser, 'accessToken'>,
   csv: string,
   fetcher: typeof fetch = fetch,
+  cleanup?: CleanupOptions,
 ): Promise<void> {
   const headers = { authorization: `Bearer ${user.accessToken}`, 'content-type': 'application/json' };
   const create = await fetcher(`${apiBaseUrl}/v1/accounts`, { method: 'POST', headers, body: JSON.stringify({ name: 'Local import smoke', accountType: 'individual' }) });
@@ -36,6 +39,14 @@ export async function runLocalImportAcceptance(
   if (commit.status !== 200 || stringAt(await parseJson(commit, 'import commit'), 'import', 'status') !== 'committed') throw new Error(`Local import commit did not complete (HTTP ${commit.status}).`);
   const undo = await fetcher(`${apiBaseUrl}/v1/imports/${importId}/undo`, { method: 'POST', headers: { authorization: `Bearer ${user.accessToken}` } });
   if (undo.status !== 200 || stringAt(await parseJson(undo, 'import undo'), 'import', 'status') !== 'undone') throw new Error(`Local import undo did not complete (HTTP ${undo.status}).`);
+  if (cleanup) {
+    const deleted = await fetcher(`${cleanup.supabaseUrl}/rest/v1/rpc/delete_user_account_data`, {
+      method: 'POST',
+      headers: { apikey: cleanup.serviceRoleKey, authorization: `Bearer ${cleanup.serviceRoleKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ p_user_id: cleanup.userId, p_account_id: accountId }),
+    });
+    if (!deleted.ok) throw new Error(`Local import cleanup failed with HTTP ${deleted.status}.`);
+  }
 }
 
 async function parseJson(response: Response, label: string): Promise<Record<string, any>> {
