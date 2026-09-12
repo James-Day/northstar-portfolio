@@ -58,3 +58,25 @@ test('public surfaces remain keyboard reachable and fit a narrow viewport', asyn
     await expect(firstLink).toBeFocused();
   }
 });
+
+test('demo dividends view exposes daily, monthly, yearly, and projected sections', async ({ page }) => {
+  await page.goto('/demo');
+  // The navigation is server-rendered; wait briefly for its client handler before clicking.
+  await page.waitForTimeout(500);
+  await page.getByRole('button', { name: 'Dividends', exact: true }).click();
+
+  await expect(page.getByRole('heading', { name: 'Dividends', exact: true })).toBeVisible();
+  await expect(page.getByText('Total received', { exact: true })).toBeVisible();
+  const tablist = page.getByRole('tablist', { name: 'Dividend views' });
+  await expect(tablist).toBeVisible();
+
+  for (const view of ['Monthly', 'Yearly', 'Day by day', 'Projected']) {
+    const tab = page.getByRole('tab', { name: view, exact: true });
+    await expect(tab).toBeVisible();
+    await tab.click();
+    await expect(tab).toHaveAttribute('aria-selected', 'true');
+  }
+
+  await expect(page.getByText(/Projection repeats each holding’s average historical payment/i)).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Projected dividend payments' })).toBeVisible();
+});
