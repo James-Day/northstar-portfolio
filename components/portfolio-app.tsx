@@ -64,6 +64,7 @@ import {
   type DashboardWarning,
 } from '@/lib/dashboard-warnings';
 import { resolvedNonReportableRowIds } from '@/lib/import/issue-resolution-view';
+import { DividendsPanel } from '@/components/dividends-panel';
 
 type PublicSupabaseConfig = { url: string; anonKey: string };
 type PublicApiConfig = { baseUrl: string };
@@ -234,6 +235,7 @@ const precise = new Intl.NumberFormat('en-US', {
 const nav = [
   ['Overview', ChartNoAxesCombined],
   ['Accounts', WalletCards],
+  ['Dividends', HandCoins],
   ['Activity', Clock3],
   ['Documents', FileUp],
   ['Settings', Landmark],
@@ -1336,6 +1338,13 @@ export function PortfolioApp({
               onNext={() => setActivityOffset((value) => value + 25)}
               filter={activityFilter}
               onFilterChange={setActivityFilter}
+            />
+          )}
+          {active === 'Dividends' && (
+            <DividendsPanel
+              events={reportSnapshot?.payload.dividends}
+              isLiveAccount={Boolean(client && userId && selectedAccountId)}
+              asOfDate={reportSnapshot?.asOfDate}
             />
           )}
           {active === 'Accounts' && (
