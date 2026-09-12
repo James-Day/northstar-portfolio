@@ -8,7 +8,7 @@ describe('staging configuration contract', () => {
       readFile(new URL('../../wrangler.api.toml', import.meta.url), 'utf8'),
       readFile(new URL('../../docs/LAUNCH_RUNBOOK.md', import.meta.url), 'utf8'),
     ]);
-    for (const name of ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'MARKETSTACK_API_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_MONTHLY_PRICE_ID', 'STRIPE_ANNUAL_PRICE_ID']) {
+    for (const name of ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID', 'SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET', 'MARKETSTACK_API_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_MONTHLY_PRICE_ID', 'STRIPE_ANNUAL_PRICE_ID']) {
       expect(env, `${name} must be declared in the environment template`).toContain(`${name}=`);
     }
     expect(env).not.toMatch(/(sk_live_|sk_test_|whsec_)[A-Za-z0-9_]+/);
