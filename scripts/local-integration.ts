@@ -96,6 +96,19 @@ async function waitForInterrupt(): Promise<void> {
   });
 }
 
+async function waitForSupabaseReady(attempts = 60, delayMs = 2000): Promise<string> {
+  let lastError = 'unknown readiness error';
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return run(['status', '-o', 'env'], false);
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw new Error(`Local Supabase did not become ready: ${lastError}`);
+}
+
 async function main() {
   let started = false;
   let credentials: LocalSupabaseCredentials | undefined;
@@ -110,9 +123,11 @@ async function main() {
     run(['start'], false);
     console.log('Local Supabase services started.');
     started = true;
+    console.log('Waiting for the local database to become ready…');
+    const statusEnv = await waitForSupabaseReady();
     console.log('Applying all migrations and deterministic fixtures…');
     run(['db', 'reset']);
-    credentials = parseSupabaseStatusEnv(run(['status', '-o', 'env'], false));
+    credentials = parseSupabaseStatusEnv(statusEnv);
     try {
       users = await createLocalIntegrationUsers(credentials);
       await seedLocalIntegrationReferenceData(credentials);
