@@ -1,6 +1,8 @@
 import type { LocalIntegrationUser } from './local-supabase-fixtures.ts';
 
 type CleanupOptions = { supabaseUrl: string; serviceRoleKey: string; userId: string };
+export type LocalImportAccountType = 'individual' | 'traditional_ira' | 'roth_ira';
+export type LocalImportAcceptanceOptions = { accountName?: string; accountType?: LocalImportAccountType };
 
 type ImportResponse = { import?: { id?: unknown; status?: unknown; review?: { acceptedRowCount?: unknown }; activityFrom?: unknown; activityThrough?: unknown } };
 
@@ -11,9 +13,10 @@ export async function runLocalImportAcceptance(
   csv: string,
   fetcher: typeof fetch = fetch,
   cleanup?: CleanupOptions,
+  options: LocalImportAcceptanceOptions = {},
 ): Promise<void> {
   const headers = { authorization: `Bearer ${user.accessToken}`, 'content-type': 'application/json' };
-  const create = await fetcher(`${apiBaseUrl}/v1/accounts`, { method: 'POST', headers, body: JSON.stringify({ name: 'Local import smoke', accountType: 'individual' }) });
+  const create = await fetcher(`${apiBaseUrl}/v1/accounts`, { method: 'POST', headers, body: JSON.stringify({ name: options.accountName ?? 'Local import smoke', accountType: options.accountType ?? 'individual' }) });
   if (create.status !== 201) throw new Error(`Local import account creation failed with HTTP ${create.status}.`);
   const accountBody = await parseJson(create, 'account creation');
   const accountId = stringAt(accountBody, 'account', 'id');

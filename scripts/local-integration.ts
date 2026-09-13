@@ -18,6 +18,7 @@ const withApp = process.argv.includes('--with-app');
 const withRls = process.argv.includes('--rls');
 const withBrowser = process.argv.includes('--browser');
 const withImport = process.argv.includes('--import');
+const withImportAll = process.argv.includes('--import-all');
 
 type Command = { executable: string; prefix: string[] };
 
@@ -140,18 +141,27 @@ async function main() {
       if (users.length !== 2) throw new Error('The RLS acceptance suite requires both deterministic Auth users.');
       await runLocalRlsAcceptance(credentials, [users[0], users[1]]);
     }
-    if (withApp || withBrowser || withImport) {
+    if (withApp || withBrowser || withImport || withImportAll) {
       console.log('Starting API and frontend processes…');
       apps = await startApps(credentials, withBrowser);
       await Promise.all(apps.map((app) => waitForLocalHttp(app, fetch, withBrowser ? { attempts: 60, delayMs: 500 } : undefined)));
-      if (withImport) {
-        const csv = await readFile(new URL('../fixtures/robinhood/individual-activity.csv', import.meta.url), 'utf8');
-        await runLocalImportAcceptance('http://127.0.0.1:8787', users[0], csv, fetch, {
-          supabaseUrl: credentials.apiUrl,
-          serviceRoleKey: credentials.serviceRoleKey,
-          userId: users[0].userId,
-        });
-        console.log('Local authenticated Robinhood staging/review/commit/undo acceptance passed.');
+      if (withImport || withImportAll) {
+        const importCases = withImportAll
+          ? [
+            { fileName: 'individual-activity.csv', accountType: 'individual' as const, accountName: 'Local individual import smoke' },
+            { fileName: 'traditional-ira-activity.csv', accountType: 'traditional_ira' as const, accountName: 'Local Traditional IRA import smoke' },
+            { fileName: 'roth-ira-activity.csv', accountType: 'roth_ira' as const, accountName: 'Local Roth IRA import smoke' },
+          ]
+          : [{ fileName: 'individual-activity.csv', accountType: 'individual' as const, accountName: 'Local individual import smoke' }];
+        for (const importCase of importCases) {
+          const csv = await readFile(new URL(`../fixtures/robinhood/${importCase.fileName}`, import.meta.url), 'utf8');
+          await runLocalImportAcceptance('http://127.0.0.1:8787', users[0], csv, fetch, {
+            supabaseUrl: credentials.apiUrl,
+            serviceRoleKey: credentials.serviceRoleKey,
+            userId: users[0].userId,
+          }, importCase);
+        }
+        console.log(`Local authenticated Robinhood staging/review/commit/undo acceptance passed for ${importCases.length} account type(s).`);
       }
       if (withBrowser) {
         const sessionProbe = await fetch('http://localhost:3000/api/auth/session', {
