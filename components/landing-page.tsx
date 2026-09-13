@@ -167,7 +167,7 @@ export function LandingPage() {
                 $5/month, when the service is ready.
               </h2>
               <p className="mt-3 max-w-xl text-slate-300">
-                The planned annual option is $49/year. Trials and billing will
+                The planned annual option is $49.99/year. Trials and billing will
                 begin only after a usable import is implemented.
               </p>
             </div>

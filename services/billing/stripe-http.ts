@@ -254,7 +254,7 @@ export type BillingPlan = "monthly" | "annual";
 
 export const BILLING_PRICE_CONTRACT = {
   monthlyCents: 500,
-  annualCents: 4900,
+  annualCents: 4999,
 } as const;
 
 export type StripeBillingConfiguration = {
@@ -305,7 +305,7 @@ export function validateStripeBillingConfiguration(
       configuration.annualPriceCents !== String(BILLING_PRICE_CONTRACT.annualCents)
     )
       throw new BillingConfigurationError(
-        "Stripe price amounts must be 500 monthly cents and 4900 annual cents.",
+        "Stripe price amounts must be 500 monthly cents and 4999 annual cents.",
       );
   }
   return { monthlyPriceId, annualPriceId };

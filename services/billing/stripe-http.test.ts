@@ -35,10 +35,10 @@ describe('Stripe billing configuration contract', () => {
     monthlyPriceId: 'price_monthlytest',
     annualPriceId: 'price_annualtest',
     monthlyPriceCents: '500',
-    annualPriceCents: '4900',
+    annualPriceCents: '4999',
   };
 
-  it('accepts the distinct $5 monthly and $49 annual server configuration', () => {
+  it('accepts the distinct $5 monthly and $49.99 annual server configuration', () => {
     expect(validateStripeBillingConfiguration(valid, { requireAmounts: true })).toEqual({
       monthlyPriceId: 'price_monthlytest',
       annualPriceId: 'price_annualtest',
@@ -50,7 +50,7 @@ describe('Stripe billing configuration contract', () => {
     ['a client-shaped or malformed monthly identifier', { monthlyPriceId: 'monthly', annualPriceId: valid.annualPriceId }],
     ['a missing annual identifier', { monthlyPriceId: valid.monthlyPriceId, annualPriceId: undefined }],
     ['a partial amount recording', { ...valid, annualPriceCents: undefined }],
-    ['a wrong amount', { ...valid, annualPriceCents: '4999' }],
+    ['a wrong amount', { ...valid, annualPriceCents: '4900' }],
   ])('rejects %s before any Stripe request', (_label, overrides) => {
     expect(() => validateStripeBillingConfiguration({ ...valid, ...overrides }, { requireAmounts: true })).toThrow(BillingConfigurationError);
   });

@@ -91,15 +91,15 @@ export function runLaunchPreflight(options: LaunchPreflightOptions = {}): Launch
       monthlyPriceCents: monthlyCents,
       annualPriceCents: annualCents,
     }, { requireAmounts: environment === 'production' });
-    amountsValid = monthlyCents === '500' && annualCents === '4900';
+    amountsValid = monthlyCents === '500' && annualCents === '4999';
   } catch {
     amountsValid = false;
   }
   checks.push(amountsValid
-    ? check('billing.price-amounts', 'pass', 'Stripe prices match $5 monthly and $49 annual pricing.')
+    ? check('billing.price-amounts', 'pass', 'Stripe prices match $5 monthly and $49.99 annual pricing.')
     : amountsConfigured || environment === 'production'
-      ? check('billing.price-amounts', 'fail', 'Stripe price amounts must be 500 monthly cents and 4900 annual cents.')
-      : check('billing.price-amounts', 'warn', 'Staging should record 500 monthly cents and 4900 annual cents after Stripe test prices are created.'));
+      ? check('billing.price-amounts', 'fail', 'Stripe price amounts must be 500 monthly cents and 4999 annual cents.')
+      : check('billing.price-amounts', 'warn', 'Staging should record 500 monthly cents and 4999 annual cents after Stripe test prices are created.'));
 
   const publicUrl = env.NEXT_PUBLIC_SUPABASE_URL;
   const serverUrl = env.SUPABASE_URL;

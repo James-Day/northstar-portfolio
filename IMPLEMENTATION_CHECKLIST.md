@@ -160,7 +160,7 @@ Owner: reporting/calculations. Depends on steps 05–08.
 
 Owner: product UI. Depends on step 09.
 
-- [x] **10.01** Approved landing/sign-in/demo design, compass asset, navigation and $5/month/$49/year pricing copy exist.
+- [x] **10.01** Approved landing/sign-in/demo design, compass asset, navigation and $5/month/$49.99/year pricing copy exist.
 - [x] **10.02** Live overview reads snapshots/freshness, renders holdings/value history/income/cash/gains where supplied, and has account selection plus loading/error/retry/awaiting-report states. Synthetic activity is hidden for authenticated users.
 - [x] **10.03** Persisted import review/history/commit/discard/latest-only undo controls exist; public skip links and active-navigation labels exist.
 - [x] **10.04** Implement persisted activity list with pagination/filtering and ledger-to-source-row detail. The authenticated Activity view now uses the account-scoped API with loading, empty, error, retry and pagination states; demo activity remains isolated.
@@ -172,7 +172,7 @@ Owner: product UI. Depends on step 09.
 
 ## 11 — Implement real trial and subscription lifecycle
 
-Owner: billing. Depends on usable reports in step 09; retain planned $5 monthly/$49 annual pricing.
+Owner: billing. Depends on usable reports in step 09; retain planned $5 monthly/$49.99 annual pricing.
 
 - [x] **11.01** Pure first-usable-import 14-day no-card trial and duplicate-event entitlement reducers exist. Evidence: `services/billing/entitlements.ts`.
 - [x] **11.02** Persist one-time trial start atomically after the first usable committed import. The commit trigger and security-definer RPC create the trial once; retries, undo or another account cannot restart an existing trial.
@@ -211,7 +211,7 @@ Owner: integration/platform. Depends on all earlier acceptance gates.
 
 Request missing external inputs when their step is ready: additional sanitized IRA/brokerage coverage (03.05), data provenance/rights evidence (07.04), a free development Marketstack key (08.07), OAuth target configuration (02.07), Stripe test configuration (11.03), and hosted service/domain access (13.04–13.06). Existing credentials were not inspected in this audit; do not assume they are missing.
 
-MVP scope: USD long U.S. stocks/ETFs, fractional shares, cash, Robinhood activity CSVs for individual/traditional/Roth accounts; $5/month or $49/year with a 14-day no-card trial after the first usable import. Unknown basis/history stays explicit; no tax or investment advice.
+MVP scope: USD long U.S. stocks/ETFs, fractional shares, cash, Robinhood activity CSVs for individual/traditional/Roth accounts; $5/month or $49.99/year with a 14-day no-card trial after the first usable import. Unknown basis/history stays explicit; no tax or investment advice.
 
 Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/shorts, FX, wash sales/tax filing, benchmarks, money-weighted returns, recommendations, forecasting, households, banking and budgeting. Keep typed provider/import interfaces for expansion.
 
@@ -242,7 +242,7 @@ Deferred: Plaid and other brokerages, PDFs/OCR, 401(k), crypto/options/margin/sh
 | 2026-09-11 | 11.06 — Local billing lifecycle boundary (partial) | Added regression coverage for server-owned Stripe customer mapping precedence, duplicate/reordered lifecycle reducer behavior, and cancellation preserving authenticated activity export and deletion request access. Focused billing/API tests (51) and typecheck passed. | Live Stripe test-mode products, signed delivery/replay against hosted Supabase, and hosted cancellation verification remain open. |
 
 | 2026-09-11 | 09.08 — Local undo/correction report replay (partial) | Extended `services/reporting/report-pipeline.integration.test.ts` with an in-memory immutable snapshot boundary: committed activity publishes the expected value and price dependencies, a correction publishes a new value under a new price revision, undo publishes the empty effective ledger, and replaying the original inputs returns the unchanged original snapshot. Focused report pipeline tests (2) and typecheck passed. | This exercises pure composition, queue consumption and repository-shaped publication only; live Supabase/storage upload → commit → queue → snapshot execution remains required. |
-| 2026-09-11 | 11.03 — Server Stripe billing integration (partial) | Added `createBillingIntegration` Worker wiring, server-selected $5 monthly/$49 annual price IDs, mapped-customer reuse for Checkout/Portal, and a guarded `link_stripe_customer` RPC invoked only after verified webhook ownership resolution. Billing/API/Supabase tests (68) and typecheck passed. | No live Stripe test-mode products, webhook delivery, or hosted customer lifecycle verification has been performed. |
+| 2026-09-11 | 11.03 — Server Stripe billing integration (partial) | Added `createBillingIntegration` Worker wiring, server-selected $5 monthly/$49.99 annual price IDs, mapped-customer reuse for Checkout/Portal, and a guarded `link_stripe_customer` RPC invoked only after verified webhook ownership resolution. Billing/API/Supabase tests (68) and typecheck passed. | No live Stripe test-mode products, webhook delivery, or hosted customer lifecycle verification has been performed. |
 | 2026-09-10 | 13.03 — Local adversarial regression matrix (partial) | Expanded `services/adversarial-regression.test.ts` with API-level guessed-ID isolation, expired-session rejection and serialized overlapping commit/undo coverage; existing cases cover duplicate DRIP, split chronology, unavailable prices, queue replay, quota concurrency and webhook ordering. Focused API/import/adversarial suite: 3 files / 62 tests passed; typecheck and diff check passed. | Real multi-user RLS/storage, queue redelivery, database lock/quota races and Stripe staging ordering still require isolated hosted execution. |
 | 2026-09-10 | Checklist re-audit at `60ba90a` | Read API/UI, migrations, queue/price/report/ledger/billing paths and test/CI setup; reran typecheck and Vitest: 50 files / 160 tests passed. Replaced stale status summary, split implementation from integration gates, added concrete correctness work, and reordered dependencies. | Documentation only; no fixes, hosted/database/storage/provider/browser execution or license clearance claimed. |
 | 2026-09-10 | 04.04 — Safe replay of undone imports | Commit `fe0bf6a`; active-import-only file-hash checks, fingerprint cleanup for undone derived rows, and regression coverage added. Import repository tests (7), typecheck and diff check passed. | Account-level commit serialization and unknown-result idempotency remain open. |
