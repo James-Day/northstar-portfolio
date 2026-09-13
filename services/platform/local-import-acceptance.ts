@@ -1,8 +1,15 @@
 import type { LocalIntegrationUser } from './local-supabase-fixtures.ts';
+import { decimalAdd, decimalString } from '../../lib/domain/money.ts';
 
 type CleanupOptions = { supabaseUrl: string; serviceRoleKey: string; userId: string };
 export type LocalImportAccountType = 'individual' | 'traditional_ira' | 'roth_ira';
-export type LocalImportAcceptanceOptions = { accountName?: string; accountType?: LocalImportAccountType; verifyPersistedProjections?: boolean };
+export type LocalImportAcceptanceOptions = {
+  accountName?: string;
+  accountType?: LocalImportAccountType;
+  verifyPersistedProjections?: boolean;
+  /** Independent expected cash total from the fixture's economic activity. */
+  expectedLedgerCash?: string;
+};
 
 type ImportResponse = { import?: { id?: unknown; status?: unknown; review?: { acceptedRowCount?: unknown }; activityFrom?: unknown; activityThrough?: unknown } };
 
@@ -42,7 +49,7 @@ export async function runLocalImportAcceptance(
   if (commit.status !== 200 || stringAt(await parseJson(commit, 'import commit'), 'import', 'status') !== 'committed') throw new Error(`Local import commit did not complete (HTTP ${commit.status}).`);
   if (options.verifyPersistedProjections) {
     if (!cleanup) throw new Error('Persisted projection verification requires service-role cleanup credentials.');
-    await verifyCommittedProjections(cleanup, accountId, importId, fetcher);
+    await verifyCommittedProjections(cleanup, accountId, importId, fetcher, options.expectedLedgerCash);
   }
   const undo = await fetcher(`${apiBaseUrl}/v1/imports/${importId}/undo`, { method: 'POST', headers: { authorization: `Bearer ${user.accessToken}` } });
   if (undo.status !== 200 || stringAt(await parseJson(undo, 'import undo'), 'import', 'status') !== 'undone') throw new Error(`Local import undo did not complete (HTTP ${undo.status}).`);
@@ -55,13 +62,27 @@ export async function runLocalImportAcceptance(
       headers: { apikey: cleanup.serviceRoleKey, authorization: `Bearer ${cleanup.serviceRoleKey}`, 'content-type': 'application/json' },
       body: JSON.stringify({ p_user_id: cleanup.userId, p_account_id: accountId }),
     });
-    if (!deleted.ok) throw new Error(`Local import cleanup failed with HTTP ${deleted.status}.`);
+    if (!deleted.ok) {
+      const detail = (await deleted.text().catch(() => '')).trim().slice(0, 240);
+      throw new Error(`Local import cleanup failed with HTTP ${deleted.status}${detail ? `: ${detail}` : '.'}`);
+    }
   }
 }
 
-async function verifyCommittedProjections(cleanup: CleanupOptions, accountId: string, importId: string, fetcher: typeof fetch): Promise<void> {
+async function verifyCommittedProjections(cleanup: CleanupOptions, accountId: string, importId: string, fetcher: typeof fetch, expectedCash?: string): Promise<void> {
   const ledger = await readServiceRows(cleanup, 'ledger_entries', `account_id=eq.${accountId}&import_id=eq.${importId}&select=id,entry_type,cash_amount,quantity`, fetcher);
   if (ledger.length < 1) throw new Error('Committed import produced no persisted ledger entries.');
+  if (expectedCash !== undefined) {
+    const cash = ledger.reduce((total, row) => {
+      const raw = row.cash_amount;
+      // PostgREST may decode PostgreSQL NUMERIC as a JSON number in local
+      // fixtures; normalize immediately into Decimal so no arithmetic uses a
+      // JavaScript float.
+      if (typeof raw !== 'string' && typeof raw !== 'number') throw new Error('Persisted ledger row is missing its exact cash amount.');
+      return decimalAdd(total, decimalString(raw));
+    }, decimalString('0'));
+    if (cash !== decimalString(expectedCash)) throw new Error(`Persisted ledger cash mismatch: expected ${expectedCash}, got ${cash}.`);
+  }
   const lots = await readServiceRows(cleanup, 'lots', `account_id=eq.${accountId}&select=id,remaining_quantity,total_cost_basis`, fetcher);
   if (lots.length < 1) throw new Error('Committed import produced no persisted FIFO lots.');
 }

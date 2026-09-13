@@ -148,9 +148,9 @@ async function main() {
       if (withImport || withImportAll) {
         const importCases = withImportAll
           ? [
-            { fileName: 'individual-activity.csv', accountType: 'individual' as const, accountName: 'Local individual import smoke', verifyPersistedProjections: true },
-            { fileName: 'traditional-ira-activity.csv', accountType: 'traditional_ira' as const, accountName: 'Local Traditional IRA import smoke', verifyPersistedProjections: true },
-            { fileName: 'roth-ira-activity.csv', accountType: 'roth_ira' as const, accountName: 'Local Roth IRA import smoke', verifyPersistedProjections: true },
+            { fileName: 'individual-activity.csv', accountType: 'individual' as const, accountName: 'Local individual import smoke', verifyPersistedProjections: true, expectedLedgerCash: '415.98' },
+            { fileName: 'traditional-ira-activity.csv', accountType: 'traditional_ira' as const, accountName: 'Local Traditional IRA import smoke', verifyPersistedProjections: true, expectedLedgerCash: '698.47' },
+            { fileName: 'roth-ira-activity.csv', accountType: 'roth_ira' as const, accountName: 'Local Roth IRA import smoke', verifyPersistedProjections: true, expectedLedgerCash: '712.75' },
           ]
           : [{ fileName: 'individual-activity.csv', accountType: 'individual' as const, accountName: 'Local individual import smoke' }];
         for (const importCase of importCases) {
@@ -199,8 +199,14 @@ async function main() {
   } finally {
     if (!keepRunning) await stopLocalProcesses(apps);
     if (credentials && users.length && !keepRunning) {
-      await deleteLocalIntegrationUsers(credentials, users);
-      console.log('Removed deterministic local Auth users.');
+      try {
+        await deleteLocalIntegrationUsers(credentials, users);
+        console.log('Removed deterministic local Auth users.');
+      } catch (cleanupError) {
+        // Preserve the primary acceptance failure; cleanup diagnostics should
+        // not hide the assertion that tells an operator what failed.
+        console.error(cleanupError instanceof Error ? cleanupError.message : 'Local Auth fixture cleanup failed.');
+      }
     }
     if (!keepRunning && started) {
       console.log('Stopping local Supabase services…');
