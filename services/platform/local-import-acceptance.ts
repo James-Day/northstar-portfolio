@@ -2,7 +2,7 @@ import type { LocalIntegrationUser } from './local-supabase-fixtures.ts';
 
 type CleanupOptions = { supabaseUrl: string; serviceRoleKey: string; userId: string };
 export type LocalImportAccountType = 'individual' | 'traditional_ira' | 'roth_ira';
-export type LocalImportAcceptanceOptions = { accountName?: string; accountType?: LocalImportAccountType };
+export type LocalImportAcceptanceOptions = { accountName?: string; accountType?: LocalImportAccountType; verifyPersistedProjections?: boolean };
 
 type ImportResponse = { import?: { id?: unknown; status?: unknown; review?: { acceptedRowCount?: unknown }; activityFrom?: unknown; activityThrough?: unknown } };
 
@@ -40,8 +40,15 @@ export async function runLocalImportAcceptance(
 
   const commit = await fetcher(`${apiBaseUrl}/v1/imports/${importId}/commit`, { method: 'POST', headers: { authorization: `Bearer ${user.accessToken}` } });
   if (commit.status !== 200 || stringAt(await parseJson(commit, 'import commit'), 'import', 'status') !== 'committed') throw new Error(`Local import commit did not complete (HTTP ${commit.status}).`);
+  if (options.verifyPersistedProjections) {
+    if (!cleanup) throw new Error('Persisted projection verification requires service-role cleanup credentials.');
+    await verifyCommittedProjections(cleanup, accountId, importId, fetcher);
+  }
   const undo = await fetcher(`${apiBaseUrl}/v1/imports/${importId}/undo`, { method: 'POST', headers: { authorization: `Bearer ${user.accessToken}` } });
   if (undo.status !== 200 || stringAt(await parseJson(undo, 'import undo'), 'import', 'status') !== 'undone') throw new Error(`Local import undo did not complete (HTTP ${undo.status}).`);
+  if (options.verifyPersistedProjections) {
+    await verifyUndoneProjections(cleanup!, accountId, importId, fetcher);
+  }
   if (cleanup) {
     const deleted = await fetcher(`${cleanup.supabaseUrl}/rest/v1/rpc/delete_user_account_data`, {
       method: 'POST',
@@ -50,6 +57,28 @@ export async function runLocalImportAcceptance(
     });
     if (!deleted.ok) throw new Error(`Local import cleanup failed with HTTP ${deleted.status}.`);
   }
+}
+
+async function verifyCommittedProjections(cleanup: CleanupOptions, accountId: string, importId: string, fetcher: typeof fetch): Promise<void> {
+  const ledger = await readServiceRows(cleanup, 'ledger_entries', `account_id=eq.${accountId}&import_id=eq.${importId}&select=id,entry_type,cash_amount,quantity`, fetcher);
+  if (ledger.length < 1) throw new Error('Committed import produced no persisted ledger entries.');
+  const lots = await readServiceRows(cleanup, 'lots', `account_id=eq.${accountId}&select=id,remaining_quantity,total_cost_basis`, fetcher);
+  if (lots.length < 1) throw new Error('Committed import produced no persisted FIFO lots.');
+}
+
+async function verifyUndoneProjections(cleanup: CleanupOptions, accountId: string, importId: string, fetcher: typeof fetch): Promise<void> {
+  const ledger = await readServiceRows(cleanup, 'ledger_entries', `account_id=eq.${accountId}&import_id=eq.${importId}&select=id`, fetcher);
+  if (ledger.length < 1) throw new Error('Undo removed immutable ledger evidence.');
+  const lots = await readServiceRows(cleanup, 'lots', `account_id=eq.${accountId}&select=id`, fetcher);
+  if (lots.length !== 0) throw new Error('Undo left derived FIFO lots behind.');
+}
+
+async function readServiceRows(cleanup: CleanupOptions, table: string, query: string, fetcher: typeof fetch): Promise<Array<Record<string, unknown>>> {
+  const response = await fetcher(`${cleanup.supabaseUrl}/rest/v1/${table}?${query}`, { headers: { apikey: cleanup.serviceRoleKey, authorization: `Bearer ${cleanup.serviceRoleKey}` } });
+  if (!response.ok) throw new Error(`Local persisted ${table} verification failed with HTTP ${response.status}.`);
+  const value: unknown = await response.json().catch(() => undefined);
+  if (!Array.isArray(value)) throw new Error(`Local persisted ${table} verification returned invalid JSON.`);
+  return value.filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === 'object' && !Array.isArray(row));
 }
 
 async function parseJson(response: Response, label: string): Promise<Record<string, any>> {

@@ -148,9 +148,9 @@ async function main() {
       if (withImport || withImportAll) {
         const importCases = withImportAll
           ? [
-            { fileName: 'individual-activity.csv', accountType: 'individual' as const, accountName: 'Local individual import smoke' },
-            { fileName: 'traditional-ira-activity.csv', accountType: 'traditional_ira' as const, accountName: 'Local Traditional IRA import smoke' },
-            { fileName: 'roth-ira-activity.csv', accountType: 'roth_ira' as const, accountName: 'Local Roth IRA import smoke' },
+            { fileName: 'individual-activity.csv', accountType: 'individual' as const, accountName: 'Local individual import smoke', verifyPersistedProjections: true },
+            { fileName: 'traditional-ira-activity.csv', accountType: 'traditional_ira' as const, accountName: 'Local Traditional IRA import smoke', verifyPersistedProjections: true },
+            { fileName: 'roth-ira-activity.csv', accountType: 'roth_ira' as const, accountName: 'Local Roth IRA import smoke', verifyPersistedProjections: true },
           ]
           : [{ fileName: 'individual-activity.csv', accountType: 'individual' as const, accountName: 'Local individual import smoke' }];
         for (const importCase of importCases) {

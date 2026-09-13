@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-13 | 06.09/04.07 — Verify live persisted projections across account types | Extended `--import-all` acceptance to query service-side `ledger_entries` and `lots` after each commit, confirming immutable ledger evidence and derived FIFO lots are present, then confirming undo removes lots while retaining ledger rows. A fresh local Supabase run passed for Individual, Traditional IRA, and Roth IRA fixtures. | This does not yet recompute and compare full report values, exercise concurrent live transactions, or verify hosted execution. |
+
 | 2026-09-13 | 03.06/03.08 — Live local import acceptance for all account types | Extended the local harness with `--import-all`; an isolated Supabase run applied every migration, created Auth fixtures, and staged, reviewed, committed, and undid the individual, Traditional IRA, and Roth IRA Robinhood fixtures successfully before cleanup. | This verifies persisted import flow coverage, not full report calculation reconciliation, concurrent mutation behavior, hosted execution, or displayed-number verification. |
 
 | 2026-09-13 | 03.06/04.07 — Live local Robinhood import acceptance rerun | `npm run integration:local -- --import` reset the local Supabase database, applied all migrations, created isolated Auth users, staged the individual Robinhood fixture, completed authenticated review/commit/undo, and cleaned up users and services successfully. | This run covers the individual fixture only; live reconciliation for all brokerage/IRA variants, hosted execution, and report persistence remain open. |
