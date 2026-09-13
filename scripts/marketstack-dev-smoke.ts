@@ -1,5 +1,6 @@
 import { MarketstackProvider, MonthlyRequestBudget } from '../services/market-data/marketstack.ts';
 import { validateMarketstackDevelopmentSmokeRequest } from '../services/platform/marketstack-development.ts';
+import { SupabaseDailyPricesRepository } from '../services/supabase/daily-prices-repository.ts';
 import { isoDate } from '../lib/domain/types.ts';
 
 function argument(name: string): string | undefined {
@@ -11,6 +12,7 @@ const symbol = argument('symbol');
 const tradingDate = argument('date');
 const confirmedAllowance = argument('allowance');
 const parsedAllowance = confirmedAllowance === undefined ? undefined : Number(confirmedAllowance);
+const persist = process.argv.includes('--persist');
 
 try {
   if (typeof parsedAllowance !== 'number' || !Number.isInteger(parsedAllowance) || parsedAllowance < 1) {
@@ -33,6 +35,19 @@ try {
     maxSymbolsPerRequest: 1,
   });
   const prices = await provider.getDailyPrices([request.symbol], isoDate(request.tradingDate));
+  let persisted: { upserted: number } | null = null;
+  if (persist) {
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('--persist requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the server-only environment.');
+    }
+    const repository = new SupabaseDailyPricesRepository({
+      supabaseUrl: process.env.SUPABASE_URL,
+      serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    });
+    persisted = await repository.persist({ tradingDate: isoDate(request.tradingDate), prices });
+    const missing = await repository.getMissingSymbols([request.symbol], request.tradingDate);
+    if (missing.length > 0) throw new Error(`Supabase daily price verification found no stored close for ${request.symbol}.`);
+  }
   const metadata = prices[0]?.providerMetadata as { exchange?: unknown; requestedDate?: unknown } | undefined;
   console.log(JSON.stringify({
     symbol: request.symbol,
@@ -43,6 +58,7 @@ try {
       exchange: typeof metadata.exchange === 'string' ? metadata.exchange : null,
       requestedDate: typeof metadata.requestedDate === 'string' ? metadata.requestedDate : null,
     } : null,
+    persisted,
     requestUnits: budget.usedUnits,
   }, null, 2));
 } catch (error) {

@@ -9,8 +9,10 @@ export type SupabaseDailyPricesRepositoryOptions = { supabaseUrl: string; servic
 export class SupabaseDailyPricesRepository {
   private readonly fetcher: typeof fetch;
   private readonly baseUrl: URL;
+  private readonly options: SupabaseDailyPricesRepositoryOptions;
 
-  constructor(private readonly options: SupabaseDailyPricesRepositoryOptions) {
+  constructor(options: SupabaseDailyPricesRepositoryOptions) {
+    this.options = options;
     this.baseUrl = new URL(options.supabaseUrl);
     if (!options.serviceRoleKey.trim()) throw new Error('SUPABASE_SERVICE_ROLE_KEY is required for daily price writes.');
     this.fetcher = options.fetcher ?? ((input, init) => fetch(input, init));
