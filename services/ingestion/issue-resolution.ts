@@ -58,6 +58,16 @@ export function parseIssueResolution(
     );
   const issueCode = value.issueCode as ImportIssueCode;
   const resolutionKind = value.resolutionKind as ImportResolutionKind;
+  const sourceScopeIsValid =
+    issueCode === "incomplete_history"
+      ? sourceRowId === null
+      : sourceRowId !== null;
+  if (!sourceScopeIsValid)
+    throw new Error(
+      issueCode === "incomplete_history"
+        ? "Incomplete-history resolutions are account-scoped and cannot reference a source row."
+        : "This issue resolution must reference its source row.",
+    );
   const validPair =
     (issueCode === "unsupported_row" && resolutionKind === "non_reportable") ||
     (issueCode === "missing_instrument_alias" &&
@@ -78,7 +88,12 @@ export function unresolvedMaterialIssueCount(
       const issueCode = row.issueCode ?? ((row.status === "unsupported" || row.status === "invalid") ? "unsupported_row" : undefined);
       if (!issueCode) return false;
       return !resolutions.some((resolution) => {
-        const sourceMatches = resolution.sourceRowId === (row.id ?? null);
+        // Incomplete history is an account-level blocker, so its durable
+        // acknowledgement intentionally has no source row. Row-level issues
+        // must match the immutable source row that raised them.
+        const sourceMatches = issueCode === "incomplete_history"
+          ? resolution.sourceRowId === null
+          : resolution.sourceRowId === (row.id ?? null);
         if (!sourceMatches || resolution.issueCode !== issueCode) return false;
         return (issueCode === "unsupported_row" && resolution.resolutionKind === "non_reportable") ||
           (issueCode === "missing_instrument_alias" && resolution.resolutionKind === "alias_confirmed") ||

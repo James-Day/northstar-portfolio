@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-14 | 03.07 — Enforce durable issue scope in local resolution boundary | Issue resolution parsing now requires source-row IDs for unsupported and missing-alias issues while keeping incomplete-history acknowledgements account-scoped. Unresolved issue evaluation recognizes the nullable source-row key for account-level history blockers, so a valid persisted acknowledgement can clear that blocker without silently dismissing row evidence. Focused issue-resolution tests (5) and typecheck pass. | Live migration/RLS execution and representative hosted alias/history review flows remain required. |
+
 | 2026-09-14 | 13.08 — Make launch preflight runnable as a standalone script | Replaced the unresolved TypeScript path alias in `services/platform/launch-preflight.ts` with an explicit relative `.ts` import, so `npm run preflight:launch` now executes and reports configuration blockers instead of failing during module loading. | Missing staging credentials and hosted launch evidence remain expected blockers. |
 
 | 2026-09-14 | 05.07 — Fail closed on malformed import worker checkpoints | Import queue processing now validates finite checkpoint configuration and durable lease attempt/progress bounds before advancing work. Invalid leases are recorded through the existing failure path and retried/dead-lettered without writing progress or completing the import. Added focused crash/retry regression coverage. | Deployed queue redelivery, private Storage isolation, and hosted crash recovery remain required. |

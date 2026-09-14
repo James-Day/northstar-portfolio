@@ -27,6 +27,21 @@ describe("import issue resolution", () => {
     ).toThrow("does not match");
   });
 
+  it("enforces account scope for incomplete history and row scope for row issues", () => {
+    expect(() => parseIssueResolution({
+      sourceRowId: "row-1",
+      issueCode: "incomplete_history",
+      resolutionKind: "history_acknowledged",
+      note: "History starts with this statement",
+    })).toThrow("account-scoped");
+    expect(() => parseIssueResolution({
+      sourceRowId: null,
+      issueCode: "missing_instrument_alias",
+      resolutionKind: "alias_confirmed",
+      note: "Confirmed against the statement symbol",
+    })).toThrow("source row");
+  });
+
   it("requires an auditable note and counts unresolved material rows", () => {
     expect(() =>
       parseIssueResolution({
@@ -91,5 +106,19 @@ describe("import issue resolution", () => {
     expect(unresolvedMaterialIssueCount([
       { id: "alias-row", status: "supported", issueCode: "missing_instrument_alias" },
     ], resolutions)).toBe(0);
+    expect(unresolvedMaterialIssueCount([
+      { id: "history-blocker", status: "supported", issueCode: "incomplete_history" },
+    ], [
+      {
+        id: "history-resolution",
+        importId: "i",
+        sourceRowId: null,
+        issueCode: "incomplete_history",
+        resolutionKind: "history_acknowledged",
+        note: "History starts with this statement",
+        resolvedBy: "u",
+        resolvedAt: "now",
+      },
+    ])).toBe(0);
   });
 });
