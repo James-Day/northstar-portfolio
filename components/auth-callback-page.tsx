@@ -38,7 +38,25 @@ export function AuthCallbackPage({ supabaseConfig }: { supabaseConfig?: PublicSu
     const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
       void handleSession(session);
     });
-    void client.auth.getSession().then(({ data, error }) => {
+
+    // Supabase may return an implicit-flow session in the URL fragment after
+    // the hosted provider callback. Explicitly consume it before getSession so
+    // the handoff also works when the provider callback crosses domains.
+    const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const accessToken = fragment.get('access_token');
+    const refreshToken = fragment.get('refresh_token');
+    const establishFragmentSession = accessToken
+      // The server session endpoint validates the access token directly. This
+      // avoids relying on a browser-side refresh-token exchange after a
+      // cross-domain hosted provider callback.
+      ? handleSession({ access_token: accessToken })
+      : Promise.resolve();
+
+    void establishFragmentSession.catch(() => {
+      if (active) setMessage('This link is expired or invalid. Request a new link and try again.');
+    }).then(async () => {
+      if (!active || accessToken) return;
+      const { data, error } = await client.auth.getSession();
       if (!active) return;
       if (data.session) void handleSession(data.session);
       else setMessage(error?.message ?? 'This link is expired or invalid. Request a new link and try again.');
@@ -51,3 +69,4 @@ export function AuthCallbackPage({ supabaseConfig }: { supabaseConfig?: PublicSu
 
   return <main className="grid min-h-screen place-items-center bg-[#f5f7fb] px-6"><section className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm"><Link href="/" className="flex items-center gap-2.5 font-bold text-slate-900"><BrandMark size={32}/><span>northstar</span></Link><h1 className="mt-8 text-2xl font-bold tracking-tight text-slate-900">Finishing sign-in</h1><p role="status" className="mt-3 text-base leading-7 text-slate-600">{message}</p><Link href="/sign-in" className="mt-7 inline-flex text-sm font-bold text-[#185da8] hover:text-[#154f8e]">Return to sign in</Link></section></main>;
 }
+

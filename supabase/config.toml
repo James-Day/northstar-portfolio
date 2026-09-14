@@ -322,7 +322,7 @@ max_frequency = "5s"
 # Enable this after adding the Google OAuth client values below. Keeping the
 # provider disabled by default makes a fresh local reset deterministic while
 # still documenting the exact Supabase configuration used in hosted projects.
-enabled = false
+enabled = true
 client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 # Never commit the client secret. Supabase reads it from the local/host secret
 # environment when Google sign-in is enabled.

@@ -11,6 +11,6 @@ export function createPublicSupabaseClient(config: PublicSupabaseConfig) {
   if (url.protocol !== 'https:' && !isLocal) throw new Error('Supabase URL must use HTTPS outside local development.');
   if (!config.anonKey) throw new Error('A Supabase anonymous key is required.');
   return createClient(config.url, config.anonKey, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit' },
   });
 }
