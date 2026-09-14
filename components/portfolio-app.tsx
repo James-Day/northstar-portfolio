@@ -1007,6 +1007,49 @@ export function PortfolioApp({
     }
   }
 
+  async function resumePersistedImport(importId: string) {
+    if (!client || !apiConfig) return;
+    setStageMessage(undefined);
+    setIsStagingImport(true);
+    try {
+      const { data } = await client.auth.getSession();
+      if (!data.session?.access_token)
+        throw new Error('Your sign-in session has expired. Sign in again before reviewing this import.');
+      const headers = { authorization: `Bearer ${data.session.access_token}` };
+      const detailResponse = await fetch(`${apiConfig.baseUrl}/v1/imports/${importId}`, { headers });
+      const detail: unknown = await detailResponse.json();
+      if (!detailResponse.ok || !detail || typeof detail !== 'object' || !('import' in detail) || !('sourceRows' in detail) || !Array.isArray(detail.sourceRows))
+        throw new Error('The saved review could not be loaded.');
+      const record = (detail as { import: LiveImportSummary }).import;
+      if (record.status !== 'ready_for_review') throw new Error('This import is no longer ready for review.');
+      const rows = detail.sourceRows as LiveImportRow[];
+      const issuesResponse = await fetch(`${apiConfig.baseUrl}/v1/imports/${importId}/issues`, { headers });
+      const issuesPayload: unknown = await issuesResponse.json().catch(() => undefined);
+      if (!issuesResponse.ok) throw new Error('The saved review issues could not be loaded.');
+      setStagedImportId(importId);
+      setStagedFileName(record.fileName);
+      setLiveRows(rows);
+      setLivePreview({
+        accountId: selectedAccountId ?? '',
+        duplicateFile: false,
+        review: {
+          sourceRowCount: rows.length,
+          acceptedRowCount: rows.filter((row) => row.status === 'supported').length,
+          unsupportedRowCount: rows.filter((row) => row.status === 'unsupported').length,
+          invalidRowCount: rows.filter((row) => row.status === 'invalid').length,
+          duplicateRowCount: rows.filter((row) => row.status === 'duplicate').length,
+          materialUnsupportedRowCount: rows.filter((row) => row.status === 'unsupported').length,
+        },
+      });
+      setResolvedIssueRowIds(resolvedNonReportableRowIds(issuesPayload));
+      setReviewOpen(true);
+    } catch (error) {
+      setStageMessage(error instanceof Error ? error.message : 'The saved review could not be loaded.');
+    } finally {
+      setIsStagingImport(false);
+    }
+  }
+
   async function commitLiveImport() {
     if (!client || !apiConfig || !stagedImportId || !livePreview) return;
     setStageMessage(undefined);
@@ -1318,6 +1361,7 @@ export function PortfolioApp({
               stagedReview={Boolean(stagedImportId && livePreview)}
               stagedReviewFileName={stagedFileName}
               onResumeReview={() => setReviewOpen(true)}
+              onResumePersistedReview={resumePersistedImport}
               canStage={Boolean(
                 client && userId && apiConfig && selectedAccountId,
               )}
@@ -2813,6 +2857,7 @@ function Documents({
   stagedReview,
   stagedReviewFileName,
   onResumeReview,
+  onResumePersistedReview,
   canStage,
   isStaging,
   importHistory,
@@ -2827,6 +2872,7 @@ function Documents({
   stagedReview: boolean;
   stagedReviewFileName: string;
   onResumeReview: () => void;
+  onResumePersistedReview: (importId: string) => Promise<void>;
   canStage: boolean;
   isStaging: boolean;
   importHistory: LiveImportSummary[];
@@ -2995,6 +3041,15 @@ function Documents({
                   >
                     {item.status.replaceAll('_', ' ')}
                   </Pill>
+                  {item.status === 'ready_for_review' && (
+                    <Button
+                      disabled={isStaging}
+                      onClick={() => void onResumePersistedReview(item.id)}
+                      className="rounded-xl bg-[#eaf2ff] text-[#185da8] hover:bg-[#dceaff]"
+                    >
+                      {isStaging ? 'Loading…' : 'Review import'}
+                    </Button>
+                  )}
                   {item.id === latestCommittedId && (
                     <Button
                       disabled={undoing === item.id}
