@@ -68,4 +68,12 @@ describe('authenticated workspace accessibility contract', () => {
     expect(portfolioApp).toMatch(/className="mt-8 h-44 min-w-0 w-full"/);
     expect(portfolioApp).toMatch(/<ResponsiveContainer[^>]*minWidth=\{0\}[^>]*minHeight=\{1\}[^>]*initialDimension=\{\{ width: 1, height: 176 \}\}/);
   });
+
+  it('separates closing a staged review from explicitly discarding it', () => {
+    expect(portfolioApp).toMatch(/onClose=\{\(\) => setReviewOpen\(false\)\}/);
+    expect(portfolioApp).toMatch(/if \(!nextOpen && !isStaging\) onClose\(\)/);
+    expect(portfolioApp).toMatch(/stagedImportId \? 'Discard import'/);
+    expect(portfolioApp).toMatch(/onClick=\{onClose\}[\s\S]*?Close review/);
+    expect(portfolioApp).toMatch(/stagedReview[\s\S]*?Resume review/);
+  });
 });
