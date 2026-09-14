@@ -1288,6 +1288,9 @@ export function PortfolioApp({
               accounts={accounts}
               selectedAccountId={selectedAccountId}
               onSelectAccount={setSelectedAccountId}
+              stagedReview={Boolean(stagedImportId && livePreview)}
+              stagedReviewFileName={stagedFileName}
+              onResumeReview={() => setReviewOpen(true)}
               canStage={Boolean(
                 client && userId && apiConfig && selectedAccountId,
               )}
@@ -1331,10 +1334,11 @@ export function PortfolioApp({
         stageMessage={stageMessage}
         onStage={persistLiveImport}
         onCommit={commitLiveImport}
-          onDiscard={discardLiveImport}
-          resolvedIssueRowIds={resolvedIssueRowIds}
-          onResolveUnsupportedIssue={resolveUnsupportedIssue}
-        />
+        onDiscard={discardLiveImport}
+        onClose={() => setReviewOpen(false)}
+        resolvedIssueRowIds={resolvedIssueRowIds}
+        onResolveUnsupportedIssue={resolveUnsupportedIssue}
+      />
     </main>
   );
 }
@@ -2778,6 +2782,9 @@ function Documents({
   accounts,
   selectedAccountId,
   onSelectAccount,
+  stagedReview,
+  stagedReviewFileName,
+  onResumeReview,
   canStage,
   isStaging,
   importHistory,
@@ -2789,6 +2796,9 @@ function Documents({
   accounts: LiveAccount[];
   selectedAccountId?: string;
   onSelectAccount: (accountId: string) => void;
+  stagedReview: boolean;
+  stagedReviewFileName: string;
+  onResumeReview: () => void;
   canStage: boolean;
   isStaging: boolean;
   importHistory: LiveImportSummary[];
@@ -2894,6 +2904,23 @@ function Documents({
           </p>
         </div>
       </section>
+      {stagedReview && (
+        <section className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-sky-200 bg-sky-50 p-6 text-sky-950">
+          <div>
+            <h2 className="font-bold">Review in progress</h2>
+            <p className="mt-1 text-sm">
+              {stagedReviewFileName || 'A CSV import'} is saved for review and
+              has not changed your portfolio.
+            </p>
+          </div>
+          <Button
+            onClick={onResumeReview}
+            className="rounded-xl bg-[#185da8] text-white"
+          >
+            Resume review
+          </Button>
+        </section>
+      )}
       {live && (
         <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-4">
@@ -2971,6 +2998,7 @@ function ImportReview({
   onStage,
   onCommit,
   onDiscard,
+  onClose,
   resolvedIssueRowIds,
   onResolveUnsupportedIssue,
 }: {
@@ -2985,6 +3013,7 @@ function ImportReview({
   onStage: () => Promise<void>;
   onCommit: () => Promise<void>;
   onDiscard: () => Promise<void>;
+  onClose: () => void;
   resolvedIssueRowIds: Set<string>;
   onResolveUnsupportedIssue: (sourceRowId: string) => Promise<void>;
 }) {
@@ -3006,11 +3035,7 @@ function ImportReview({
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        // Closing a dialog (Escape, outside click, or focus changes) must not
-        // delete a staged import. Discard is an explicit action in the footer;
-        // keeping the dialog open here also prevents an accidental click from
-        // turning a valid review into a discarded import.
-        if (!nextOpen && !isStaging) return;
+        if (!nextOpen && !isStaging) onClose();
       }}
     >
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-auto rounded-3xl bg-white p-6 shadow-2xl md:p-8">
@@ -3177,12 +3202,17 @@ function ImportReview({
             onClick={() => void onDiscard()}
             className="rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200"
           >
-            {stagedImportId
-              ? 'Discard import'
-              : stageMessage
-                ? 'Done'
-                : 'Discard preview'}
+            {stagedImportId ? 'Discard import' : stageMessage ? 'Done' : 'Discard preview'}
           </Button>
+          {stagedImportId && (
+            <Button
+              disabled={isStaging}
+              onClick={onClose}
+              className="rounded-xl bg-white text-slate-700 hover:bg-slate-50"
+            >
+              Close review
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
