@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import {
   BillingConfigurationError,
   validateStripeBillingConfiguration,
-} from '@/services/billing/stripe-http';
+} from '../billing/stripe-http.ts';
 
 export type LaunchCheckStatus = 'pass' | 'fail' | 'warn';
 
