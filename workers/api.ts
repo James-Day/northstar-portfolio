@@ -64,9 +64,18 @@ export const queue = createCloudflareQueueHandler(resolveImportHandlers, {
   },
 });
 
+export function resolveReportThroughDate(environment: Pick<WorkerBindings, 'REPORT_THROUGH_DATE'>, now = new Date()) {
+  const configured = environment.REPORT_THROUGH_DATE?.trim();
+  if (configured) return isoDate(configured);
+  // Imports and price events can arrive before the operator has recorded a
+  // fixed report-through date. The queue should still run; missing future
+  // closes remain explicitly unavailable in the report rather than blocking
+  // every publication at worker startup.
+  return isoDate(now.toISOString().slice(0, 10));
+}
 function resolveReportHandlers(environment: WorkerBindings) {
-  if (!environment.SUPABASE_URL || !environment.SUPABASE_SERVICE_ROLE_KEY || !environment.REPORT_THROUGH_DATE) throw new Error('Report queue requires Supabase service-role secrets and REPORT_THROUGH_DATE.');
-  const through = isoDate(environment.REPORT_THROUGH_DATE);
+  if (!environment.SUPABASE_URL || !environment.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Report queue requires Supabase service-role secrets.');
+  const through = resolveReportThroughDate(environment);
   const maxDays = environment.REPORT_MAX_LOOKBACK_DAYS ? Number(environment.REPORT_MAX_LOOKBACK_DAYS) : undefined;
   const ledger = new SupabaseLedgerReplayRepository({ supabaseUrl: environment.SUPABASE_URL, serviceRoleKey: environment.SUPABASE_SERVICE_ROLE_KEY });
   const market = new SupabaseReportInputRepository({ supabaseUrl: environment.SUPABASE_URL, serviceRoleKey: environment.SUPABASE_SERVICE_ROLE_KEY });

@@ -4,6 +4,8 @@ Archived from the previous checklist. Entries describe the state at the time of 
 
 ## Completion log
 
+| 2026-09-14 | 09.08 — Allow report queue fallback date | Removed the unconditional `REPORT_THROUGH_DATE` startup requirement from the report worker. A configured date is still validated and honored; an empty deployment value now uses the current UTC date, allowing queued reports to publish while future missing closes remain explicitly unavailable. Added worker wiring coverage for configured, fallback, and malformed dates. | Hosted Supabase/Queue execution and end-to-end deployed report reconciliation remain required. |
+
 | 2026-09-14 | 11.03 — Expose authenticated Checkout from Settings | Added monthly ($5) and annual ($49.99) subscription actions to the signed-in Settings surface and wired them to the existing server-selected Checkout endpoint; subscription users continue to use the hosted Billing Portal. Typecheck and focused API/Stripe journey tests (51) pass. | Stripe test-mode product configuration, live Checkout/Portal redirects, webhook delivery, and hosted customer lifecycle verification remain required. |
 
 | 2026-09-14 | 11.06 — Signed billing lifecycle acceptance boundary | Added an end-to-end local acceptance case that signs raw Stripe-shaped payloads, verifies the untouched body, resolves the server-owned customer, and exercises duplicate and out-of-order lifecycle events through the durable reducer. Focused billing lifecycle, Stripe HTTP, and Stripe API tests (17) plus typecheck pass. | This remains deterministic local coverage; Stripe test-mode delivery, hosted Supabase persistence, and hosted cancellation verification remain required. |
