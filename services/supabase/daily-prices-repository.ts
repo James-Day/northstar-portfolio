@@ -69,16 +69,23 @@ export class SupabaseDailyPricesRepository {
     const aliasResponse = await this.fetcher(aliasUrl, { headers: this.headers() });
     if (!aliasResponse.ok) throw new Error(`Supabase instrument-alias lookup failed with HTTP ${aliasResponse.status}.`);
     const aliases = z.array(aliasSchema).parse(await aliasResponse.json());
-    const instrumentFor = (price: DailyPrice) => {
+    const instrumentsFor = (price: DailyPrice) => {
       const matches = aliases.filter((alias) => alias.symbol === price.symbol.toUpperCase() && alias.effective_from <= price.tradingDate && (alias.effective_to === null || alias.effective_to >= price.tradingDate));
-      if (matches.length !== 1) throw new Error(`Expected one effective instrument alias for ${price.symbol} on ${price.tradingDate}.`);
-      return matches[0].instrument_id;
+      const instrumentIds = [...new Set(matches.map((alias) => alias.instrument_id))];
+      if (instrumentIds.length === 0) throw new Error(`Expected an effective instrument alias for ${price.symbol} on ${price.tradingDate}.`);
+      // Imports can create more than one stable instrument row for the same
+      // ticker when older data was loaded before the alias catalog was
+      // complete. A provider close is economic data for the ticker, so copy it
+      // to every effective internal instrument rather than dropping the price
+      // or failing the entire refresh.
+      return instrumentIds;
     };
     const priceUrl = new URL('/rest/v1/daily_prices', this.baseUrl);
     priceUrl.searchParams.set('on_conflict', 'instrument_id,trading_date,price_revision_id');
-    const response = await this.fetcher(priceUrl, { method: 'POST', headers: { ...this.headers(), 'content-type': 'application/json', prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(input.prices.map((price) => ({ instrument_id: instrumentFor(price), trading_date: price.tradingDate, close: price.close, price_revision_id: revisionId }))) });
+    const rows = input.prices.flatMap((price) => instrumentsFor(price).map((instrumentId) => ({ instrument_id: instrumentId, trading_date: price.tradingDate, close: price.close, price_revision_id: revisionId })));
+    const response = await this.fetcher(priceUrl, { method: 'POST', headers: { ...this.headers(), 'content-type': 'application/json', prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) });
     if (!response.ok) throw new Error(`Supabase daily price write failed with HTTP ${response.status}.`);
-    return { upserted: input.prices.length };
+    return { upserted: rows.length };
   }
 
   private headers() { return { apikey: this.options.serviceRoleKey, authorization: `Bearer ${this.options.serviceRoleKey}` }; }
