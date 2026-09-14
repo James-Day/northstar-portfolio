@@ -3177,7 +3177,11 @@ function ImportReview({
             onClick={() => void onDiscard()}
             className="rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200"
           >
-            {stageMessage ? 'Done' : 'Discard preview'}
+            {stagedImportId
+              ? 'Discard import'
+              : stageMessage
+                ? 'Done'
+                : 'Discard preview'}
           </Button>
         </DialogFooter>
       </DialogContent>
