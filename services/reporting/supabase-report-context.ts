@@ -25,7 +25,7 @@ export function createSupabaseReportContextLoader(options: SupabaseReportContext
     const dates = buildUsEquityValuationDates({ from: range.from, through: range.through, overrides: options.calendarOverrides });
     const instrumentIds = [...new Set([
       ...replay.openingLots.map((lot) => lot.instrumentId),
-      ...replay.events.flatMap((event) => 'instrumentId' in event ? [event.instrumentId] : []),
+      ...replay.events.flatMap((event) => 'instrumentId' in event && event.instrumentId ? [event.instrumentId] : []),
     ])] as InstrumentId[];
     const query = { instrumentIds, from: range.from, through: range.through };
     const [closes, corrections, corporateActions] = await Promise.all([

@@ -18,6 +18,24 @@ describe('createSupabaseReportContextLoader', () => {
     await expect(loader({ kind: 'report.recompute', accountId: 'account-1', requestedBy: 'user-1', reason: 'price_updated' })).resolves.toBeUndefined();
   });
 
+  it('does not turn a cash-only dividend into an invalid market instrument query', async () => {
+    const listCloses = vi.fn().mockResolvedValue([]);
+    const replay = {
+      events: [{ id: 'cash-dividend', date: isoDate('2026-01-02'), type: 'dividend' as const, amount: '2.50' }],
+      openingLots: [],
+      activityCoveredThrough: isoDate('2026-01-02'),
+      sourceEntryIds: ['cash-dividend'],
+    };
+    const loader = createSupabaseReportContextLoader({
+      ledger: { get: vi.fn().mockResolvedValue(replay) },
+      market: { listCloses, listCorrections: vi.fn().mockResolvedValue([]), listValidatedCorporateActions: vi.fn().mockResolvedValue([]), findPriceRevisionId: vi.fn() },
+      resolveRange: vi.fn().mockResolvedValue({ from: isoDate('2026-01-02'), through: isoDate('2026-01-02') }),
+    });
+
+    await expect(loader({ kind: 'report.recompute', accountId: 'account-1', requestedBy: 'user-1', reason: 'import_committed' })).resolves.toMatchObject({ inputs: { ledger: { dividendIncome: '2.5' } } });
+    expect(listCloses).toHaveBeenCalledWith({ instrumentIds: [], from: isoDate('2026-01-02'), through: isoDate('2026-01-02') });
+  });
+
   it('attaches a UUID only for one unambiguous provider revision', async () => {
     const replay = { events: [], openingLots: [{ id: 'lot-1', instrumentId: '11111111-1111-4111-8111-111111111111', acquiredOn: isoDate('2026-01-02'), quantity: '1', totalCostBasis: '100' }], activityCoveredThrough: isoDate('2026-01-02'), sourceEntryIds: ['entry-1'] };
     const findPriceRevisionId = vi.fn().mockResolvedValue('22222222-2222-4222-8222-222222222222');
