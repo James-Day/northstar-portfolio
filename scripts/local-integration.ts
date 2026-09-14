@@ -12,6 +12,8 @@ import { boundedRedactedOutput, startLocalProcess, stopLocalProcesses, waitForLo
 import { runLocalRlsAcceptance } from '../services/platform/local-rls-acceptance.ts';
 import { runLocalImportAcceptance } from '../services/platform/local-import-acceptance.ts';
 import { readFile } from 'node:fs/promises';
+import { existsSync, unlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const keepRunning = process.argv.includes('--keep');
 const withApp = process.argv.includes('--with-app');
@@ -21,6 +23,20 @@ const withImport = process.argv.includes('--import');
 const withImportAll = process.argv.includes('--import-all');
 
 type Command = { executable: string; prefix: string[] };
+
+function createLocalFrontendVars(credentials: LocalSupabaseCredentials): { cleanup: () => void } {
+  const path = join(process.cwd(), '.dev.vars.integration');
+  if (existsSync(path)) throw new Error('A previous local integration run left .dev.vars.integration; remove it before retrying.');
+  writeFileSync(path, [
+    `SUPABASE_URL=${credentials.apiUrl}`,
+    `SUPABASE_ANON_KEY=${credentials.anonKey}`,
+    `SUPABASE_SERVICE_ROLE_KEY=${credentials.serviceRoleKey}`,
+    `NEXT_PUBLIC_SUPABASE_URL=${credentials.apiUrl}`,
+    `NEXT_PUBLIC_SUPABASE_ANON_KEY=${credentials.anonKey}`,
+    'NEXT_PUBLIC_API_URL=http://127.0.0.1:8787',
+  ].join('\n') + '\n', 'utf8');
+  return { cleanup: () => { if (existsSync(path)) unlinkSync(path); } };
+}
 
 function supabaseCommand(): Command {
   const directExecutable = process.platform === 'win32' ? 'supabase.cmd' : 'supabase';
@@ -56,6 +72,8 @@ async function startApps(credentials: LocalSupabaseCredentials, browser = false)
   }
   const env: NodeJS.ProcessEnv = {
     ...process.env,
+    CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false',
+    CLOUDFLARE_INCLUDE_PROCESS_ENV: 'true',
     SUPABASE_URL: credentials.apiUrl,
     SUPABASE_ANON_KEY: credentials.anonKey,
     SUPABASE_SERVICE_ROLE_KEY: credentials.serviceRoleKey,
@@ -69,7 +87,13 @@ async function startApps(credentials: LocalSupabaseCredentials, browser = false)
     // Use the HTTP-only local config here. Deployment bindings remain in
     // wrangler.api.toml and are exercised by the staging/launch contracts;
     // Wrangler's Windows local queue/DO runtime is not needed for this smoke.
-    { name: 'api', command: 'npx', args: ['wrangler', 'dev', '--config', 'wrangler.api.local.toml', ...(browser ? ['--port', String(apiPort)] : [])], url: `http://127.0.0.1:${apiPort}/health` },
+    { name: 'api', command: 'npx', args: [
+      'wrangler', 'dev', '--config', 'wrangler.api.local.toml',
+      '--var', `SUPABASE_URL:${credentials.apiUrl}`,
+      '--var', `SUPABASE_ANON_KEY:${credentials.anonKey}`,
+      '--var', `SUPABASE_SERVICE_ROLE_KEY:${credentials.serviceRoleKey}`,
+      ...(browser ? ['--port', String(apiPort)] : []),
+    ], url: `http://127.0.0.1:${apiPort}/health` },
     { name: 'frontend', command: 'npm', args: ['run', 'dev', '--', '--host', '127.0.0.1', ...(browser ? ['--port', String(frontendPort)] : [])], url: `http://localhost:${frontendPort}/` },
   ];
   const handles: LocalProcessHandle[] = [];
@@ -84,7 +108,12 @@ async function startApps(credentials: LocalSupabaseCredentials, browser = false)
     } catch {
       // Start the process below when no listener is available.
     }
-    handles.push(startLocalProcess(spec, { env, output: (line) => process.stdout.write(`${line}\n`) }));
+    handles.push(startLocalProcess(spec, {
+      env: spec.name === 'frontend'
+        ? { ...env, CLOUDFLARE_ENV: 'integration', CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false' }
+        : env,
+      output: (line) => process.stdout.write(`${line}\n`),
+    }));
   }
   return handles;
 }
@@ -110,11 +139,33 @@ async function waitForSupabaseReady(attempts = 60, delayMs = 2000): Promise<stri
   throw new Error(`Local Supabase did not become ready: ${lastError}`);
 }
 
+async function waitForSupabaseAuthReady(
+  credentials: Pick<LocalSupabaseCredentials, 'apiUrl' | 'anonKey'>,
+  attempts = 60,
+  delayMs = 1000,
+): Promise<void> {
+  let lastError = 'no response';
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch(`${credentials.apiUrl.replace(/\/$/, '')}/auth/v1/settings`, {
+        headers: { apikey: credentials.anonKey },
+      });
+      if (response.ok) return;
+      lastError = `HTTP ${response.status}`;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  throw new Error(`Local Supabase Auth did not become ready (${lastError}).`);
+}
+
 async function main() {
   let started = false;
   let credentials: LocalSupabaseCredentials | undefined;
   let users: LocalIntegrationUser[] = [];
   let apps: LocalProcessHandle[] = [];
+  let frontendVars: { cleanup: () => void } | undefined;
   try {
     assertCliAvailable();
     console.log('Starting isolated local Supabase services…');
@@ -129,6 +180,7 @@ async function main() {
     console.log('Applying all migrations and deterministic fixtures…');
     run(['db', 'reset']);
     credentials = parseSupabaseStatusEnv(statusEnv);
+    await waitForSupabaseAuthReady(credentials);
     try {
       users = await createLocalIntegrationUsers(credentials);
       await seedLocalIntegrationReferenceData(credentials);
@@ -142,6 +194,7 @@ async function main() {
       await runLocalRlsAcceptance(credentials, [users[0], users[1]]);
     }
     if (withApp || withBrowser || withImport || withImportAll) {
+      frontendVars = createLocalFrontendVars(credentials);
       console.log('Starting API and frontend processes…');
       apps = await startApps(credentials, withBrowser);
       await Promise.all(apps.map((app) => waitForLocalHttp(app, fetch, withBrowser ? { attempts: 60, delayMs: 500 } : undefined)));
@@ -198,6 +251,7 @@ async function main() {
     }
   } finally {
     if (!keepRunning) await stopLocalProcesses(apps);
+    frontendVars?.cleanup();
     if (credentials && users.length && !keepRunning) {
       try {
         await deleteLocalIntegrationUsers(credentials, users);
