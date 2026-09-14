@@ -3006,7 +3006,11 @@ function ImportReview({
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && !isStaging) void onDiscard();
+        // Closing a dialog (Escape, outside click, or focus changes) must not
+        // delete a staged import. Discard is an explicit action in the footer;
+        // keeping the dialog open here also prevents an accidental click from
+        // turning a valid review into a discarded import.
+        if (!nextOpen && !isStaging) return;
       }}
     >
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-auto rounded-3xl bg-white p-6 shadow-2xl md:p-8">
