@@ -3,7 +3,6 @@ export type PrivateWorkspaceResetters = {
   setUserId: (value: unknown) => void;
   setAccounts: (value: unknown) => void;
   setSelectedAccountId: (value: unknown) => void;
-  setOpeningHistory: (value: unknown) => void;
   setLivePreview: (value: unknown) => void;
   setLiveRows: (value: unknown) => void;
   setStagedCsv: (value: unknown) => void;
@@ -21,7 +20,6 @@ export function clearPrivateWorkspaceState(resetters: PrivateWorkspaceResetters)
   resetters.setUserId(undefined);
   resetters.setAccounts([]);
   resetters.setSelectedAccountId(undefined);
-  resetters.setOpeningHistory(undefined);
   resetters.setLivePreview(undefined);
   resetters.setStagedCsv(undefined);
   resetters.setStagedImportId(undefined);

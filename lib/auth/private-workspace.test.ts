@@ -3,11 +3,11 @@ import { clearPrivateWorkspaceState } from '@/lib/auth/private-workspace';
 
 describe('private workspace cache', () => {
   it('clears identity, account, import and report state together', () => {
-    const names = ['email', 'userId', 'accounts', 'selectedAccountId', 'openingHistory', 'livePreview', 'stagedCsv', 'stagedImportId', 'liveRows', 'importHistory', 'freshnessReport', 'reportSnapshot', 'activityPage', 'billingStatus'] as const;
+    const names = ['email', 'userId', 'accounts', 'selectedAccountId', 'livePreview', 'stagedCsv', 'stagedImportId', 'liveRows', 'importHistory', 'freshnessReport', 'reportSnapshot', 'activityPage', 'billingStatus'] as const;
     const calls = Object.fromEntries(names.map((name) => [name, vi.fn<(value: unknown) => void>()])) as Record<(typeof names)[number], ReturnType<typeof vi.fn<(value: unknown) => void>>>;
     clearPrivateWorkspaceState({
       setEmail: calls.email, setUserId: calls.userId, setAccounts: calls.accounts, setSelectedAccountId: calls.selectedAccountId,
-      setOpeningHistory: calls.openingHistory, setLivePreview: calls.livePreview, setStagedCsv: calls.stagedCsv, setStagedImportId: calls.stagedImportId,
+      setLivePreview: calls.livePreview, setStagedCsv: calls.stagedCsv, setStagedImportId: calls.stagedImportId,
       setLiveRows: calls.liveRows, setImportHistory: calls.importHistory, setFreshnessReport: calls.freshnessReport, setReportSnapshot: calls.reportSnapshot,
       setActivityPage: calls.activityPage, setBillingStatus: calls.billingStatus,
     });
