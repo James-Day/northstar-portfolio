@@ -28,6 +28,10 @@ or production secrets. The staging deployment record must capture the Supabase
 project, migration revision, Worker revision, queue names, configured origins,
 and the results of the RLS, Storage, browser, queue, and report checks.
 
+Until production launch, use the direct Cloudflare frontend Worker at
+`https://sites-project.jamesoman332.workers.dev`. Do not use the managed
+`chatgpt.site` deployment URL for development links or OAuth testing.
+
 ## Production
 
 The recommended production topology is:
