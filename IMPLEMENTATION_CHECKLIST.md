@@ -1,6 +1,6 @@
 # Portfolio tracker implementation checklist
 
-Last audited: September 11, 2026. Source baseline: `3a69876`.
+Last audited: September 14, 2026. Source baseline: `90885f1`.
 
 ## How to use this checklist
 
