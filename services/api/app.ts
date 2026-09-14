@@ -1060,6 +1060,13 @@ export function createApi(dependencies: ApiDependencies = {}) {
     }
     if (!importRecord)
       return context.json({ error: 'not_found_or_not_committable' }, 404);
+    // The first usable committed import starts the user's trial exactly once.
+    // The Supabase RPC is idempotent, so a retried commit remains safe.
+    if (billingPersistence)
+      await billingPersistence.startTrialAfterCommittedImport(
+        authenticated.user.id,
+        authenticated.accessToken,
+      );
     return context.json({ import: importRecord });
   });
 

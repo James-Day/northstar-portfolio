@@ -1254,6 +1254,7 @@ describe('standalone API', () => {
   });
 
   it('commits a reviewed import through the authenticated repository', async () => {
+    const startTrialAfterCommittedImport = vi.fn(async () => undefined);
     const commit = async (importId: string, token: string) => {
       expect(importId).toBe('import-123');
       expect(token).toBe('session-token');
@@ -1272,6 +1273,13 @@ describe('standalone API', () => {
     };
     const app = createApi({
       verifySession: async () => ({ id: 'user-123' }),
+      billingPersistence: {
+        getEntitlement: async () => undefined,
+        startTrialAfterCommittedImport,
+        applyVerifiedWebhook: async () => {
+          throw new Error('unused');
+        },
+      },
       importsRepository: {
         hasFileHash: async () => false,
         stage: async () => {
@@ -1294,6 +1302,10 @@ describe('standalone API', () => {
     await expect(response.json()).resolves.toMatchObject({
       import: { id: 'import-123', status: 'committed' },
     });
+    expect(startTrialAfterCommittedImport).toHaveBeenCalledWith(
+      'user-123',
+      'session-token',
+    );
   });
 
   it('does not claim an unavailable or already-committed import was committed', async () => {
