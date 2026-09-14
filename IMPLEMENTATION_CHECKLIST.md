@@ -21,6 +21,8 @@ Run `npm run checklist:audit` after checklist edits to verify the 102 stable tas
 
 Counts describe task completion, not remaining engineering effort or launch readiness. The old checklist grouped several unfinished requirements under checked items; these counts are a new baseline, not a regression in delivered code.
 
+**MVP history policy:** Users do not enter opening balances or opening lots. The earliest valid activity in a committed Robinhood import establishes the account's tracking start date, and imported deposits, trades, dividends, fees, and transfers establish the starting cash and positions. The legacy opening-history API remains for compatibility while its editor is removed from the MVP workflow. Accounts with an export that starts after the true account opening are labeled as having history that begins at the imported date; Northstar does not invent earlier activity or lifetime returns.
+
 ## Audit conclusion
 
 The project has a substantial local implementation: authentication wiring, account setup, durable import APIs/RPCs, decimal accounting functions, historical/daily price adapters, report storage/readers, and a dashboard that can render supplied snapshots. It is **not yet an end-to-end portfolio tracker**: committed activity is not automatically replayed into reconciled positions and reports. Billing and privacy execution remain largely unconnected.
