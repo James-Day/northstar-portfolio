@@ -4,9 +4,10 @@ import { isoDate, type DailyClose, type InstrumentId, type IsoDate } from '@/lib
 import type { PriceCorrection } from '@/services/market-data/price-corrections';
 import type { CorporateAction } from '@/services/ledger/corporate-actions';
 
-const closeSchema = z.object({ instrument_id: z.string().uuid(), trading_date: z.string(), close: z.string(), price_revisions: z.object({ source: z.enum(['dolthub', 'marketstack', 'manual_correction']), source_revision: z.string() }) });
-const correctionSchema = z.object({ instrument_id: z.string().uuid(), trading_date: z.string(), corrected_close: z.string(), evidence: z.string(), correction_version: z.string() });
-const actionSchema = z.object({ instrument_id: z.string().uuid(), action_date: z.string(), action_type: z.literal('split'), ratio_numerator: z.string(), ratio_denominator: z.string(), status: z.literal('validated') });
+const decimalText = z.coerce.string();
+const closeSchema = z.object({ instrument_id: z.string().uuid(), trading_date: z.string(), close: decimalText, price_revisions: z.object({ source: z.enum(['dolthub', 'marketstack', 'manual_correction']), source_revision: z.string() }) });
+const correctionSchema = z.object({ instrument_id: z.string().uuid(), trading_date: z.string(), corrected_close: decimalText, evidence: z.string(), correction_version: z.string() });
+const actionSchema = z.object({ instrument_id: z.string().uuid(), action_date: z.string(), action_type: z.literal('split'), ratio_numerator: decimalText, ratio_denominator: decimalText, status: z.literal('validated') });
 const revisionIdSchema = z.array(z.object({ id: z.string().uuid() }));
 
 export type SupabaseReportInputRepositoryOptions = { supabaseUrl: string; serviceRoleKey: string; fetcher?: typeof fetch; pageSize?: number };

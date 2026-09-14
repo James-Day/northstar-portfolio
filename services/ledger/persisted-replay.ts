@@ -4,7 +4,10 @@ import { decimalString, type DecimalString } from '@/lib/domain/money';
 import { isoDate, type IsoDate } from '@/lib/domain/types';
 import type { LedgerEvent, LotInput } from '@/services/ledger/fifo';
 
-const decimalText = z.string().regex(/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/);
+// PostgREST may decode PostgreSQL NUMERIC columns as JSON numbers when the
+// value fits its numeric representation. Normalize both wire forms to the
+// decimal text used by the calculation layer before validating them.
+const decimalText = z.coerce.string().regex(/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/);
 const rowSchema = z.object({
   id: z.string().uuid(),
   account_id: z.string().uuid(),
