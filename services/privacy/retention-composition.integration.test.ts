@@ -117,4 +117,45 @@ describe('scheduled retention local composition', () => {
     expect(audit.map((event) => event.event)).toEqual(['claimed', 'deleted']);
     expect(normalizedActivity).toEqual([{ importId: row.importId, type: 'dividend', symbol: 'VTI', amount: '12.34' }]);
   });
+
+  it('recovers when object deletion succeeds but durable completion recording fails', async () => {
+    const firstRunAt = new Date('2026-02-01T00:00:00.000Z');
+    const retryAt = new Date('2026-02-01T00:01:00.000Z');
+    const row = fixture(firstRunAt);
+    const audit: Array<{ event: string; attempt: number; error?: string }> = [];
+    const repositoryAdapter = repository(row, audit);
+    const normalizedActivity = [{ importId: row.importId, type: 'buy', symbol: 'VOO', amount: '100.00' }];
+    const objects = new Set([row.objectPath]);
+    let completionFailure = true;
+    const storageDeletes: string[] = [];
+    const storage = {
+      async delete(path: string) {
+        storageDeletes.push(path);
+        objects.delete(path);
+      },
+      async verifyDeleted(path: string) { return !objects.has(path); },
+    };
+    repositoryAdapter.markDeleted = async (_id: string, at: Date) => {
+      if (completionFailure) {
+        completionFailure = false;
+        throw new Error('completion store outage');
+      }
+      row.status = 'deleted';
+      row.deletedAt = at;
+      row.claimedAt = null;
+      audit.push({ event: 'deleted', attempt: row.attempt });
+    };
+
+    const first = await runRawFileRetention({ repository: repositoryAdapter, storage, now: () => firstRunAt, retryDelayMs: 60_000 });
+    expect(first).toEqual({ claimed: 1, deleted: 0, retrying: 1, exhausted: 0 });
+    expect(row.status).toBe('pending');
+    expect(objects.has(row.objectPath)).toBe(false);
+
+    const second = await runRawFileRetention({ repository: repositoryAdapter, storage, now: () => retryAt, retryDelayMs: 60_000 });
+    expect(second).toEqual({ claimed: 1, deleted: 1, retrying: 0, exhausted: 0 });
+    expect(row.status).toBe('deleted');
+    expect(storageDeletes).toEqual([row.objectPath, row.objectPath]);
+    expect(audit.map((event) => event.event)).toEqual(['claimed', 'failed', 'claimed', 'deleted']);
+    expect(normalizedActivity).toEqual([{ importId: row.importId, type: 'buy', symbol: 'VOO', amount: '100.00' }]);
+  });
 });
