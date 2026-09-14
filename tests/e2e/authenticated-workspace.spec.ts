@@ -39,6 +39,36 @@ test('authenticated workspace can switch account scope and sign out cleanly', as
   await expect(page.getByRole('link', { name: /explore the synthetic demo/i })).toBeVisible();
 });
 
+test('authenticated workspace navigation is keyboard reachable on a narrow viewport', async ({ page }) => {
+  test.skip(!email || !password, 'Set E2E_AUTH_EMAIL and E2E_AUTH_PASSWORD for the integration environment.');
+  await page.setViewportSize({ width: 375, height: 812 });
+  await signIn(page, email!, password!);
+
+  const menuButton = page.getByRole('button', { name: 'Open navigation' });
+  await menuButton.focus();
+  await menuButton.press('Enter');
+  await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+
+  const sections = [
+    { label: 'Overview', heading: /Portfolio overview|Portfolio example/ },
+    { label: 'Accounts', heading: /Accounts|Example account/ },
+    { label: 'Dividends', heading: 'Dividends' },
+    { label: 'Activity', heading: 'Activity' },
+    { label: 'Documents', heading: /Import activity|CSV preview/ },
+    { label: 'Settings', heading: 'Settings' },
+  ] as const;
+  for (const section of sections) {
+    if (!await menuButton.getAttribute('aria-expanded').then((value) => value === 'true')) {
+      await menuButton.press('Enter');
+    }
+    const navigationButton = page.getByRole('button', { name: section.label, exact: true });
+    await navigationButton.focus();
+    await navigationButton.press('Enter');
+    await expect(navigationButton).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('heading', { name: section.heading }).first()).toBeVisible();
+  }
+});
+
 test('local fixture users can create supported accounts and cannot see each other', async ({ browser }) => {
   test.skip(!email || !password || !secondEmail || !secondPassword, 'The local browser harness supplies two disposable Auth fixtures.');
   const firstContext = await browser.newContext();
