@@ -28,6 +28,8 @@ describe('authenticated CI integration contract', () => {
     expect(workflow).toMatch(/-X DELETE/);
     expect(workflow).toMatch(/E2E_AUTH_EMAIL=/);
     expect(workflow).toMatch(/E2E_AUTH_PASSWORD=/);
+    expect(workflow).toMatch(/E2E_AUTH_EMAIL_B=/);
+    expect(workflow).toMatch(/E2E_AUTH_PASSWORD_B=/);
     expect(workflow).toMatch(/npm run test:e2e -- tests\/e2e\/authenticated-workspace\.spec\.ts/);
     expect(workflow).toMatch(/kill "\$\{app_pid\}"/);
     expect(workflow).toMatch(/wait "\$\{app_pid\}"/);

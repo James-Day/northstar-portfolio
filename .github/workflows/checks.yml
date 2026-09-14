@@ -157,4 +157,6 @@ jobs:
           fi
           E2E_AUTH_EMAIL='portfolio-integration-a@example.test' \
           E2E_AUTH_PASSWORD='local-integration-a-2026-only' \
+          E2E_AUTH_EMAIL_B='portfolio-integration-b@example.test' \
+          E2E_AUTH_PASSWORD_B='local-integration-b-2026-only' \
           npm run test:e2e -- tests/e2e/authenticated-workspace.spec.ts
