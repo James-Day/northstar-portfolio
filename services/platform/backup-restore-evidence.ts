@@ -68,12 +68,15 @@ export function validateBackupRestoreEvidence(input: unknown, options: { now?: D
   const started = timestamp(record.restoreStartedAt, 'restoreStartedAt', errors);
   const completed = timestamp(record.restoreCompletedAt, 'restoreCompletedAt', errors);
   const now = options.now ?? new Date();
+  if (!Number.isFinite(now.getTime())) errors.push('now must be a valid timestamp.');
   if (backup && started && started < backup) errors.push('restoreStartedAt must be at or after backupCompletedAt.');
   if (started && completed && completed < started) errors.push('restoreCompletedAt must be at or after restoreStartedAt.');
   if (completed && completed > now) errors.push('restoreCompletedAt cannot be in the future.');
 
   const maxRpo = options.maxRpoHours ?? 24;
   const maxRto = options.maxRtoHours ?? 4;
+  if (!Number.isFinite(maxRpo) || maxRpo < 0) errors.push('maxRpoHours must be a finite non-negative number.');
+  if (!Number.isFinite(maxRto) || maxRto < 0) errors.push('maxRtoHours must be a finite non-negative number.');
   for (const [field, maximum] of [['measuredRpoHours', maxRpo], ['measuredRtoHours', maxRto]] as const) {
     const value = record[field];
     if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) errors.push(`${field} must be a finite non-negative number.`);

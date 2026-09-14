@@ -34,4 +34,19 @@ describe('backup restore evidence validator', () => {
   it('does not accept malformed input as evidence', () => {
     expect(validateBackupRestoreEvidence(null).valid).toBe(false);
   });
+
+  it('fails closed when validator thresholds or its clock are invalid', () => {
+    const evidence = validEvidence();
+    const result = validateBackupRestoreEvidence(evidence, {
+      now: new Date('invalid'),
+      maxRpoHours: Number.NaN,
+      maxRtoHours: Number.POSITIVE_INFINITY,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual(expect.arrayContaining([
+      'now must be a valid timestamp.',
+      'maxRpoHours must be a finite non-negative number.',
+      'maxRtoHours must be a finite non-negative number.',
+    ]));
+  });
 });
