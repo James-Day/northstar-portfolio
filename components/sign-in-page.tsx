@@ -28,11 +28,15 @@ export function SignInPage({ supabaseConfig, authRedirectOrigins = ['http://loca
     event.preventDefault();
     if (!auth) return;
     setMessage(undefined);
-    setIsSubmitting(true);
+      setIsSubmitting(true);
     try {
       if (mode === 'sign-up') {
-        await auth.signUp({ email, password }, buildAuthRedirectUrl(window.location.origin, 'callback', authRedirectOrigins));
-        setMessage('Check your email to confirm your account, then return here to sign in.');
+        const session = await auth.signUp({ email, password }, buildAuthRedirectUrl(window.location.origin, 'callback', authRedirectOrigins));
+        if (session?.access_token && await establishBrowserSession(session.access_token)) {
+          window.location.assign('/dashboard');
+        } else {
+          setMessage('Check your email to confirm your account, then return here to sign in.');
+        }
       } else {
         await auth.signIn({ email, password });
         const { data } = await client!.auth.getSession();

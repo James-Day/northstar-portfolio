@@ -6,9 +6,10 @@ const credentialsSchema = z.object({
 });
 
 type AuthResponse = { error: { message: string } | null };
+type SignUpResponse = AuthResponse & { data?: { session?: { access_token: string } | null } };
 
 export type SupabaseAuthPort = {
-  signUp(input: { email: string; password: string; options: { emailRedirectTo: string } }): Promise<AuthResponse>;
+  signUp(input: { email: string; password: string; options: { emailRedirectTo: string } }): Promise<SignUpResponse>;
   signInWithPassword(input: { email: string; password: string }): Promise<AuthResponse>;
   signInWithOAuth(input: { provider: 'google'; options: { redirectTo: string } }): Promise<AuthResponse>;
   resetPasswordForEmail(email: string, options: { redirectTo: string }): Promise<AuthResponse>;
@@ -24,7 +25,9 @@ export function createSupabaseAuthService(auth: SupabaseAuthPort) {
   return {
     async signUp(input: z.input<typeof credentialsSchema>, emailRedirectTo: string) {
       const credentials = credentialsSchema.parse(input);
-      assertSuccess(await auth.signUp({ ...credentials, options: { emailRedirectTo } }));
+      const response = await auth.signUp({ ...credentials, options: { emailRedirectTo } });
+      assertSuccess(response);
+      return response.data?.session ?? null;
     },
     async signIn(input: z.input<typeof credentialsSchema>) {
       const credentials = credentialsSchema.parse(input);
