@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 
 type SettingsAccount = { id: string; name: string };
 type BillingStatus = { status: 'inactive' | 'trialing' | 'active' | 'past_due' | 'canceled'; allowed: boolean; reason: 'active' | 'trialing' | 'trial_expired' | 'past_due' | 'canceled' | 'inactive'; trialEndsAt: string | null };
+type BillingPlan = 'monthly' | 'annual';
 
 export function SettingsPanel({
   email,
@@ -15,6 +16,7 @@ export function SettingsPanel({
   onExportActivity,
   onExportReport,
   onOpenBilling,
+  onStartCheckout,
   onRequestDeletion,
   billingStatus,
 }: {
@@ -25,6 +27,7 @@ export function SettingsPanel({
   onExportActivity: () => Promise<void>;
   onExportReport: () => Promise<void>;
   onOpenBilling: () => Promise<void>;
+  onStartCheckout: (plan: BillingPlan) => Promise<void>;
   onRequestDeletion: () => Promise<void>;
   billingStatus?: BillingStatus;
 }) {
@@ -85,7 +88,13 @@ export function SettingsPanel({
         </section>
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-start gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700"><CreditCard size={20} /></span><div><h2 className="text-lg font-bold">Subscription</h2><p className="mt-1 text-sm leading-6 text-slate-500">Update payment details, invoices or cancellation through Stripe’s hosted billing portal.</p>{billingStatus && <p className={`mt-3 text-sm font-semibold ${billingStatus.allowed ? "text-emerald-700" : "text-amber-700"}`} role="status">{billingStatus.reason === "trialing" ? `14-day trial · ends ${new Date(billingStatus.trialEndsAt ?? "").toLocaleDateString()}` : billingStatus.reason === "active" ? "Subscription active" : billingStatus.reason === "past_due" ? "Payment failed · update your payment method" : billingStatus.reason === "canceled" ? "Subscription canceled" : billingStatus.reason === "trial_expired" ? "Trial ended · choose a plan to continue" : "No active subscription"}</p>}</div></div>
-          <Button type="button" variant="outline" disabled={Boolean(action)} onClick={() => run("billing", onOpenBilling)} className="mt-5 rounded-xl">{action === "billing" ? "Opening…" : "Manage billing"}</Button>
+          <div className="mt-5 flex flex-wrap gap-3">
+            {billingStatus && !billingStatus.allowed && <>
+              <Button type="button" disabled={Boolean(action)} onClick={() => run("checkout-monthly", () => onStartCheckout("monthly"))} className="rounded-xl bg-[#185da8] text-white">{action === "checkout-monthly" ? "Opening…" : "Start monthly · $5"}</Button>
+              <Button type="button" variant="outline" disabled={Boolean(action)} onClick={() => run("checkout-annual", () => onStartCheckout("annual"))} className="rounded-xl">{action === "checkout-annual" ? "Opening…" : "Start annual · $49.99"}</Button>
+            </>}
+            <Button type="button" variant="outline" disabled={Boolean(action)} onClick={() => run("billing", onOpenBilling)} className="rounded-xl">{action === "billing" ? "Opening…" : "Manage billing"}</Button>
+          </div>
         </section>
         <section className="rounded-3xl border border-rose-200 bg-rose-50/60 p-6 shadow-sm lg:col-span-2">
           <div className="flex items-start gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-rose-100 text-rose-700"><Trash2 size={20} /></span><div><h2 className="text-lg font-bold text-slate-900">Delete account data</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">A deletion request removes your profile, normalized activity, reports and private brokerage files after the durable cleanup process completes. Raw uploaded files are otherwise removed automatically after 30 days. This action cannot be undone.</p></div></div>

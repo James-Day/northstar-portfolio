@@ -797,6 +797,33 @@ export function PortfolioApp({
     window.location.assign(String(payload.url));
   }
 
+  async function startCheckout(plan: 'monthly' | 'annual') {
+    if (!client || !apiConfig)
+      throw new Error('Billing is not configured for this environment.');
+    const { data } = await client.auth.getSession();
+    if (!data.session?.access_token)
+      throw new Error(
+        'Your sign-in session has expired. Sign in again before starting a subscription.',
+      );
+    const response = await fetch(`${apiConfig.baseUrl}/v1/billing/checkout`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${data.session.access_token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ plan }),
+    });
+    const payload: unknown = await response.json().catch(() => undefined);
+    if (
+      !response.ok ||
+      !payload ||
+      typeof payload !== 'object' ||
+      !('url' in payload)
+    )
+      throw new Error('Checkout is not available yet.');
+    window.location.assign(String(payload.url));
+  }
+
   async function requestDeletion() {
     if (!client || !apiConfig)
       throw new Error(
@@ -1309,6 +1336,7 @@ export function PortfolioApp({
               onExportActivity={() => downloadLiveExport('activity')}
               onExportReport={() => downloadLiveExport('report')}
               onOpenBilling={openBillingPortal}
+              onStartCheckout={startCheckout}
               onRequestDeletion={requestDeletion}
               billingStatus={billingStatus}
             />
