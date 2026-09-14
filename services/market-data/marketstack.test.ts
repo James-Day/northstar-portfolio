@@ -91,6 +91,18 @@ describe("MarketstackProvider", () => {
     expect(budget.usedUnits).toBe(3);
   });
 
+  it("returns unattempted later-batch units when a provider call fails", async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ symbol: "AAPL", date: "2026-09-08T00:00:00+0000", close: 100 }] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response("upstream unavailable", { status: 503 }));
+    const budget = new MonthlyRequestBudget(3);
+    const provider = new MarketstackProvider({ apiKey: "development-key", fetcher, requestBudget: budget, maxSymbolsPerRequest: 1 });
+
+    await expect(provider.getDailyPrices(["AAPL", "MSFT", "VTI"], isoDate("2026-09-08"))).rejects.toThrow("HTTP 503");
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(budget.usedUnits).toBe(2);
+  });
+
   it("does not reserve quota when the batch-size configuration is invalid", async () => {
     const budget = new MonthlyRequestBudget(3);
     const provider = new MarketstackProvider({

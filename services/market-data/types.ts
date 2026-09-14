@@ -15,4 +15,6 @@ export interface DailyPriceProvider {
 
 export interface PriceRequestBudget {
   reserve(units: number): void;
+  /** Return units reserved for provider batches that were never attempted. */
+  release?(units: number): void;
 }

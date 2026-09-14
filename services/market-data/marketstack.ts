@@ -47,6 +47,12 @@ export class MonthlyRequestBudget implements PriceRequestBudget {
     this.used += units;
   }
 
+  release(units: number) {
+    if (!Number.isInteger(units) || units < 0 || units > this.used)
+      throw new Error("Market-data request release must be a valid reserved unit count.");
+    this.used -= units;
+  }
+
   get usedUnits() {
     return this.used;
   }
@@ -99,15 +105,21 @@ export class MarketstackProvider implements DailyPriceProvider {
     // batch size must never consume units when no provider request can run.
     this.options.requestBudget.reserve(uniqueSymbols.length);
     const prices: DailyPrice[] = [];
-    for (let offset = 0; offset < uniqueSymbols.length; offset += batchSize) {
-      prices.push(
-        ...(await this.fetchDailyPriceBatch(
-          uniqueSymbols.slice(offset, offset + batchSize),
-          date,
-        )),
-      );
+    let attemptedUnits = 0;
+    try {
+      for (let offset = 0; offset < uniqueSymbols.length; offset += batchSize) {
+        const batch = uniqueSymbols.slice(offset, offset + batchSize);
+        // A batch counts as attempted once the request is about to leave the
+        // process. If a later batch fails, only never-started batches can be
+        // returned to the local budget.
+        attemptedUnits += batch.length;
+        prices.push(...(await this.fetchDailyPriceBatch(batch, date)));
+      }
+      return prices;
+    } catch (error) {
+      this.options.requestBudget.release?.(uniqueSymbols.length - attemptedUnits);
+      throw error;
     }
-    return prices;
   }
 
   private async fetchDailyPriceBatch(
