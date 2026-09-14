@@ -30,6 +30,16 @@ export type HistoricalVerificationManifestResult = {
   errors: string[];
 };
 
+function isSafeHttpsEvidenceUrl(value: unknown): value is string {
+  if (typeof value !== 'string' || !value.trim()) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && Boolean(url.hostname) && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Validates operator-maintained independent evidence before it can be used as
  * an acceptance fixture. Pending rows remain visible and are never silently
@@ -52,7 +62,7 @@ export function validateHistoricalVerificationManifest(
     seen.add(key);
     if (!['pending', 'verified'].includes(fixture.evidence.status)) errors.push(`${prefix}.evidence.status must be pending or verified.`);
     if (fixture.evidence.status === 'verified') {
-      if (!fixture.evidence.sourceUrl.startsWith('https://')) errors.push(`${prefix}.evidence.sourceUrl must use HTTPS.`);
+      if (!isSafeHttpsEvidenceUrl(fixture.evidence.sourceUrl)) errors.push(`${prefix}.evidence.sourceUrl must be a credential-free HTTPS URL.`);
       if (!fixture.evidence.sourceName.trim()) errors.push(`${prefix}.evidence.sourceName is required.`);
       if (!fixture.evidence.locator.trim()) errors.push(`${prefix}.evidence.locator is required.`);
       if (!fixture.evidence.reviewer.trim()) errors.push(`${prefix}.evidence.reviewer is required.`);

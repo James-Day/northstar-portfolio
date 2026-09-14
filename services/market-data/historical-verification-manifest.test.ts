@@ -44,7 +44,7 @@ describe('historical verification manifest contract', () => {
     const result = validateHistoricalVerificationManifest([row]);
     expect(result.ready).toBe(false);
     expect(result.errors).toEqual(expect.arrayContaining([
-      'case[0].evidence.sourceUrl must use HTTPS.',
+      'case[0].evidence.sourceUrl must be a credential-free HTTPS URL.',
       'case[0].evidence.reviewer is required.',
     ]));
   });
@@ -84,5 +84,14 @@ describe('historical verification manifest contract', () => {
     const result = validateHistoricalVerificationManifest([row]);
     expect(result.ready).toBe(false);
     expect(result.errors).toContain('case[0].tradingDate must be a valid calendar date.');
+  });
+
+  it('rejects malformed or credential-bearing evidence URLs', () => {
+    const row = verified();
+    row.evidence.sourceUrl = 'https://reviewer:secret@issuer.example/archive';
+    expect(validateHistoricalVerificationManifest([row]).errors).toContain('case[0].evidence.sourceUrl must be a credential-free HTTPS URL.');
+
+    row.evidence.sourceUrl = 'https://';
+    expect(validateHistoricalVerificationManifest([row]).errors).toContain('case[0].evidence.sourceUrl must be a credential-free HTTPS URL.');
   });
 });
