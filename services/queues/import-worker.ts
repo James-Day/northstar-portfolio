@@ -12,13 +12,17 @@ export type ImportJobRepository = {
 
 /** Advances durable import checkpoints; the repository owns atomic lease semantics. */
 export function createImportQueueHandlers(repository: ImportJobRepository, input: { checkpointEvery?: number } = {}): Pick<QueueHandlers, 'importProcess'> {
-  const checkpointEvery = Math.max(1, Math.floor(input.checkpointEvery ?? 500));
+  const configuredCheckpointEvery = input.checkpointEvery ?? 500;
+  if (!Number.isFinite(configuredCheckpointEvery) || configuredCheckpointEvery < 1)
+    throw new Error('Import checkpoint interval must be a finite positive number.');
+  const checkpointEvery = Math.max(1, Math.floor(configuredCheckpointEvery));
   return {
     importProcess: async (job) => {
       const lease = await repository.claim(job);
       if (!lease || 'state' in lease) return;
       try {
-        const start = Math.max(lease.progressRows, 0);
+        validateLease(lease);
+        const start = lease.progressRows;
         if (lease.totalRows === 0) await repository.progress(lease, 0);
         else {
           for (let row = start + checkpointEvery; row < lease.totalRows; row += checkpointEvery) await repository.progress(lease, row);
@@ -32,4 +36,13 @@ export function createImportQueueHandlers(repository: ImportJobRepository, input
       }
     },
   };
+}
+
+function validateLease(lease: ImportProcessingLease): void {
+  if (!Number.isInteger(lease.totalRows) || lease.totalRows < 0)
+    throw new Error('Import lease total row count is invalid.');
+  if (!Number.isInteger(lease.progressRows) || lease.progressRows < 0 || lease.progressRows > lease.totalRows)
+    throw new Error('Import lease progress is outside the total row range.');
+  if (!Number.isInteger(lease.attempt) || lease.attempt < 1)
+    throw new Error('Import lease attempt is invalid.');
 }
