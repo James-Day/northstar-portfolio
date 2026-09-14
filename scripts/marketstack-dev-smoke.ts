@@ -2,6 +2,9 @@ import { MarketstackProvider, MonthlyRequestBudget } from '../services/market-da
 import { validateMarketstackDevelopmentSmokeRequest } from '../services/platform/marketstack-development.ts';
 import { SupabaseDailyPricesRepository } from '../services/supabase/daily-prices-repository.ts';
 import { isoDate } from '../lib/domain/types.ts';
+import { loadServerDevVars } from './server-env.ts';
+
+loadServerDevVars();
 
 function argument(name: string): string | undefined {
   const index = process.argv.indexOf(`--${name}`);

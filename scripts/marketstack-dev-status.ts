@@ -1,4 +1,7 @@
 import { getMarketstackDevelopmentStatus } from '../services/platform/marketstack-development.ts';
+import { loadServerDevVars } from './server-env.ts';
+
+loadServerDevVars();
 
 const status = getMarketstackDevelopmentStatus({
   APP_ENV: process.env.APP_ENV,
