@@ -61,6 +61,12 @@ function nonEmpty(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function parseUtcTimestamp(value: unknown): Date | null {
+  if (typeof value !== 'string' || !UTC_TIMESTAMP.test(value)) return null;
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
 function add(checks: LaunchEvidenceCheck[], id: string, status: EvidenceStatus, message: string) {
   checks.push({ id, status, message });
 }
@@ -96,11 +102,14 @@ export function aggregateLaunchEvidence(input: LaunchEvidenceInput): LaunchEvide
   }
 
   const deployment = input?.deployment;
-  const deploymentValid = deployment?.environment === preflight?.environment && nonEmpty(deployment?.workerRevision) && nonEmpty(deployment?.migrationRevision) && UTC_TIMESTAMP.test(deployment?.deployedAt ?? '');
+  const deployedAt = parseUtcTimestamp(deployment?.deployedAt);
+  const deploymentValid = deployment?.environment === preflight?.environment && nonEmpty(deployment?.workerRevision) && nonEmpty(deployment?.migrationRevision) && deployedAt !== null;
   add(checks, 'deployment.revision', deploymentValid ? 'pass' : 'fail', deploymentValid ? 'Deployed environment, Worker revision, migration revision, and timestamp are recorded.' : 'A deployed environment and immutable Worker/migration revisions are required.');
 
   const rollback = input?.rollback;
-  const rollbackValid = rollback?.runbookPresent === true && nonEmpty(rollback.lastKnownGoodWorkerRevision) && nonEmpty(rollback.migrationRecovery) && nonEmpty(rollback.queueRecovery) && nonEmpty(rollback.owner) && UTC_TIMESTAMP.test(rollback.verifiedAt ?? '');
+  const rollbackVerifiedAt = parseUtcTimestamp(rollback?.verifiedAt);
+  const rollbackChronologyValid = deployedAt === null || rollbackVerifiedAt === null || rollbackVerifiedAt >= deployedAt;
+  const rollbackValid = rollback?.runbookPresent === true && nonEmpty(rollback.lastKnownGoodWorkerRevision) && nonEmpty(rollback.migrationRecovery) && nonEmpty(rollback.queueRecovery) && nonEmpty(rollback.owner) && rollbackVerifiedAt !== null && rollbackChronologyValid;
   add(checks, 'recovery.rollback', rollbackValid ? 'pass' : 'fail', rollbackValid ? 'Rollback owner, revision, migration, queue, and verification evidence are recorded.' : 'Rollback procedure and last-known-good revision evidence are required.');
 
   for (const check of checks) if (check.status !== 'pass') blockers.push(check.id);

@@ -50,4 +50,18 @@ describe('launch evidence aggregator', () => {
     ]));
     expect(result.summary.passed).toBe(0);
   });
+
+  it('rejects impossible deployment timestamps and rollback evidence before deployment', () => {
+    const evidence = validEvidence();
+    evidence.deployment.deployedAt = '2026-99-99T12:00:00.000Z';
+    evidence.rollback.verifiedAt = '2026-09-13T11:00:00.000Z';
+    const result = aggregateLaunchEvidence(evidence);
+    expect(result.ready).toBe(false);
+    expect(result.blockers).toContain('deployment.revision');
+
+    const chronology = validEvidence();
+    chronology.rollback.verifiedAt = '2026-09-13T11:00:00.000Z';
+    chronology.deployment.deployedAt = '2026-09-13T12:00:00.000Z';
+    expect(aggregateLaunchEvidence(chronology).blockers).toContain('recovery.rollback');
+  });
 });
