@@ -94,4 +94,11 @@ describe('historical verification manifest contract', () => {
     row.evidence.sourceUrl = 'https://';
     expect(validateHistoricalVerificationManifest([row]).errors).toContain('case[0].evidence.sourceUrl must be a credential-free HTTPS URL.');
   });
+
+  it('fails closed for malformed manifest containers and rows', () => {
+    expect(validateHistoricalVerificationManifest(null)).toEqual({ ready: false, verifiedCases: [], pending: [], errors: ['Verification manifest cases must be an array.'] });
+    const result = validateHistoricalVerificationManifest([null, { symbol: 'AAPL' }]);
+    expect(result.ready).toBe(false);
+    expect(result.errors).toEqual(expect.arrayContaining(['case[0] must be an object.', 'case[1].tradingDate must be a valid calendar date.', 'case[1].evidence must be an object.']));
+  });
 });
